@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -37,7 +41,7 @@ export class CompaniesService {
   async update(id: number, updateCompanyDto: UpdateCompanyDto) {
     const company = await this.companiesRepository.findOne({ where: { id } });
     if (!company) {
-      throw new InternalServerErrorException();
+      throw new NotFoundException();
     }
     this.companiesRepository.merge(company, updateCompanyDto);
     return this.companiesRepository.save(company);

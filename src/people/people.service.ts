@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { Person } from './entities/person.entity';
@@ -28,7 +32,7 @@ export class PeopleService {
   async update(id: number, updatePersonDto: UpdatePersonDto) {
     const person = await this.peopleRepository.findOne({ where: { id } });
     if (!person) {
-      throw new InternalServerErrorException();
+      throw new NotFoundException();
     }
     this.peopleRepository.merge(person, updatePersonDto);
     return this.peopleRepository.save(person);
