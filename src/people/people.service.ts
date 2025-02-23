@@ -12,9 +12,9 @@ export class PeopleService {
     private readonly peopleRepository: Repository<Person>,
   ) {}
 
-  async create(createPersonDto: CreatePersonDto) {
+  create(createPersonDto: CreatePersonDto) {
     const person = this.peopleRepository.create(createPersonDto);
-    return await this.peopleRepository.save(person);
+    return this.peopleRepository.save(person);
   }
 
   findAll() {

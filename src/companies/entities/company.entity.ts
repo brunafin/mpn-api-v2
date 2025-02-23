@@ -1,14 +1,15 @@
-import { Company } from 'src/companies/entities/company.entity';
+import { Person } from 'src/people/entities/person.entity';
 import {
   Column,
   Entity,
-  OneToMany,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web', name: 'people' })
-export class Person {
+@Entity({ schema: 'web', name: 'companies' })
+export class Company {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -28,14 +29,14 @@ export class Person {
   @Column({ length: 20, nullable: true })
   phone: string;
 
+  @Column({ nullable: true, type: 'text' })
+  instagram_url: string;
+
+  @Column({ nullable: true, type: 'text' })
+  facebook_url: string;
+
   @Column({ length: 100, nullable: true })
   email: string;
-
-  @Column({ length: 11, nullable: true })
-  cpf: string;
-
-  @Column({ nullable: true })
-  born_date: Date;
 
   @Column({ length: 9, nullable: true })
   cep: string;
@@ -56,8 +57,17 @@ export class Person {
   uf: string;
 
   @Column()
-  status: boolean;
+  administrator_id: number;
 
-  @OneToMany(() => Company, (company) => company.administrator)
-  companies: Company[];
+  @ManyToOne(() => Person, (person) => person.companies, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'administrator_id' })
+  administrator: Person;
+
+  // @OneToMany(() => Quadra, (quadra) => quadra.empresa)
+  // quadras: Quadra[];
+
+  // @OneToMany(() => Imagens, (imagem) => imagem.empresa)
+  // imagens: Imagens[];
 }
