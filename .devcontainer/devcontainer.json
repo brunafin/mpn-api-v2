@@ -23,5 +23,6 @@
   "postCreateCommand": "npm install",
   "containerEnv": {
     "NODE_ENV": "development"
-  }
+  },
+  "runArgs": ["--memory=4g", "--cpus=4"]
 }
