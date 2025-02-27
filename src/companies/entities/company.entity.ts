@@ -10,7 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web', name: 'companies' })
+@Entity({ schema: 'web' })
 export class Company {
   @PrimaryGeneratedColumn()
   id: number;
