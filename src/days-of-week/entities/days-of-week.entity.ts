@@ -1,6 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { OperatingSchedule } from 'src/operating_schedule/entities/operating_schedule.entity';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity({ schema: 'web', name: 'days-of-week' })
+@Entity({ schema: 'web', name: 'days_of_week' })
 export class DaysOfWeek {
   @PrimaryGeneratedColumn()
   id: number;
@@ -14,8 +15,11 @@ export class DaysOfWeek {
   @Column({ type: 'int' })
   ref: number;
 
-  // @OneToMany(() => Grade, (grade) => grade.diaSemana)
-  // grades: Grade[];
+  @OneToMany(
+    () => OperatingSchedule,
+    (operating_schedule) => operating_schedule.day_of_week,
+  )
+  operating_schedule: OperatingSchedule[];
 
   // @OneToMany(() => Horario, (horario) => horario.diaSemana)
   // horarios: Horario[];

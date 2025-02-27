@@ -1,9 +1,11 @@
+import { Court } from 'src/courts/entities/court.entity';
 import { Person } from 'src/people/entities/person.entity';
 import {
   Column,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -65,8 +67,8 @@ export class Company {
   @JoinColumn({ name: 'administrator_id' })
   administrator: Person;
 
-  // @OneToMany(() => Quadra, (quadra) => quadra.empresa)
-  // quadras: Quadra[];
+  @OneToMany(() => Court, (court) => court.company)
+  courts: Court[];
 
   // @OneToMany(() => Imagens, (imagem) => imagem.empresa)
   // imagens: Imagens[];
