@@ -1,4 +1,4 @@
-import { OperatingSchedule } from 'src/operating_schedule/entities/operating_schedule.entity';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ schema: 'web', name: 'day_of_week' })

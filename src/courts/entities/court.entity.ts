@@ -1,5 +1,6 @@
 import { Company } from 'src/companies/entities/company.entity';
-import { OperatingSchedule } from 'src/operating_schedule/entities/operating_schedule.entity';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
+import { TypeOfCourt } from 'src/type-of-court/entities/type-of-court.entity';
 import {
   Column,
   Entity,
@@ -31,8 +32,8 @@ export class Court {
   @Column()
   company_id: number;
 
-  // @Column()
-  // court_type_id: number;
+  @Column()
+  type_of_court_id: number;
 
   @Column()
   show: boolean;
@@ -50,6 +51,6 @@ export class Court {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  // @ManyToOne(() => CourtType, (type) => type.id)
-  // court_type: CourtType;
+  @ManyToOne(() => TypeOfCourt, (type) => type.id)
+  type_of_court: TypeOfCourt;
 }

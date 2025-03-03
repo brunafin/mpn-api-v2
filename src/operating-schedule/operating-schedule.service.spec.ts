@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { OperatingScheduleService } from './operating_schedule.service';
+import { OperatingScheduleService } from './operating-schedule.service';
 
 describe('OperatingScheduleService', () => {
   let service: OperatingScheduleService;

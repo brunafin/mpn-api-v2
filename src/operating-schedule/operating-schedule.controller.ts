@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Query } from '@nestjs/common';
-import { OperatingScheduleService } from './operating_schedule.service';
-import { CreateOperatingScheduleDto } from './dto/create-operating_schedule.dto';
+import { OperatingScheduleService } from './operating-schedule.service';
+import { CreateOperatingScheduleDto } from './dto/create-operating-schedule.dto';
 import {
   ApiBody,
   ApiOkResponse,
@@ -8,7 +8,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { GetOperatingScheduleURLQueryDto } from './dto/url_query-operating_schedule.dto';
+import { GetOperatingScheduleURLQueryDto } from './dto/url-query-operating-schedule.dto';
 
 @Controller('operating-schedule')
 @ApiTags('operating-schedule')

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { CreateOperatingScheduleDto } from './dto/create-operating_schedule.dto';
-import { UpdateOperatingScheduleDto } from './dto/update-operating_schedule.dto';
+import { CreateOperatingScheduleDto } from './dto/create-operating-schedule.dto';
+import { UpdateOperatingScheduleDto } from './dto/update-operating-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { OperatingSchedule } from './entities/operating_schedule.entity';
+import { OperatingSchedule } from './entities/operating-schedule.entity';
 import { Repository } from 'typeorm';
-import { GetOperatingScheduleURLQueryDto } from './dto/url_query-operating_schedule.dto';
+import { GetOperatingScheduleURLQueryDto } from './dto/url-query-operating-schedule.dto';
 
 @Injectable()
 export class OperatingScheduleService {
