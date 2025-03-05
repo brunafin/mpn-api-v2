@@ -1,3 +1,4 @@
+import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
@@ -21,6 +22,9 @@ export class DaysOfWeek {
   )
   operating_schedule: OperatingSchedule[];
 
-  // @OneToMany(() => Horario, (horario) => horario.diaSemana)
-  // horarios: Horario[];
+  @OneToMany(
+    () => CourtSchedule,
+    (court_schedule) => court_schedule.day_of_week,
+  )
+  court_schedule: CourtSchedule[];
 }

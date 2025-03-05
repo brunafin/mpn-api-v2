@@ -29,6 +29,7 @@ export class CourtsController {
           name: 'Quadra 1',
           company_id: 1,
           show: true,
+          type_of_court_id: 1,
         },
       },
     },

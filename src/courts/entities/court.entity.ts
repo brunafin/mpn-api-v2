@@ -1,4 +1,5 @@
 import { Company } from 'src/companies/entities/company.entity';
+import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { TypeOfCourt } from 'src/type-of-court/entities/type-of-court.entity';
 import {
@@ -38,8 +39,8 @@ export class Court {
   @Column()
   show: boolean;
 
-  // @OneToMany(() => Hour, (hour) => hour.court)
-  // hours: Hour[];
+  @OneToMany(() => CourtSchedule, (court_schedule) => court_schedule.court)
+  court_schedule: CourtSchedule[];
 
   @OneToMany(
     () => OperatingSchedule,
@@ -52,5 +53,6 @@ export class Court {
   company: Company;
 
   @ManyToOne(() => TypeOfCourt, (type) => type.id)
+  @JoinColumn({ name: 'type_of_court_id' })
   type_of_court: TypeOfCourt;
 }
