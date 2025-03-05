@@ -1,5 +1,6 @@
 import { Court } from 'src/courts/entities/court.entity';
 import { DaysOfWeek } from 'src/days-of-week/entities/days-of-week.entity';
+import { Reservation } from 'src/reservations/entities/reservation.entity';
 import {
   Column,
   Entity,
@@ -41,8 +42,8 @@ export class CourtSchedule {
   @JoinColumn({ name: 'court_id' })
   court: Court;
 
-  // @OneToOne(() => Reservation, (reservation) => reservation.court_schedule)
-  // reservation: Reservation;
+  @OneToOne(() => Reservation, (reservation) => reservation.court_schedule)
+  reservation: Reservation;
 
   @ManyToOne(() => DaysOfWeek, (day) => day.court_schedule)
   @JoinColumn({ name: 'day_of_week_id' })

@@ -17,6 +17,8 @@ import { TypeOfCourtModule } from './type-of-court/type-of-court.module';
 import { TypeOfCourt } from './type-of-court/entities/type-of-court.entity';
 import { CourtSchedulesModule } from './court-schedules/court-schedules.module';
 import { CourtSchedule } from './court-schedules/entities/court-schedule.entity';
+import { ReservationsModule } from './reservations/reservations.module';
+import { Reservation } from './reservations/entities/reservation.entity';
 
 @Module({
   imports: [
@@ -37,6 +39,7 @@ import { CourtSchedule } from './court-schedules/entities/court-schedule.entity'
         Court,
         TypeOfCourt,
         CourtSchedule,
+        Reservation,
       ],
     }),
     PeopleModule,
@@ -46,6 +49,7 @@ import { CourtSchedule } from './court-schedules/entities/court-schedule.entity'
     CourtsModule,
     TypeOfCourtModule,
     CourtSchedulesModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
