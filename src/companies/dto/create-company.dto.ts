@@ -1,39 +1,42 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCompanyDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'Nome da empresa' })
   name: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'Telefone da empresa', required: false })
   phone: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'URL do Instagram da empresa', required: false })
   instagram_url: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'URL do Facebook da empresa', required: false })
   facebook_url: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'Email da empresa', required: false })
   email: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'CEP da empresa', required: false })
   cep: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'Rua da empresa', required: false })
   street: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    description: 'Número do endereço da empresa',
+    required: false,
+  })
   number: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'Cidade da empresa', required: false })
   city: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'Bairro da empresa', required: false })
   neighborhood: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ description: 'UF da empresa', required: false })
   uf: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'ID do administrador da empresa' })
   administrator_id: number;
 }

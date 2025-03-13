@@ -1,8 +1,8 @@
-import { Transform } from 'class-transformer';
-import { IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsNumber } from 'class-validator';
 
-export class GetOperatingScheduleURLQueryDto {
-  @IsString()
-  @Transform(({ value }) => value.trim()) // Exemplo de transformação
-  court_id: string;
+export class UrlQueryParamOperatingScheduleDto {
+  @IsNumber()
+  @Type(() => Number)
+  courtId: number;
 }

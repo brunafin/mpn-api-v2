@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { CreateOperatingScheduleDto } from './dto/create-operating-schedule.dto';
-import { UpdateOperatingScheduleDto } from './dto/update-operating-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OperatingSchedule } from './entities/operating-schedule.entity';
 import { Repository } from 'typeorm';
-import { GetOperatingScheduleURLQueryDto } from './dto/url-query-operating-schedule.dto';
+import { UrlQueryParamOperatingScheduleDto } from './dto/url-query-operating-schedule.dto';
 
 @Injectable()
 export class OperatingScheduleService {
@@ -16,21 +15,9 @@ export class OperatingScheduleService {
     return this.operatingScheduleRepository.save(createOperatingScheduleDto);
   }
 
-  findAllByCourtId(query: GetOperatingScheduleURLQueryDto) {
+  findAllByCourtId(query: UrlQueryParamOperatingScheduleDto) {
     return this.operatingScheduleRepository.find({
-      where: { court_id: Number(query.court_id) },
+      where: { court_id: query.courtId },
     });
   }
-
-  // findOne(id: number) {
-  //   return `This action returns a #${id} operatingSchedule`;
-  // }
-
-  // update(id: number, updateOperatingScheduleDto: UpdateOperatingScheduleDto) {
-  //   return `This action updates a #${id} operatingSchedule`;
-  // }
-
-  // remove(id: number) {
-  //   return `This action removes a #${id} operatingSchedule`;
-  // }
 }

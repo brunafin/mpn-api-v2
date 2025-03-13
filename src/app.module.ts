@@ -19,6 +19,8 @@ import { CourtSchedulesModule } from './court-schedules/court-schedules.module';
 import { CourtSchedule } from './court-schedules/entities/court-schedule.entity';
 import { ReservationsModule } from './reservations/reservations.module';
 import { Reservation } from './reservations/entities/reservation.entity';
+import { CompanyImagesModule } from './company-images/company-images.module';
+import { CompanyImage } from './company-images/entities/company-image.entity';
 
 @Module({
   imports: [
@@ -40,6 +42,7 @@ import { Reservation } from './reservations/entities/reservation.entity';
         TypeOfCourt,
         CourtSchedule,
         Reservation,
+        CompanyImage,
       ],
     }),
     PeopleModule,
@@ -50,6 +53,8 @@ import { Reservation } from './reservations/entities/reservation.entity';
     TypeOfCourtModule,
     CourtSchedulesModule,
     ReservationsModule,
+    CompanyImagesModule,
+    CompanyImagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

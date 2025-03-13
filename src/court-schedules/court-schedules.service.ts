@@ -143,6 +143,7 @@ export class CourtSchedulesService {
             id: true,
             name: true,
             city: true,
+            logo_url: true,
           },
           type_of_court: {
             id: true,

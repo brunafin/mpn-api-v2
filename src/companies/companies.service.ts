@@ -28,11 +28,14 @@ export class CompaniesService {
   findOne(id: number) {
     return this.companiesRepository.findOne({
       where: { id },
-      relations: ['administrator'],
+      relations: ['administrator', 'images'],
       select: {
         administrator: {
           id: true,
           name: true,
+        },
+        images: {
+          url: true,
         },
       },
     });

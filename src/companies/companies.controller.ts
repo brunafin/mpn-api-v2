@@ -28,6 +28,8 @@ export class CompaniesController {
         value: {
           name: 'Company Name',
           phone: '123456789',
+          logo_url:
+            'https://storage.googleapis.com/mpn-bucket_public/mpn/logo_underline.svg',
           instagram_url: 'https://instagram.com/company',
           facebook_url: 'https://facebook.com/company',
           email: 'company@example.com',
@@ -57,6 +59,11 @@ export class CompaniesController {
         properties: {
           name: { type: 'string', example: 'Company Name' },
           phone: { type: 'string', example: '123456789' },
+          logo_url: {
+            type: 'string',
+            example:
+              'https://storage.googleapis.com/mpn-bucket_public/mpn/logo_underline.svg',
+          },
           instagram_url: {
             type: 'string',
             example: 'https://instagram.com/company',
@@ -101,6 +108,11 @@ export class CompaniesController {
         },
         name: { type: 'string', example: 'Company Name' },
         phone: { type: 'string', example: '123456789' },
+        logo_url: {
+          type: 'string',
+          example:
+            'https://storage.googleapis.com/mpn-bucket_public/mpn/logo_underline.svg',
+        },
         instagram_url: {
           type: 'string',
           example: 'https://instagram.com/company',
@@ -124,6 +136,19 @@ export class CompaniesController {
             name: { type: 'string', example: 'João da Silva Santos' },
           },
         },
+        images: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              url: {
+                type: 'string',
+                example:
+                  'https://storage.googleapis.com/mpn-bucket_public/mpn/image1.jpg',
+              },
+            },
+          },
+        },
       },
     },
   })
@@ -142,6 +167,8 @@ export class CompaniesController {
         value: {
           name: 'Updated Company Name',
           phone: '987654321',
+          logo_url:
+            'https://storage.googleapis.com/mpn-bucket_public/mpn/logo_underline.svg',
           instagram_url: 'https://instagram.com/updated_company',
           facebook_url: 'https://facebook.com/updated_company',
           email: 'updated_company@example.com',
@@ -152,6 +179,14 @@ export class CompaniesController {
           neighborhood: 'Updated Company Neighborhood',
           uf: 'UC',
           administrator_id: 2,
+          images: [
+            {
+              url: 'https://storage.googleapis.com/mpn-bucket_public/mpn/image1.jpg',
+            },
+            {
+              url: 'https://storage.googleapis.com/mpn-bucket_public/mpn/image2.jpg',
+            },
+          ],
         },
       },
     },

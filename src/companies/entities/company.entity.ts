@@ -1,3 +1,4 @@
+import { CompanyImage } from 'src/company-images/entities/company-image.entity';
 import { Court } from 'src/courts/entities/court.entity';
 import { Person } from 'src/people/entities/person.entity';
 import {
@@ -30,6 +31,9 @@ export class Company {
 
   @Column({ length: 20, nullable: true })
   phone: string;
+
+  @Column({ nullable: true, type: 'text' })
+  logo_url: string;
 
   @Column({ nullable: true, type: 'text' })
   instagram_url: string;
@@ -70,6 +74,6 @@ export class Company {
   @OneToMany(() => Court, (court) => court.company)
   courts: Court[];
 
-  // @OneToMany(() => Imagens, (imagem) => imagem.empresa)
-  // imagens: Imagens[];
+  @OneToMany(() => CompanyImage, (image) => image.company)
+  images: CompanyImage[];
 }

@@ -8,7 +8,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { GetOperatingScheduleURLQueryDto } from './dto/url-query-operating-schedule.dto';
+import { UrlQueryParamOperatingScheduleDto } from './dto/url-query-operating-schedule.dto';
 
 @Controller('operating-schedule')
 @ApiTags('operating-schedule')
@@ -59,28 +59,7 @@ export class OperatingScheduleController {
       },
     },
   })
-  findAllByCourtId(@Query() query: GetOperatingScheduleURLQueryDto) {
+  findAllByCourtId(@Query() query: UrlQueryParamOperatingScheduleDto) {
     return this.operatingScheduleService.findAllByCourtId(query);
   }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.operatingScheduleService.findOne(+id);
-  // }
-
-  // @Patch(':id')
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateOperatingScheduleDto: UpdateOperatingScheduleDto,
-  // ) {
-  //   return this.operatingScheduleService.update(
-  //     +id,
-  //     updateOperatingScheduleDto,
-  //   );
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.operatingScheduleService.remove(+id);
-  // }
 }
