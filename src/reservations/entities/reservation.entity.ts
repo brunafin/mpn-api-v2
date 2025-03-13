@@ -32,6 +32,12 @@ export class Reservation {
   @Column({ type: 'text', nullable: true })
   token_to_cancel: string;
 
+  @Column({ default: false })
+  is_canceled: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  canceled_at: Date;
+
   @Column()
   court_schedule_id: number;
 

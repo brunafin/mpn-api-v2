@@ -6,11 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  NotFoundException,
+  Res,
 } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 
 @Controller('reservations')
 @ApiTags('reservations')
@@ -38,8 +41,44 @@ export class ReservationsController {
     return this.reservationsService.create(createReservationDto);
   }
 
-  @Post('/cancel/:id')
-  @ApiOperation({ summary: 'Cancelar uma reserva pelo ID' })
+  @Get('/cancel/:token')
+  @ApiOperation({
+    summary: 'Exibe a página de confirmação para cancelar a reserva',
+  })
+  async showCancelPage(@Param('token') token: string, @Res() res: Response) {
+    const reservation = await this.reservationsService.findByToken(token);
+    if (!reservation) {
+      throw new NotFoundException('Reserva não encontrada.');
+    }
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="pt">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Confirmação de Cancelamento</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; text-align: center;">
+        <h1>Tem certeza que deseja cancelar sua reserva?</h1>
+        <p>Quadra: <strong>${reservation.courtName}</strong></p>
+        <p>Data: <strong>${reservation.date}</strong></p>
+        <p>Horário: <strong>${reservation.time}</strong></p>
+        <p>Em nome de: <strong>${reservation.contactName} - ${reservation.contactPhone}</strong></p>
+        <form action="/reservations/cancel" method="POST">
+          <input type="hidden" name="token" value="${token}" />
+          <button type="submit"
+            style="background-color: #d9534f; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+            Confirmar Cancelamento
+          </button>
+        </form>
+      </body>
+      </html>
+    `);
+  }
+
+  @Post('/cancel')
+  @ApiOperation({ summary: 'Cancelar uma reserva pelo token de cancelamento' })
   @ApiBody({
     description: 'Token para cancelar a reserva',
     schema: {
@@ -50,8 +89,8 @@ export class ReservationsController {
       required: ['token'],
     },
   })
-  cancel(@Param('id') id: string, @Body('token') token: string) {
-    return this.reservationsService.cancel(+id, token);
+  cancel(@Body('token') token: string) {
+    return this.reservationsService.cancel(token);
   }
 
   @Get()

@@ -14,7 +14,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Ocorreu um erro';
+    let message = 'Ocorreu um erro inesperado';
     let errorDetails: string | null = null;
 
     if (exception instanceof HttpException) {
@@ -22,30 +22,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse();
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        errorDetails = (exceptionResponse as any).error || null;
+        const responseObject = exceptionResponse as any;
+        message = responseObject.message || message;
+        errorDetails = responseObject.error || null;
+      } else if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
       }
     } else if (exception instanceof Error) {
       message = exception.message;
       errorDetails = exception.stack || null;
-
-      const errorMessages: Record<number, string> = {
-        [HttpStatus.INTERNAL_SERVER_ERROR]: 'Ocorreu um erro no servidor.',
-        [HttpStatus.BAD_REQUEST]: 'Os dados enviados são inválidos!',
-        [HttpStatus.UNAUTHORIZED]:
-          'Você não tem permissão para acessar este recurso!',
-        [HttpStatus.FORBIDDEN]: 'Acesso negado!',
-        [HttpStatus.NOT_FOUND]: 'O recurso solicitado não foi encontrado!',
-        [HttpStatus.CONFLICT]: 'Conflito nos dados enviados!',
-      };
-
-      message = errorMessages[status] || message;
-
-      response.status(status).json({
-        statusCode: status,
-        message,
-        error: errorDetails,
-        timestamp: new Date().toISOString(),
-      });
     }
+
+    response.status(status).json({
+      statusCode: status,
+      message,
+      error: errorDetails,
+      timestamp: new Date().toISOString(),
+    });
   }
 }
