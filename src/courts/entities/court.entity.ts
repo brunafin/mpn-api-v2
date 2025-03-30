@@ -3,6 +3,7 @@ import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entit
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { TypeOfCourt } from 'src/type-of-court/entities/type-of-court.entity';
 import {
+  Check,
   Column,
   Entity,
   JoinColumn,
@@ -12,7 +13,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web' })
+@Entity()
 export class Court {
   @PrimaryGeneratedColumn()
   id: number;
@@ -30,13 +31,17 @@ export class Court {
   @Column({ length: 100 })
   name: string;
 
+  @Check(`"note_stars" >= 0 AND "note_stars" <= 5`)
+  @Column({ type: 'real', nullable: true })
+  note_stars: number;
+
   @Column()
   company_id: number;
 
   @Column()
   type_of_court_id: number;
 
-  @Column()
+  @Column({ default: false })
   show: boolean;
 
   @OneToMany(() => CourtSchedule, (court_schedule) => court_schedule.court)

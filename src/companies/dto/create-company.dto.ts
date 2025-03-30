@@ -4,7 +4,7 @@ export class CreateCompanyDto {
   @ApiProperty({ description: 'Nome da empresa' })
   name: string;
 
-  @ApiProperty({ description: 'Telefone da empresa', required: false })
+  @ApiProperty({ description: 'Telefone da empresa', required: false, maxLength: 11 })
   phone: string;
 
   @ApiProperty({ description: 'URL do Instagram da empresa', required: false })
@@ -16,7 +16,7 @@ export class CreateCompanyDto {
   @ApiProperty({ description: 'Email da empresa', required: false })
   email: string;
 
-  @ApiProperty({ description: 'CEP da empresa', required: false })
+  @ApiProperty({ description: 'CEP da empresa', required: false, maxLength: 9 })
   cep: string;
 
   @ApiProperty({ description: 'Rua da empresa', required: false })
@@ -34,7 +34,7 @@ export class CreateCompanyDto {
   @ApiProperty({ description: 'Bairro da empresa', required: false })
   neighborhood: string;
 
-  @ApiProperty({ description: 'UF da empresa', required: false })
+  @ApiProperty({ description: 'UF da empresa', required: false, maxLength: 2 })
   uf: string;
 
   @ApiProperty({ description: 'ID do administrador da empresa' })

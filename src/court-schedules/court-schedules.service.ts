@@ -15,7 +15,7 @@ export class CourtSchedulesService {
     private readonly courtSchedulesRepository: Repository<CourtSchedule>,
     @InjectRepository(OperatingSchedule)
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
-  ) {}
+  ) { }
   create(createCourtScheduleDto: CreateCourtScheduleDto) {
     const courtSchedule = this.courtSchedulesRepository.create(
       createCourtScheduleDto,
@@ -59,10 +59,14 @@ export class CourtSchedulesService {
         .filter((element) => element.weekday_ref === weekdayRef);
 
       for (const operatingSchedule of operatingScheduleOfDay) {
+        const [hours, minutes] = operatingSchedule.hour.split(':').map(Number);
+        const startHour = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        const endHour = `${((hours + 1) % 24).toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
         const newCourtSchedule: CreateCourtScheduleDto = {
           date: new Date(currentDate.toISOString().split('T')[0]),
-          start_hour: formatHour(operatingSchedule.hour),
-          end_hour: formatHour(operatingSchedule.hour + 1),
+          start_hour: startHour,
+          end_hour: endHour,
           day_of_week_id: operatingSchedule.weekday_id,
           price: operatingSchedule.price,
           court_id,

@@ -2,18 +2,18 @@ import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entit
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity({ schema: 'web', name: 'day_of_week' })
+@Entity({ name: 'day_of_week' })
 export class DaysOfWeek {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 3 })
+  @Column({ type: 'char', length: 3 })
   abbreviation: string;
 
-  @Column({ length: 50 })
+  @Column({ length: 13 })
   description: string;
 
-  @Column({ type: 'int' })
+  @Column({ enum: [0, 1, 2, 3, 4, 5, 6] })
   ref: number;
 
   @OneToMany(

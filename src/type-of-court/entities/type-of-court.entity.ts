@@ -1,12 +1,12 @@
 import { Court } from 'src/courts/entities/court.entity';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity({ schema: 'web' })
+@Entity()
 export class TypeOfCourt {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 20 })
+  @Column({ enum: ['Futsal', 'Beach', 'Society'] })
   name: string;
 
   @Column({ length: 50 })

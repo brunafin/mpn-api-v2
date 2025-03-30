@@ -9,13 +9,13 @@ import {
   Unique,
 } from 'typeorm';
 
-@Entity({ schema: 'web' })
+@Entity()
 @Unique(['hour', 'court_id', 'day_of_week_id'])
 export class OperatingSchedule {
-  @PrimaryColumn()
-  hour: number;
+  @PrimaryColumn({ type: 'time' })
+  hour: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 10, scale: 2 })
   price: number;
 
   @PrimaryColumn()

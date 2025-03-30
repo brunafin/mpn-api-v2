@@ -1,10 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCourtScheduleDto {
-  @ApiProperty({ description: 'Hora de início do agendamento' })
+  @ApiProperty({
+    type: 'string',
+    format: 'time',
+    description: 'Hora de início do agendamento',
+  })
   start_hour: string;
 
-  @ApiProperty({ description: 'Hora de término do agendamento' })
+  @ApiProperty({
+    type: 'string',
+    format: 'time',
+    description: 'Hora de término do agendamento',
+  })
   end_hour: string;
 
   @ApiProperty({
@@ -20,8 +28,8 @@ export class CreateCourtScheduleDto {
   @ApiProperty({
     type: 'number',
     format: 'decimal',
-    nullable: true,
     description: 'Preço do agendamento',
+    example: '12345.67',
   })
   price: number;
 

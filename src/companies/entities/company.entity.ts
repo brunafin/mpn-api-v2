@@ -11,7 +11,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web' })
+@Entity()
 export class Company {
   @PrimaryGeneratedColumn()
   id: number;
@@ -29,7 +29,7 @@ export class Company {
   @Column({ length: 50 })
   name: string;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ type: 'char', length: 11, nullable: true })
   phone: string;
 
   @Column({ nullable: true, type: 'text' })
@@ -44,7 +44,7 @@ export class Company {
   @Column({ length: 100, nullable: true })
   email: string;
 
-  @Column({ length: 9, nullable: true })
+  @Column({ type: 'char', length: 9, nullable: true })
   cep: string;
 
   @Column({ length: 100, nullable: true })
@@ -59,7 +59,7 @@ export class Company {
   @Column({ length: 50, nullable: true })
   neighborhood: string;
 
-  @Column({ length: 2, nullable: true })
+  @Column({ type: 'char', length: 2, nullable: true })
   uf: string;
 
   @Column()

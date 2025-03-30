@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web' })
+@Entity()
 export class CompanyImage {
   @PrimaryGeneratedColumn()
   id: number;

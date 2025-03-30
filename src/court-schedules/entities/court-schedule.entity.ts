@@ -11,16 +11,16 @@ import {
   Unique,
 } from 'typeorm';
 
-@Entity({ schema: 'web', name: 'court_schedule' })
+@Entity({ name: 'court_schedule' })
 @Unique(['start_hour', 'date', 'court_id'])
 export class CourtSchedule {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ type: 'time' })
   start_hour: string;
 
-  @Column()
+  @Column({ type: 'time' })
   end_hour: string;
 
   @Column({ type: 'date' })
@@ -29,7 +29,7 @@ export class CourtSchedule {
   @Column({ default: true })
   available: boolean;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 10, scale: 2 })
   price: number;
 
   @Column()

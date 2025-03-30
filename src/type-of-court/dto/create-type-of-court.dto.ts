@@ -2,10 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateTypeOfCourtDto {
   @ApiProperty({
-    description: 'Nome do tipo da quadra (Futsal, Vôlei)',
-    maxLength: 20,
+    description: 'Tipo da quadra (Futsal, Beach, Society)',
+    enum: ['Futsal', 'Beach', 'Society'],
   })
-  name: string;
+  type: 'Futsal' | 'Beach' | 'Society';
 
   @ApiProperty({ description: 'Descrição do tipo da quadra', maxLength: 50 })
   description: string;

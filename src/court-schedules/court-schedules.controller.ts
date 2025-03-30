@@ -16,7 +16,7 @@ import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 @Controller('court-schedules')
 @ApiTags('court-schedules')
 export class CourtSchedulesController {
-  constructor(private readonly courtSchedulesService: CourtSchedulesService) {}
+  constructor(private readonly courtSchedulesService: CourtSchedulesService) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar um horário de quadra' })
@@ -82,7 +82,7 @@ export class CourtSchedulesController {
   @ApiQuery({ name: 'typeOfCourtId', type: Number, required: false })
   findAll(
     @Query('courtId') courtId: number,
-    @Query('hour') hour?: number,
+    @Query('hour') hour?: string,
     @Query('date') date?: Date,
     @Query('city') city?: string,
     @Query('typeOfCourtId') typeOfCourtId?: number,

@@ -2,8 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import createDatabaseIfNotExists from './database-init';
 
 async function bootstrap() {
+  await createDatabaseIfNotExists();
+
   const app = await NestFactory.create(AppModule);
 
   const config = new DocumentBuilder()

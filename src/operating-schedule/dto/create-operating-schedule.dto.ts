@@ -1,13 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateOperatingScheduleDto {
-  @ApiProperty({ description: 'Hora do agendamento' })
-  hour: number;
+  @ApiProperty({
+    type: 'string',
+    format: 'time',
+    description: 'Hora do agendamento',
+    example: '10:00'
+  })
+  hour: string;
 
   @ApiProperty({
     type: 'number',
-    format: 'float',
+    format: 'decimal',
     description: 'Preço do agendamento',
+    example: '90.00'
   })
   price: number;
 

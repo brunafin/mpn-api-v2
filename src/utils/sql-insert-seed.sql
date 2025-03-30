@@ -1,5 +1,5 @@
 INSERT INTO
-  web.day_of_week (abbreviation, description, ref)
+  day_of_week (abbreviation, description, ref)
 VALUES
   ('SEG', 'Segunda-feira', 1),
   ('TER', 'Terça-feira', 2),
@@ -7,17 +7,17 @@ VALUES
   ('QUI', 'Quinta-feira', 4),
   ('SEX', 'Sexta-feira', 5),
   ('SAB', 'Sábado', 6),
-  ('DOM', 'Domingo', 7);
+  ('DOM', 'Domingo', 0);
 
 INSERT INTO
-  web.type_of_court (name, description)
+  type_of_court (name, description)
 VALUES
-  ('Futsal', 'Quadra de futsal'),
-  ('Beach Vôlei', 'Quadra de beach vôlei'),
-  ('Society', 'Campo de futebol society');
+  ('Futsal', 'Quadra de salão'),
+  ('Beach', 'Quadra de areia'),
+  ('Society', 'Quadra de grama sintética society');
 
 INSERT INTO
-  web.person (
+  person (
     created_at,
     updated_at,
     name,
@@ -52,7 +52,7 @@ VALUES
   );
 
 INSERT INTO
-  web.company (
+  company (
     created_at,
     updated_at,
     name,
@@ -72,34 +72,37 @@ VALUES
   (
     '2023-10-01 12:00:00',
     '2023-10-01 12:00:00',
-    'Empresa Exemplo',
-    '11999999999',
-    'https://instagram.com/empresa',
-    'https://facebook.com/empresa',
-    'contato@empresa.com',
-    '12345678',
-    'Rua Exemplo',
+    'Nena Esportes',
+    '51999365300',
+    'https://instagram.com/marcapranos',
+    'https://facebook.com/marcapranos',
+    'nenaesportes@outlook.com',
+    '94090000',
+    'Rua das Quadras',
     '123',
-    'São Paulo',
+    'Gravataí',
     'Centro',
-    'SP',
+    'RS',
     1
   );
 
 INSERT INTO
-  web.court (name, company_id, type_of_court_id, show)
+  court (name, company_id, note_stars, type_of_court_id, show)
 VALUES
-  ('Nena A', 1, 1, true);
+  ('Quadra A', 1, null, 1, true),
+  ('Quadra B', 1, 5, 1, true),
+  ('Quadra C', 1, 3.5, 1, true),
+  ('Quadra D', 1, 0, 1, true);
 
 INSERT INTO
-  web.operating_schedule (hour, price, day_of_week_id, court_id)
+  operating_schedule (hour, price, day_of_week_id, court_id)
 VALUES
-  (18, 50.00, 1, 1),
-  (19, 55.00, 1, 1),
-  (20, 60.00, 1, 1);
+  ('10:00', 50.00, 1, 1),
+  ('19:00', 55.00, 2, 1),
+  ('20:00', 60.00, 3, 1);
 
 INSERT INTO
-  web.court_schedule (
+  court_schedule (
     start_hour,
     end_hour,
     date,
@@ -109,4 +112,13 @@ INSERT INTO
     day_of_week_id
   )
 VALUES
-  ('08:00', '10:00', '2023-10-01', true, 50.00, 1, 1);
+  ('10:00', '11:00', '2025-10-01', true, 50.00, 1, 1);
+
+
+SELECT * FROM day_of_week;
+SELECT * FROM type_of_court;
+SELECT * FROM person;
+SELECT * FROM company;
+SELECT * FROM court;
+SELECT * FROM operating_schedule;
+SELECT * FROM court_schedule;

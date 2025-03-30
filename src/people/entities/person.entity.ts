@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web' })
+@Entity()
 export class Person {
   @PrimaryGeneratedColumn()
   id: number;
@@ -25,19 +25,19 @@ export class Person {
   @Column({ length: 50 })
   name: string;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ type: 'char', length: 11, nullable: true })
   phone: string;
 
   @Column({ length: 100, nullable: true })
   email: string;
 
-  @Column({ length: 11, nullable: true })
+  @Column({ type: 'char', length: 11, nullable: true })
   cpf: string;
 
   @Column({ nullable: true })
   born_date: Date;
 
-  @Column({ length: 9, nullable: true })
+  @Column({ type: 'char', length: 9, nullable: true })
   cep: string;
 
   @Column({ length: 100, nullable: true })
@@ -52,10 +52,10 @@ export class Person {
   @Column({ length: 50, nullable: true })
   neighborhood: string;
 
-  @Column({ length: 2, nullable: true })
+  @Column({ type: 'char', length: 2, nullable: true })
   uf: string;
 
-  @Column()
+  @Column({ default: true })
   status: boolean;
 
   @OneToMany(() => Company, (company) => company.administrator)

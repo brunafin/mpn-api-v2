@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ schema: 'web', name: 'reservations' })
+@Entity({ name: 'reservations' })
 export class Reservation {
   @PrimaryGeneratedColumn()
   id: number;
@@ -26,7 +26,7 @@ export class Reservation {
   @Column({ length: 50 })
   contact_name: string;
 
-  @Column({ length: 15 })
+  @Column({ type: 'char', length: 11 })
   contact_phone: string;
 
   @Column({ type: 'text', nullable: true })
