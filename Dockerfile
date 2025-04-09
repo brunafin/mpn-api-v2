@@ -13,8 +13,10 @@ RUN npm install
 # Copia o restante dos arquivos do projeto
 COPY . .
 
+RUN npm run build
+
 # Expõe a porta usada pelo NestJS
 EXPOSE 3000
 
 # Comando padrão ao iniciar o container
-CMD ["npm", "run", "start:dev"]
+CMD ["npm", "run", "start"]
