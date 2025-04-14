@@ -164,12 +164,12 @@ export class CourtSchedulesService {
     return courtSchedule;
   }
 
-  findOne(id: number) {
+  findOneByPublicId(publicId: string) {
     return this.courtSchedulesRepository.findOne({
-      where: { id },
+      where: { public_id: publicId },
       relations: { day_of_week: true },
       select: {
-        id: true,
+        public_id: true,
         date: true,
         start_hour: true,
         end_hour: true,
@@ -184,9 +184,9 @@ export class CourtSchedulesService {
     });
   }
 
-  async update(id: number, updateCourtScheduleDto: UpdateCourtScheduleDto) {
+  async updateByPublicId(publicId: string, updateCourtScheduleDto: UpdateCourtScheduleDto) {
     const courtSchedule = await this.courtSchedulesRepository.findOne({
-      where: { id },
+      where: { public_id: publicId },
     });
     if (!courtSchedule) {
       throw new Error('Horário de quadra não encontrado');
@@ -195,7 +195,7 @@ export class CourtSchedulesService {
     return this.courtSchedulesRepository.save(courtSchedule);
   }
 
-  remove(id: number) {
-    return this.courtSchedulesRepository.delete({ id });
+  removeByPublicId(publicId: string) {
+    return this.courtSchedulesRepository.delete({ public_id: publicId });
   }
 }

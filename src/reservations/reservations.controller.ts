@@ -18,7 +18,7 @@ import { Response } from 'express';
 @Controller('reservations')
 @ApiTags('reservations')
 export class ReservationsController {
-  constructor(private readonly reservationsService: ReservationsService) {}
+  constructor(private readonly reservationsService: ReservationsService) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar uma nova reserva' })

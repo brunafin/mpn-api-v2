@@ -8,26 +8,30 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Company } from './entities/company.entity';
 import { Repository } from 'typeorm';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class CompaniesService {
   constructor(
     @InjectRepository(Company)
     private readonly companiesRepository: Repository<Company>,
-  ) {}
+  ) { }
 
   create(createCompanyDto: CreateCompanyDto) {
     const company = this.companiesRepository.create(createCompanyDto);
     return this.companiesRepository.save(company);
   }
 
-  findAll() {
-    return this.companiesRepository.find();
+  async findAll() {
+    const list = await this.companiesRepository.find();
+    return plainToInstance(Company, list, {
+      excludeExtraneousValues: true,
+    });
   }
 
-  findOne(id: number) {
-    return this.companiesRepository.findOne({
-      where: { id },
+  async findOneByPublicId(uuid: string) {
+    const company = await this.companiesRepository.findOne({
+      where: { public_id: uuid },
       relations: ['administrator', 'images'],
       select: {
         administrator: {
@@ -39,10 +43,18 @@ export class CompaniesService {
         },
       },
     });
+
+    if (!company) {
+      throw new NotFoundException();
+    }
+
+    return plainToInstance(Company, company, {
+      exposeUnsetFields: true,
+    });
   }
 
-  async update(id: number, updateCompanyDto: UpdateCompanyDto) {
-    const company = await this.companiesRepository.findOne({ where: { id } });
+  async updateByPublicId(publicId: string, updateCompanyDto: UpdateCompanyDto) {
+    const company = await this.companiesRepository.findOne({ where: { public_id: publicId } });
     if (!company) {
       throw new NotFoundException();
     }
@@ -50,7 +62,7 @@ export class CompaniesService {
     return this.companiesRepository.save(company);
   }
 
-  remove(id: number) {
-    return this.companiesRepository.delete({ id });
+  removeByPublicId(publicId: string) {
+    return this.companiesRepository.delete({ public_id: publicId });
   }
 }

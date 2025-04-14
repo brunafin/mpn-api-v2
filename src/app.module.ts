@@ -21,6 +21,8 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { Reservation } from './reservations/entities/reservation.entity';
 import { CompanyImagesModule } from './company-images/company-images.module';
 import { CompanyImage } from './company-images/entities/company-image.entity';
+import { SportsModule } from './sports/sports.module';
+import { Sport } from './sports/entities/sport.entity';
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { CompanyImage } from './company-images/entities/company-image.entity';
         CourtSchedule,
         Reservation,
         CompanyImage,
+        Sport,
       ],
     }),
     PeopleModule,
@@ -55,6 +58,7 @@ import { CompanyImage } from './company-images/entities/company-image.entity';
     ReservationsModule,
     CompanyImagesModule,
     CompanyImagesModule,
+    SportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

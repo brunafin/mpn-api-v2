@@ -10,15 +10,15 @@ export class CourtsService {
   constructor(
     @InjectRepository(Court)
     private readonly courtRepository: Repository<Court>,
-  ) {}
+  ) { }
 
   create(createCourtDto: CreateCourtDto) {
     return this.courtRepository.save(createCourtDto);
   }
 
-  findAllByCompanyId(company_id: string) {
+  findAllByCompanyId(companyPublicId: string) {
     return this.courtRepository.find({
-      where: { company_id: Number(company_id) },
+      where: { company: { public_id: companyPublicId } },
     });
   }
 
@@ -26,9 +26,9 @@ export class CourtsService {
     return this.courtRepository.find();
   }
 
-  findOne(id: number) {
+  findOneByPublicId(publicId: string) {
     return this.courtRepository.findOne({
-      where: { id },
+      where: { public_id: publicId },
       relations: {
         operating_schedule: true,
       },
@@ -42,8 +42,8 @@ export class CourtsService {
     });
   }
 
-  async update(id: number, updateCourtDto: UpdateCourtDto) {
-    const court = await this.courtRepository.findOne({ where: { id } });
+  async updateByPublicId(publicId: string, updateCourtDto: UpdateCourtDto) {
+    const court = await this.courtRepository.findOne({ where: { public_id: publicId } });
     if (!court) {
       throw new NotFoundException();
     }
@@ -51,7 +51,7 @@ export class CourtsService {
     return this.courtRepository.save(court);
   }
 
-  remove(id: number) {
-    return this.courtRepository.delete({ id });
+  removeByPublicId(publicId: string) {
+    return this.courtRepository.delete({ public_id: publicId });
   }
 }

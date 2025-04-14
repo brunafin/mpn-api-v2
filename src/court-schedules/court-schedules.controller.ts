@@ -32,6 +32,7 @@ export class CourtSchedulesController {
           date: '2023-10-01',
           available: true,
           price: 50.0,
+          is_fixed: false,
           court_id: 1,
           day_of_week_id: 1,
         },
@@ -96,10 +97,10 @@ export class CourtSchedulesController {
     });
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Obter um horário de quadra pelo ID' })
-  findOne(@Param('id') id: string) {
-    return this.courtSchedulesService.findOne(+id);
+  @Get(':public_id')
+  @ApiOperation({ summary: 'Obter um horário de quadra pelo public_id da quadra' })
+  findOne(@Param('public_id') publicId: string) {
+    return this.courtSchedulesService.findOneByPublicId(publicId);
   }
 
   @Patch(':id')
@@ -117,21 +118,22 @@ export class CourtSchedulesController {
           available: false,
           price: 60.0,
           court_id: 1,
+          is_fixed: true,
           day_of_week_id: 2,
         },
       },
     },
   })
   update(
-    @Param('id') id: string,
+    @Param('public_id') publicId: string,
     @Body() updateCourtScheduleDto: UpdateCourtScheduleDto,
   ) {
-    return this.courtSchedulesService.update(+id, updateCourtScheduleDto);
+    return this.courtSchedulesService.updateByPublicId(publicId, updateCourtScheduleDto);
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Remover um horário de quadra pelo ID' })
-  remove(@Param('id') id: string) {
-    return this.courtSchedulesService.remove(+id);
+  @Delete(':public_id')
+  @ApiOperation({ summary: 'Remover um horário de quadra pelo public_id' })
+  remove(@Param('public_id') publicId: string) {
+    return this.courtSchedulesService.removeByPublicId(publicId);
   }
 }

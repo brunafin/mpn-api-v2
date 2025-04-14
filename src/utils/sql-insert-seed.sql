@@ -12,9 +12,9 @@ VALUES
 INSERT INTO
   type_of_court (name, description)
 VALUES
-  ('Futsal', 'Quadra de salão'),
-  ('Beach', 'Quadra de areia'),
-  ('Society', 'Quadra de grama sintética society');
+  ('Piso queimado', 'Quadra com o chão em piso queimado'),
+  ('Areia', 'Quadra de areia'),
+  ('Grama sintética', 'Quadra de grama sintética society');
 
 INSERT INTO
   person (

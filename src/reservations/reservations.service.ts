@@ -22,7 +22,7 @@ export class ReservationsService {
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
   async create(createReservationDto: CreateReservationDto) {
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

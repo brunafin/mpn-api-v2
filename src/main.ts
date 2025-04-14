@@ -15,8 +15,11 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag('people')
     .build();
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
+
+  if(process.env.TYPE_ENV === 'development'){
+    const documentFactory = () => SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, documentFactory);
+  }
 
   app.useGlobalFilters(new HttpExceptionFilter());
 

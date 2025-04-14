@@ -18,6 +18,9 @@ export class OperatingSchedule {
   @Column({ type: 'numeric', precision: 10, scale: 2 })
   price: number;
 
+  @Column({ type: 'boolean', default: false })
+  is_fixed: boolean;
+
   @PrimaryColumn()
   day_of_week_id: number;
 

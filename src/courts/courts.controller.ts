@@ -15,7 +15,7 @@ import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 @Controller('courts')
 @ApiTags('courts')
 export class CourtsController {
-  constructor(private readonly courtsService: CourtsService) {}
+  constructor(private readonly courtsService: CourtsService) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar uma quadra' })
@@ -38,25 +38,25 @@ export class CourtsController {
     return this.courtsService.create(createCourtDto);
   }
 
-  @Get('/company/:id')
+  @Get('/company/:public_id')
   @ApiOperation({ summary: 'Listar todas as quadras de uma empresa' })
   @ApiOkResponse({
-    description: 'Lista de todas as quadras de uma empresa pelo ID',
+    description: 'Lista de todas as quadras de uma empresa pelo public_id',
     schema: {
       type: 'array',
       items: {
         type: 'object',
         properties: {
-          id: { type: 'number', example: 1 },
+          public_id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
           name: { type: 'string', example: 'Quadra 1' },
-          company_id: { type: 'number', example: 1 },
+          company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
           show: { type: 'boolean', example: true },
         },
       },
     },
   })
-  findAllByCompanyId(@Param('id') company_id: string) {
-    return this.courtsService.findAllByCompanyId(company_id);
+  findAllByCompanyId(@Param('company_public_id') company_public_id: string) {
+    return this.courtsService.findAllByCompanyId(company_public_id);
   }
 
   @Get()
@@ -68,9 +68,9 @@ export class CourtsController {
       items: {
         type: 'object',
         properties: {
-          id: { type: 'number', example: 1 },
+          id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
           name: { type: 'string', example: 'Quadra 1' },
-          company_id: { type: 'number', example: 1 },
+          company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
           show: { type: 'boolean', example: true },
         },
       },
@@ -87,19 +87,19 @@ export class CourtsController {
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'number', example: 1 },
+        id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
         name: { type: 'string', example: 'Quadra 1' },
-        company_id: { type: 'number', example: 1 },
+        company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
         show: { type: 'boolean', example: true },
       },
     },
   })
-  findOne(@Param('id') id: string) {
-    return this.courtsService.findOne(+id);
+  findOne(@Param('public_id') public_id: string) {
+    return this.courtsService.findOneByPublicId(public_id);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Atualizar uma quadra pelo ID' })
+  @Patch(':public_id')
+  @ApiOperation({ summary: 'Atualizar uma quadra pelo public_id' })
   @ApiBody({
     description: 'Dados para atualizar uma quadra',
     type: UpdateCourtDto,
@@ -114,13 +114,13 @@ export class CourtsController {
       },
     },
   })
-  update(@Param('id') id: string, @Body() updateCourtDto: UpdateCourtDto) {
-    return this.courtsService.update(+id, updateCourtDto);
+  update(@Param('public_id') public_id: string, @Body() updateCourtDto: UpdateCourtDto) {
+    return this.courtsService.updateByPublicId(public_id, updateCourtDto);
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Remover uma quadra pelo ID' })
-  remove(@Param('id') id: string) {
-    return this.courtsService.remove(+id);
+  @Delete(':public_id')
+  @ApiOperation({ summary: 'Remover uma quadra pelo public_id' })
+  remove(@Param('public_id') public_id: string) {
+    return this.courtsService.removeByPublicId(public_id);
   }
 }
