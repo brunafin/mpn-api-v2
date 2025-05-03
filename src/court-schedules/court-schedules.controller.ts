@@ -100,6 +100,7 @@ export class CourtSchedulesController {
   @Get(':public_id')
   @ApiOperation({ summary: 'Obter um horário de quadra pelo public_id da quadra' })
   findOne(@Param('public_id') publicId: string) {
+    console.log('ENTREI NO CONTROLLER', publicId);
     return this.courtSchedulesService.findOneByPublicId(publicId);
   }
 

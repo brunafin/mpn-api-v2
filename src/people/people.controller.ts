@@ -15,7 +15,7 @@ import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 @Controller('people')
 @ApiTags('people')
 export class PeopleController {
-  constructor(private readonly peopleService: PeopleService) {}
+  constructor(private readonly peopleService: PeopleService) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar uma nova pessoa' })
@@ -27,7 +27,7 @@ export class PeopleController {
         summary: 'Pessoa com todos os dados preenchidos',
         value: {
           name: 'João da Silva',
-          phone: '(11) 91234-5678',
+          phone: '11912345678',
           email: 'joao@email.com',
           cpf: '1234568900',
           born_date: '1990-05-20',
@@ -56,7 +56,7 @@ export class PeopleController {
         properties: {
           id: { type: 'number', example: 1 },
           name: { type: 'string', example: 'João da Silva' },
-          phone: { type: 'string', example: '(11) 91234-5678' },
+          phone: { type: 'string', example: '11912345678' },
           email: { type: 'string', example: 'joao@email.com' },
           cpf: { type: 'string', example: '1234568900' },
           born_date: { type: 'string', example: '1990-05-20' },
@@ -84,7 +84,7 @@ export class PeopleController {
       properties: {
         id: { type: 'number', example: 1 },
         name: { type: 'string', example: 'João da Silva' },
-        phone: { type: 'string', example: '(11) 91234-5678' },
+        phone: { type: 'string', example: '11912345678' },
         email: { type: 'string', example: 'joao@email.com' },
         cpf: { type: 'string', example: '1234568900' },
         born_date: { type: 'string', example: '1990-05-20' },
@@ -112,7 +112,7 @@ export class PeopleController {
         summary: 'Atualização de todos os dados da pessoa',
         value: {
           name: 'João da Silva',
-          phone: '(11) 91234-5678',
+          phone: '11912345678',
           email: 'joao@email.com',
           cpf: '1234568900',
           born_date: '1990-05-20',

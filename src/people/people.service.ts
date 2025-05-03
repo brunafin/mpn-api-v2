@@ -1,6 +1,5 @@
 import {
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { CreatePersonDto } from './dto/create-person.dto';
@@ -14,7 +13,7 @@ export class PeopleService {
   constructor(
     @InjectRepository(Person)
     private readonly peopleRepository: Repository<Person>,
-  ) {}
+  ) { }
 
   create(createPersonDto: CreatePersonDto) {
     const person = this.peopleRepository.create(createPersonDto);

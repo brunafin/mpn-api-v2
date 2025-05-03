@@ -32,7 +32,7 @@ export class ReservationsController {
           contact_name: 'João da Silva',
           contact_phone: '51999521474',
           token_to_cancel: null,
-          court_schedule_id: 1,
+          court_schedule_public_id: '123e4567-e89b-12d3-a456-426614174000',
         },
       },
     },
@@ -99,10 +99,10 @@ export class ReservationsController {
     return this.reservationsService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Buscar uma reserva pelo ID' })
-  findOne(@Param('id') id: string) {
-    return this.reservationsService.findOne(+id);
+  @Get(':public_id')
+  @ApiOperation({ summary: 'Buscar uma reserva pelo ID público' })
+  findOne(@Param('public_id') public_id: string) {
+    return this.reservationsService.findOneByPublicId(public_id);
   }
 
   @Patch(':id')
@@ -117,16 +117,16 @@ export class ReservationsController {
           contact_name: 'João da Silva',
           contact_phone: '51999521474',
           token_to_cancel: null,
-          court_schedule_id: 1,
+          court_schedule_public_id: 1,
         },
       },
     },
   })
   update(
-    @Param('id') id: string,
+    @Param('public_id') public_id: string,
     @Body() updateReservationDto: UpdateReservationDto,
   ) {
-    return this.reservationsService.update(+id, updateReservationDto);
+    return this.reservationsService.updateByPublicId(public_id, updateReservationDto);
   }
 
   @Delete(':id')

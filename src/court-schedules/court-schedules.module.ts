@@ -3,7 +3,6 @@ import { CourtSchedulesService } from './court-schedules.service';
 import { CourtSchedulesController } from './court-schedules.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CourtSchedule } from './entities/court-schedule.entity';
-import { Court } from 'src/courts/entities/court.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 
 @Module({
@@ -11,4 +10,4 @@ import { OperatingSchedule } from 'src/operating-schedule/entities/operating-sch
   controllers: [CourtSchedulesController],
   providers: [CourtSchedulesService],
 })
-export class CourtSchedulesModule {}
+export class CourtSchedulesModule { }

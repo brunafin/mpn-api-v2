@@ -80,14 +80,14 @@ export class CourtsController {
     return this.courtsService.findAll();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Obter uma quadra pelo ID' })
+  @Get(':public_id')
+  @ApiOperation({ summary: 'Obter uma quadra pelo uuid' })
   @ApiOkResponse({
     description: 'Dados da quadra encontrada',
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
+        public_id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
         name: { type: 'string', example: 'Quadra 1' },
         company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
         show: { type: 'boolean', example: true },

@@ -15,6 +15,6 @@ export class CreateReservationDto {
   })
   token_to_cancel: string;
 
-  @ApiProperty({ description: 'ID do agendamento da quadra' })
-  court_schedule_id: number;
+  @ApiProperty({ description: 'ID do agendamento da quadra', example: '550e8400-e29b-41d4-a716-446655440000' })
+  court_schedule_public_id: string;
 }

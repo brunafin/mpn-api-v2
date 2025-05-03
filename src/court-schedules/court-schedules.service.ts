@@ -5,8 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CourtSchedule } from './entities/court-schedule.entity';
 import { ILike, Repository } from 'typeorm';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
-import { formatHour } from 'src/utils/formatHour';
 import { UrlQueryParamCourtScheduleDto } from './dto/url-query-param-court-schedule.dto';
+import { instanceToPlain } from 'class-transformer';
 
 @Injectable()
 export class CourtSchedulesService {
@@ -165,10 +165,11 @@ export class CourtSchedulesService {
   }
 
   findOneByPublicId(publicId: string) {
-    return this.courtSchedulesRepository.findOne({
+    return instanceToPlain(this.courtSchedulesRepository.findOne({
       where: { public_id: publicId },
       relations: { day_of_week: true },
       select: {
+        id: true,
         public_id: true,
         date: true,
         start_hour: true,
@@ -181,7 +182,7 @@ export class CourtSchedulesService {
           ref: true,
         },
       },
-    });
+    }));
   }
 
   async updateByPublicId(publicId: string, updateCourtScheduleDto: UpdateCourtScheduleDto) {

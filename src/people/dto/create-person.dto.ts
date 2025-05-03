@@ -1,13 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Company } from 'src/companies/entities/company.entity';
 import {
   IsString,
-  IsNumber,
   IsBoolean,
   IsDate,
   IsOptional,
   MaxLength,
-  IsArray,
 } from 'class-validator';
 
 export class CreatePersonDto {

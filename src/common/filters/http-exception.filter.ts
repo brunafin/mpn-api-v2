@@ -23,14 +23,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const responseObject = exceptionResponse as any;
-        message = responseObject.message || message;
-        errorDetails = responseObject.error || null;
+        message = responseObject.message ?? message;
+        errorDetails = responseObject.error ?? null;
       } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      errorDetails = exception.stack || null;
+      errorDetails = exception.stack ?? null;
     }
 
     response.status(status).json({

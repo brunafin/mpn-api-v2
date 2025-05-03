@@ -26,7 +26,7 @@ interface SendCanceledReservationEmailDto {
 
 @Injectable()
 export class EmailService {
-  private resend: Resend;
+  private readonly resend: Resend;
 
   constructor() {
     this.resend = new Resend(process.env.EMAIL_RESEND_API_KEY);

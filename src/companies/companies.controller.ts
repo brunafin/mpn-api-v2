@@ -112,8 +112,31 @@ export class CompaniesController {
       },
     },
   })
+
   findOne(@Param('public_id') public_id: string) {
     return this.companiesService.findOneByPublicId(public_id);
+  }
+
+  @Get(':public_id/schedules/:date')
+  @ApiOperation({ summary: 'Obter horários de um dia específico para uma empresa' })
+  @ApiOkResponse({
+    description: 'Horários retornados com sucesso',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          time: { type: 'string', example: '09:00' },
+          available: { type: 'boolean', example: true },
+        },
+      },
+    },
+  })
+  findSchedules(
+    @Param('public_id') public_id: string,
+    @Param('date') date: string,
+  ) {
+    return this.companiesService.findSchedulesByDate(public_id, date);
   }
 
   @Patch(':public_id')

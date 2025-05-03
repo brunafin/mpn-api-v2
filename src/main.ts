@@ -16,12 +16,14 @@ async function bootstrap() {
     .addTag('people')
     .build();
 
-  if(process.env.TYPE_ENV === 'development'){
+  if (process.env.TYPE_ENV === 'development') {
     const documentFactory = () => SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api', app, documentFactory);
   }
 
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  app.enableCors({ origin: '*' })
 
   await app.listen(process.env.PORT ?? 3000);
 }

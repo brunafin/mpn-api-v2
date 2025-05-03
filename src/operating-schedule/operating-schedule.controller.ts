@@ -15,7 +15,7 @@ import { UrlQueryParamOperatingScheduleDto } from './dto/url-query-operating-sch
 export class OperatingScheduleController {
   constructor(
     private readonly operatingScheduleService: OperatingScheduleService,
-  ) {}
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar um horário de funcionamento' })
@@ -26,8 +26,8 @@ export class OperatingScheduleController {
       exemplo1: {
         summary: 'Horário de funcionamento com todos os dados preenchidos',
         value: {
-          hour: 10,
-          price: 50.0,
+          hour: '10:00',
+          price: 59.0,
           day_of_week_id: 1,
           court_id: 2,
         },

@@ -11,6 +11,7 @@ import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { JwtService } from 'src/jwt/jwt.service';
 import { EmailService } from 'src/email/email.service';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class ReservationsService {
@@ -30,9 +31,10 @@ export class ReservationsService {
 
     try {
       const courtSchedule = await this.courtSchedulesRepository.findOne({
-        where: { id: createReservationDto.court_schedule_id },
+        where: { public_id: createReservationDto.court_schedule_public_id },
         select: {
           id: true,
+          public_id: true,
           available: true,
           court: {
             id: true,
@@ -63,7 +65,7 @@ export class ReservationsService {
       );
 
       const reservation =
-        this.reservationsRepository.create(createReservationDto);
+        this.reservationsRepository.create({ ...createReservationDto, court_schedule_id: courtSchedule.id });
       reservation.token_to_cancel = this.jwtService.generateToken(
         reservation.id,
       );
@@ -91,7 +93,7 @@ export class ReservationsService {
       });
 
       await queryRunner.commitTransaction();
-      return reservation;
+      return plainToInstance(Reservation, reservation);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw new BadRequestException('Erro ao criar reserva: ' + error.message);
@@ -197,8 +199,22 @@ export class ReservationsService {
     return `This action returns a #${id} reservation`;
   }
 
+  findOneByPublicId(public_id: string) {
+    const reservation = this.reservationsRepository.findOne({
+      where: { public_id },
+    })
+    return plainToInstance(Reservation, reservation);
+  }
+
   update(id: number, updateReservationDto: UpdateReservationDto) {
     return `This action updates a #${id} reservation`;
+  }
+
+  updateByPublicId(public_id: string, updateReservationDto: UpdateReservationDto) {
+    return this.reservationsRepository.update(
+      { public_id },
+      { ...updateReservationDto },
+    );
   }
 
   remove(id: number) {
