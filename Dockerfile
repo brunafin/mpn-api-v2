@@ -1,28 +1,22 @@
+# Usa a imagem oficial do Node.js
 FROM node:20-slim
 
-# Cria um usuário não-root
-RUN groupadd -r nodeapp && useradd -m -r -g nodeapp nodeapp
-
-# Diretório de trabalho da aplicação
+# Define o diretório de trabalho dentro do container
 WORKDIR /usr/src/app
 
-# Copia somente os arquivos necessários para instalar dependências
-COPY --chown=nodeapp:nodeapp package*.json ./
+# Copia os arquivos do projeto para dentro do container
+COPY package*.json ./
 
-# Instala dependências com segurança (ignora scripts de postinstall maliciosos)
-RUN npm install --ignore-scripts
+# Instala as dependências
+RUN npm install
 
-# Copia os demais arquivos do projeto
-COPY --chown=nodeapp:nodeapp . .
+# Copia o restante dos arquivos do projeto
+COPY . .
 
-# Compila a aplicação
 RUN npm run build
 
-# Usa o usuário não-root
-USER nodeapp
-
-# Expõe a porta da aplicação
+# Expõe a porta usada pelo NestJS
 EXPOSE 3000
 
-# Comando para rodar a aplicação
+# Comando padrão ao iniciar o container
 CMD ["npm", "run", "start"]
