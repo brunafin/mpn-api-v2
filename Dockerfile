@@ -1,31 +1,22 @@
-# Usa uma imagem base do Node.js (slim para menor tamanho)
+# Usa a imagem oficial do Node.js
 FROM node:20-slim
-
-# Cria um usuário não-root para rodar a aplicação
-RUN groupadd -r nodeapp && useradd -m -r -g nodeapp nodeapp
 
 # Define o diretório de trabalho dentro do container
 WORKDIR /usr/src/app
 
-# Copia arquivos de dependência (package.json e package-lock.json) como root, com permissões restritas
-COPY --chown=root:root --chmod=444 package*.json ./
+# Copia os arquivos do projeto para dentro do container
+COPY package*.json ./
 
-# Instala as dependências (sem scripts de pós-instalação)
-RUN npm install --ignore-scripts
+# Instala as dependências
+RUN npm install
 
-# Copia apenas os arquivos relevantes para a construção da aplicação com permissões de leitura
-COPY --chown=nodeapp:nodeapp --chmod=444 src ./src
-COPY --chown=nodeapp:nodeapp --chmod=444 tsconfig.json ./
-COPY --chown=nodeapp:nodeapp --chmod=444 nest-cli.json ./
+# Copia o restante dos arquivos do projeto
+COPY . .
 
-# Executa a compilação da aplicação (gerando os arquivos em dist/)
 RUN npm run build
 
-# Muda para o usuário não-root para rodar a aplicação
-USER nodeapp
-
-# Expõe a porta da aplicação (3000 é a porta padrão do NestJS)
+# Expõe a porta usada pelo NestJS
 EXPOSE 3000
 
-# Define o comando de execução da aplicação (start em produção)
+# Comando padrão ao iniciar o container
 CMD ["npm", "run", "start"]
