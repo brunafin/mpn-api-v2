@@ -6,26 +6,23 @@ RUN groupadd -r nodeapp && useradd -m -r -g nodeapp nodeapp
 # Define diretório de trabalho
 WORKDIR /usr/src/app
 
-# Copia arquivos de dependência e ajusta propriedade
-COPY --chown=nodeapp:nodeapp package*.json ./
+# Copia arquivos de dependência com segurança (sem permissões de escrita para o runtime)
+COPY --chown=root:root --chmod=644 package*.json ./
 
-# Remove permissões de escrita dos arquivos sensíveis
-RUN chmod 444 package.json package-lock.json || true
-
-# Instala dependências com segurança
+# Instala dependências com scripts desativados para evitar execuções indesejadas
 RUN npm install --ignore-scripts
 
-# Copia o restante da aplicação com segurança
+# Copia restante do projeto com permissões para o usuário de execução
 COPY --chown=nodeapp:nodeapp . .
 
 # Compila a aplicação
 RUN npm run build
 
-# Troca para o usuário seguro
+# Define o usuário que executará o container
 USER nodeapp
 
 # Expõe a porta da aplicação
 EXPOSE 3000
 
-# Comando padrão de inicialização
+# Comando de execução padrão
 CMD ["npm", "run", "start"]
