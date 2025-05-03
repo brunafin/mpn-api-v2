@@ -13,10 +13,10 @@ COPY --chown=root:root --chmod=444 package*.json ./
 # Instala as dependências (sem scripts de pós-instalação)
 RUN npm install --ignore-scripts
 
-# Copia apenas os arquivos relevantes para a construção da aplicação
-COPY --chown=nodeapp:nodeapp src ./src
-COPY --chown=nodeapp:nodeapp tsconfig.json ./
-COPY --chown=nodeapp:nodeapp nest-cli.json ./
+# Copia apenas os arquivos relevantes para a construção da aplicação com permissões de leitura
+COPY --chown=nodeapp:nodeapp --chmod=444 src ./src
+COPY --chown=nodeapp:nodeapp --chmod=444 tsconfig.json ./
+COPY --chown=nodeapp:nodeapp --chmod=444 nest-cli.json ./
 
 # Executa a compilação da aplicação (gerando os arquivos em dist/)
 RUN npm run build
