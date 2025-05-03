@@ -1,28 +1,31 @@
 FROM node:20-slim
 
-# Cria um usuário não-root
+# Cria um usuário e grupo não-root
 RUN groupadd -r nodeapp && useradd -m -r -g nodeapp nodeapp
 
-# Diretório de trabalho da aplicação
+# Define diretório de trabalho
 WORKDIR /usr/src/app
 
-# Copia somente os arquivos necessários para instalar dependências
+# Copia arquivos de dependência e ajusta propriedade
 COPY --chown=nodeapp:nodeapp package*.json ./
 
-# Instala dependências com segurança (ignora scripts de postinstall maliciosos)
+# Remove permissões de escrita dos arquivos sensíveis
+RUN chmod 444 package.json package-lock.json || true
+
+# Instala dependências com segurança
 RUN npm install --ignore-scripts
 
-# Copia os demais arquivos do projeto
+# Copia o restante da aplicação com segurança
 COPY --chown=nodeapp:nodeapp . .
 
 # Compila a aplicação
 RUN npm run build
 
-# Usa o usuário não-root
+# Troca para o usuário seguro
 USER nodeapp
 
 # Expõe a porta da aplicação
 EXPOSE 3000
 
-# Comando para rodar a aplicação
+# Comando padrão de inicialização
 CMD ["npm", "run", "start"]
