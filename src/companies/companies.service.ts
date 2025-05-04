@@ -9,6 +9,18 @@ import { Company } from './entities/company.entity';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
+import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
+import { ReservationStatusEnum } from 'src/court-schedules/court-schedules.service';
+import { formatDateDateToDDMMYYYY } from 'src/utils/formatDate';
+
+export interface IReservationItemProps {
+  scheduleId: string;
+  status: ReservationStatusEnum;
+  date: Date;
+  court: string;
+  time: string;
+  customerName: string | null;
+}
 
 @Injectable()
 export class CompaniesService {
@@ -53,22 +65,7 @@ export class CompaniesService {
     });
   }
 
-  getStatusCourtSchedule = (courtSchedule: CourtSchedule) => {
-    if (courtSchedule.is_fixed) {
-      return 'fixed';
-    }
-    if (courtSchedule.reservation) {
-      return 'reserved';
-    }
-    if (courtSchedule.available) {
-      return 'available';
-    }
-    if (!courtSchedule.available && !courtSchedule.reservation) {
-      return 'inactive';
-    }
-  }
-
-  async findSchedulesByDate(publicId: string, date: string) {
+  async findSchedulesByDate(publicId: string, date: string): Promise<IReservationItemProps[]> {
     const company = await this.companiesRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.courts', 'court')
@@ -96,29 +93,25 @@ export class CompaniesService {
         'reservation.contact_phone',
         'reservation.token_to_cancel',
         'reservation.created_at',
+        'reservation.is_prepaid',
       ])
       .getOne();
 
 
-    const reservations = company?.courts.flatMap((court) => {
+    const reservations: IReservationItemProps[] = company?.courts.flatMap((court) => {
       return court.court_schedule
         .map(schedule => ({
           scheduleId: schedule.public_id,
-          status: this.getStatusCourtSchedule(schedule),
+          status: getStatusCourtSchedule(schedule),
           date: schedule.date,
-          reservationDate: schedule?.reservation?.created_at,
           court: court.name,
-          time: schedule.start_hour,
-          price: schedule.price,
-          customer: {
-            name: schedule?.reservation?.contact_name,
-            phone: schedule?.reservation?.contact_phone,
-          }
+          time: schedule.start_hour.slice(0, 5),
+          customerName: schedule.reservation?.contact_name ?? null,
         }))
     }
-    )
+    ) ?? [];
 
-    return reservations;
+    return reservations ?? [];
   }
 
   async updateByPublicId(publicId: string, updateCompanyDto: UpdateCompanyDto) {

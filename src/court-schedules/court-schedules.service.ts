@@ -7,6 +7,33 @@ import { ILike, Repository } from 'typeorm';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { UrlQueryParamCourtScheduleDto } from './dto/url-query-param-court-schedule.dto';
 import { instanceToPlain } from 'class-transformer';
+import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
+import { formatDateDateToDDMMYYYY, formatDateTimestampToDDMMYYYY } from 'src/utils/formatDate';
+
+export enum ReservationStatusEnum {
+  FIXED = "fixed",
+  INACTIVE = "inactive",
+  RESERVED = "reserved",
+  AVAILABLE = "available",
+  PREPAID = "prepaid",
+  UNKNOWN = "unknown",
+}
+
+interface IReservationDetailsItemProps {
+  scheduleId: string;
+  status: ReservationStatusEnum;
+  date: string;
+  reservation: {
+    createdAt: string;
+    isPrepaid: boolean;
+    contactName: string;
+    contactPhone: string;
+    tokenToCancel: string;
+  } | null;
+  court: string;
+  time: string;
+  price: number;
+}
 
 @Injectable()
 export class CourtSchedulesService {
@@ -164,10 +191,10 @@ export class CourtSchedulesService {
     return courtSchedule;
   }
 
-  findOneByPublicId(publicId: string) {
-    return instanceToPlain(this.courtSchedulesRepository.findOne({
+  async findOneByPublicId(publicId: string) {
+    const courtSchedule = await this.courtSchedulesRepository.findOne({
       where: { public_id: publicId },
-      relations: { day_of_week: true },
+      relations: { day_of_week: true, court: true, reservation: true },
       select: {
         id: true,
         public_id: true,
@@ -175,14 +202,47 @@ export class CourtSchedulesService {
         start_hour: true,
         end_hour: true,
         available: true,
+        is_fixed: true,
+        reservation: {
+          is_prepaid: true,
+          contact_name: true,
+          contact_phone: true,
+          token_to_cancel: true,
+          created_at: true,
+        },
+        court: {
+          name: true,
+        },
         price: true,
         day_of_week: {
           description: true,
-          abbreviation: true,
-          ref: true,
         },
       },
-    }));
+    });
+
+    if (!courtSchedule) {
+      throw new Error('Horário de quadra não encontrado');
+    }
+
+    const obj: IReservationDetailsItemProps = {
+      scheduleId: courtSchedule.public_id,
+      status: getStatusCourtSchedule(courtSchedule),
+      date: formatDateDateToDDMMYYYY(String(courtSchedule.date)),
+      reservation: courtSchedule.reservation ? {
+        createdAt: formatDateTimestampToDDMMYYYY(courtSchedule?.reservation?.created_at),
+        isPrepaid: courtSchedule.reservation?.is_prepaid,
+        contactName: courtSchedule.reservation?.contact_name,
+        contactPhone: courtSchedule.reservation?.contact_phone,
+        tokenToCancel: courtSchedule.reservation?.token_to_cancel,
+      } : null,
+      court: courtSchedule.court.name,
+      time: courtSchedule.start_hour.slice(0, 5),
+      price: courtSchedule.price,
+    }
+
+
+
+    return instanceToPlain(obj);
   }
 
   async updateByPublicId(publicId: string, updateCourtScheduleDto: UpdateCourtScheduleDto) {
