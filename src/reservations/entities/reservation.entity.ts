@@ -47,6 +47,10 @@ export class Reservation {
   @Expose()
   is_canceled: boolean;
 
+  @Column({ default: false })
+  @Expose()
+  is_prepaid: boolean;
+
   @Column({ type: 'timestamp', nullable: true })
   @Expose()
   canceled_at: Date;
