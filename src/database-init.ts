@@ -18,7 +18,7 @@ async function createDatabaseIfNotExists() {
   const res = await client.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [dbName]);
 
   if (res.rowCount === 0) {
-    await client.query(`CREATE DATABASE $1`, [dbName]);
+    await client.query(`CREATE DATABASE "${dbName}"`);
   }
 
   await client.end();
