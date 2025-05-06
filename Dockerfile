@@ -3,11 +3,15 @@ FROM node:23 AS builder
 
 WORKDIR /app
 
+# Copia os arquivos de dependências
 COPY package*.json ./
 RUN npm install
 
+# Copia o restante dos arquivos do projeto
 COPY . .
-RUN npm run build
+
+# Executa o build e verifica se os arquivos foram gerados
+RUN npm run build && ls -la /app/dist
 
 # Etapa 2: produção com usuário não-root
 FROM node:23-alpine AS production
@@ -29,6 +33,8 @@ RUN chown -R appuser:appgroup /app
 # Usa o usuário não-root
 USER appuser
 
-EXPOSE 3000
+# Exponha a porta da aplicação
+EXPOSE 3001
 
-CMD ["node", "main.js"]
+# Comando de inicialização
+CMD ["node", "dist/src/main.js"]
