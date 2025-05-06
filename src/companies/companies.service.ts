@@ -95,7 +95,6 @@ export class CompaniesService {
         'reservation.created_at',
         'reservation.is_prepaid',
       ])
-      .orderBy('schedule.start_hour', 'ASC')
       .getOne();
 
 
