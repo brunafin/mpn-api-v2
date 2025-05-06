@@ -109,7 +109,7 @@ export class CompaniesService {
           customerName: schedule.reservation?.contact_name ?? null,
         }))
     }
-    ) ?? [];
+    ).sort((a, b) => a.time.localeCompare(b.time)) ?? [];
 
     return reservations ?? [];
   }
