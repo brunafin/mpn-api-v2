@@ -1,32 +1,34 @@
 # Etapa 1: build
 FROM node:23 AS builder
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia apenas os arquivos necessários para instalar as dependências
 COPY package*.json ./
-
-# Instala as dependências com o cache de build
 RUN npm install
 
-# Copia o restante dos arquivos e constrói a aplicação
 COPY . .
 RUN npm run build
 
-# Etapa 2: produção
+# Etapa 2: produção com usuário não-root
 FROM node:23-alpine AS production
 
-# Define o diretório de trabalho
+# Cria um usuário e grupo não-root
+RUN addgroup -g 1001 appgroup && \
+  adduser -S -u 1001 -G appgroup appuser
+
 WORKDIR /app
 
-# Copia apenas os arquivos necessários da etapa anterior
+# Copia apenas os arquivos necessários da etapa de build
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
-# Expõe a porta usada pela aplicação NestJS
-EXPOSE 3001
+# Define permissões apropriadas
+RUN chown -R appuser:appgroup /app
 
-# Comando para iniciar a aplicação
+# Usa o usuário não-root
+USER appuser
+
+EXPOSE 3000
+
 CMD ["node", "dist/main"]
