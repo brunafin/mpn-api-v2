@@ -15,7 +15,7 @@ import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 
-@Controller('reservations')
+@Controller('reservation')
 @ApiTags('reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) { }
@@ -29,10 +29,9 @@ export class ReservationsController {
       exemplo1: {
         summary: 'Reserva com todos os dados preenchidos',
         value: {
-          contact_name: 'João da Silva',
-          contact_phone: '51999521474',
-          token_to_cancel: null,
-          court_schedule_public_id: '123e4567-e89b-12d3-a456-426614174000',
+          contactName: 'João da Silva',
+          contactPhone: '51912345678',
+          courtSchedulePublicId: '550e8400-e29b-41d4-a716-446655440000',
         },
       },
     },
@@ -114,10 +113,9 @@ export class ReservationsController {
       exemplo1: {
         summary: 'Reserva com todos os dados preenchidos',
         value: {
-          contact_name: 'João da Silva',
-          contact_phone: '51999521474',
-          token_to_cancel: null,
-          court_schedule_public_id: 1,
+          contactName: 'João da Silva',
+          contactPhone: '51999521474',
+          courtSchedulePublicId: 1,
         },
       },
     },
