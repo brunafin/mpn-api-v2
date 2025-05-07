@@ -259,4 +259,11 @@ export class CourtSchedulesService {
   removeByPublicId(publicId: string) {
     return this.courtSchedulesRepository.delete({ public_id: publicId });
   }
+
+  updateAvailability(publicId: string, available: boolean) {
+    return this.courtSchedulesRepository.update(
+      { public_id: publicId },
+      { available }
+    );
+  }
 }

@@ -136,4 +136,13 @@ export class CourtSchedulesController {
   remove(@Param('public_id') publicId: string) {
     return this.courtSchedulesService.removeByPublicId(publicId);
   }
+
+  @Patch(':public_id/availability')
+  @ApiOperation({ summary: 'Atualizar a disponibilidade de um horário de quadra' })
+  updateAvailability(
+    @Param('public_id') publicId: string,
+    @Body('available') available: boolean,
+  ) {
+    return this.courtSchedulesService.updateAvailability(publicId, available);
+  }
 }

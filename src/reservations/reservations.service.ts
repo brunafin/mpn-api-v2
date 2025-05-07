@@ -28,10 +28,9 @@ export class ReservationsService {
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
-
     try {
       const courtSchedule = await this.courtSchedulesRepository.findOne({
-        where: { public_id: createReservationDto.court_schedule_public_id },
+        where: { public_id: createReservationDto.courtSchedulePublicId },
         select: {
           id: true,
           public_id: true,
@@ -65,7 +64,11 @@ export class ReservationsService {
       );
 
       const reservation =
-        this.reservationsRepository.create({ ...createReservationDto, court_schedule_id: courtSchedule.id });
+        this.reservationsRepository.create({
+          contact_name: createReservationDto.contactName,
+          contact_phone: createReservationDto.contactPhone,
+          court_schedule_id: courtSchedule.id
+        });
       reservation.token_to_cancel = this.jwtService.generateToken(
         reservation.id,
       );
@@ -80,17 +83,17 @@ export class ReservationsService {
         currency: 'BRL',
       }).format(courtSchedule.price);
 
-      await this.emailService.sendEmailNewReservation({
-        contactName: reservation.contact_name,
-        contactPhone: reservation.contact_phone,
-        tokenToCancel: reservation.token_to_cancel,
-        courtEmail: courtSchedule.court.company.email,
-        amount: formattedPrice,
-        courtName: courtSchedule.court.name,
-        date: String(courtSchedule.date),
-        time: courtSchedule.start_hour,
-        subjectPrefix: 'Reserva',
-      });
+      // await this.emailService.sendEmailNewReservation({
+      //   contactName: reservation.contact_name,
+      //   contactPhone: reservation.contact_phone,
+      //   tokenToCancel: reservation.token_to_cancel,
+      //   courtEmail: courtSchedule.court.company.email,
+      //   amount: formattedPrice,
+      //   courtName: courtSchedule.court.name,
+      //   date: String(courtSchedule.date),
+      //   time: courtSchedule.start_hour,
+      //   subjectPrefix: 'Reserva',
+      // });
 
       await queryRunner.commitTransaction();
       return plainToInstance(Reservation, reservation);
@@ -168,18 +171,18 @@ export class ReservationsService {
         relations: ['court', 'court.company'],
       });
 
-      if (courtSchedule) {
-        await this.emailService.sendEmailCanceledReservation({
-          companyName: courtSchedule.court.company.name,
-          contactName: reservation.contact_name,
-          contactPhone: reservation.contact_phone,
-          courtEmail: courtSchedule.court.company.email,
-          courtName: courtSchedule.court.name,
-          date: String(courtSchedule.date),
-          time: courtSchedule.start_hour,
-          subjectPrefix: 'Cancelamento de Reserva',
-        });
-      }
+      // if (courtSchedule) {
+      //   await this.emailService.sendEmailCanceledReservation({
+      //     companyName: courtSchedule.court.company.name,
+      //     contactName: reservation.contact_name,
+      //     contactPhone: reservation.contact_phone,
+      //     courtEmail: courtSchedule.court.company.email,
+      //     courtName: courtSchedule.court.name,
+      //     date: String(courtSchedule.date),
+      //     time: courtSchedule.start_hour,
+      //     subjectPrefix: 'Cancelamento de Reserva',
+      //   });
+      // }
 
       await queryRunner.commitTransaction();
       return 'Reserva cancelada com sucesso!';
@@ -213,7 +216,10 @@ export class ReservationsService {
   updateByPublicId(public_id: string, updateReservationDto: UpdateReservationDto) {
     return this.reservationsRepository.update(
       { public_id },
-      { ...updateReservationDto },
+      {
+        contact_name: updateReservationDto.contactName,
+        contact_phone: updateReservationDto.contactPhone,
+      },
     );
   }
 
