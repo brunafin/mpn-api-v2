@@ -33,6 +33,7 @@ interface IReservationDetailsItemProps {
   court: string;
   time: string;
   price: number;
+  weekday: string;
 }
 
 @Injectable()
@@ -238,6 +239,7 @@ export class CourtSchedulesService {
       court: courtSchedule.court.name,
       time: courtSchedule.start_hour.slice(0, 5),
       price: courtSchedule.price,
+      weekday: courtSchedule.day_of_week.description
     }
 
 
