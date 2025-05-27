@@ -3,12 +3,14 @@ import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CourtSchedule } from './entities/court-schedule.entity';
-import { ILike, Repository } from 'typeorm';
+import { Between, ILike, Repository } from 'typeorm';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { UrlQueryParamCourtScheduleDto } from './dto/url-query-param-court-schedule.dto';
 import { instanceToPlain } from 'class-transformer';
 import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
 import { formatDateDateToDDMMYYYY, formatDateTimestampToDDMMYYYY } from 'src/utils/formatDate';
+import { Court } from 'src/courts/entities/court.entity';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 export enum ReservationStatusEnum {
   FIXED = "fixed",
@@ -43,6 +45,8 @@ export class CourtSchedulesService {
     private readonly courtSchedulesRepository: Repository<CourtSchedule>,
     @InjectRepository(OperatingSchedule)
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
+    @InjectRepository(Court)
+    private readonly courtRepository: Repository<Court>,
   ) { }
   create(createCourtScheduleDto: CreateCourtScheduleDto) {
     const courtSchedule = this.courtSchedulesRepository.create(
@@ -83,6 +87,7 @@ export class CourtSchedulesService {
           price: item.price,
           weekday_ref: item.day_of_week.ref,
           weekday_id: item.day_of_week_id,
+          is_fixed: item.is_fixed,
         }))
         .filter((element) => element.weekday_ref === weekdayRef);
 
@@ -99,6 +104,7 @@ export class CourtSchedulesService {
           price: operatingSchedule.price,
           court_id,
           available: true,
+          is_fixed: operatingSchedule.is_fixed,
         };
         newsCourtSchedule.push(newCourtSchedule);
       }
@@ -108,6 +114,57 @@ export class CourtSchedulesService {
 
     return this.courtSchedulesRepository.save(newsCourtSchedule);
   }
+
+  @Cron(CronExpression.EVERY_DAY_AT_10AM)
+  async handleCron() {
+    const courts = await this.courtRepository.find();
+    const today = new Date();
+    const endDate = new Date();
+    endDate.setDate(today.getDate() + 29);
+
+    console.log(`Iniciando verificação de horários faltantes para ${courts.length} quadras`);
+
+    for (const court of courts) {
+      const operatingSchedule = await this.operatingScheduleRepository.find({
+        where: { court_id: court.id },
+        relations: { day_of_week: true },
+      });
+
+      for (
+        let d = new Date(today);
+        d <= endDate;
+        d.setDate(d.getDate() + 1)
+      ) {
+        const weekdayRef = d.getDay();
+
+        const expectedSlots = operatingSchedule.filter(
+          (os) => os.day_of_week.ref === weekdayRef
+        );
+
+        if (expectedSlots.length === 0) {
+          continue;
+        }
+
+        const existingSchedulesCount = await this.courtSchedulesRepository.count({
+          where: {
+            court_id: court.id,
+            date: new Date(d.toISOString().split('T')[0]),
+          },
+        });
+
+        if (existingSchedulesCount < expectedSlots.length) {
+          const dateStr = d.toISOString().split('T')[0];
+          try {
+            await this.populateCourtSchedule(court.id, dateStr, dateStr);
+            console.log(`Criados horários faltantes para quadra ${court.id} no dia ${dateStr}`);
+          } catch (error) {
+            console.error(`Erro ao popular quadra ${court.id} no dia ${dateStr}:`, error.message);
+          }
+        }
+      }
+    }
+  }
+
 
   findAll({
     courtId,

@@ -23,10 +23,12 @@ import { CompanyImagesModule } from './company-images/company-images.module';
 import { CompanyImage } from './company-images/entities/company-image.entity';
 import { SportsModule } from './sports/sports.module';
 import { Sport } from './sports/entities/sport.entity';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.POSTGRES_HOST,
