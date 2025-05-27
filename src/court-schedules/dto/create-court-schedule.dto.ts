@@ -38,4 +38,7 @@ export class CreateCourtScheduleDto {
 
   @ApiProperty({ description: 'ID do dia da semana' })
   day_of_week_id: number;
+
+  @ApiProperty({ description: 'Indica se o horário é fixo', default: false })
+  is_fixed: boolean;
 }
