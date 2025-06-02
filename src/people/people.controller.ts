@@ -6,17 +6,20 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { PeopleService } from './people.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
 
+@UseGuards(AuthGuard('jwt'))
+@ApiBearerAuth()
 @Controller('people')
 @ApiTags('people')
 export class PeopleController {
   constructor(private readonly peopleService: PeopleService) { }
-
   @Post()
   @ApiOperation({ summary: 'Criar uma nova pessoa' })
   @ApiBody({
@@ -38,6 +41,7 @@ export class PeopleController {
           neighborhood: 'Centro',
           uf: 'SP',
           status: true,
+          username: 'joao.silva',
         },
       },
     },
@@ -45,6 +49,7 @@ export class PeopleController {
   create(@Body() createPersonDto: CreatePersonDto) {
     return this.peopleService.create(createPersonDto);
   }
+
   @Get()
   @ApiOperation({ summary: 'Listar todas as pessoas' })
   @ApiOkResponse({
@@ -67,6 +72,7 @@ export class PeopleController {
           neighborhood: { type: 'string', example: 'Centro' },
           uf: { type: 'string', example: 'SP' },
           status: { type: 'boolean', example: true },
+          username: { type: 'string', example: 'joao.silva' },
         },
       },
     },
@@ -95,6 +101,7 @@ export class PeopleController {
         neighborhood: { type: 'string', example: 'Centro' },
         uf: { type: 'string', example: 'SP' },
         status: { type: 'boolean', example: true },
+        username: { type: 'string', example: 'joao.silva' },
       },
     },
   })

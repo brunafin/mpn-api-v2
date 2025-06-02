@@ -78,6 +78,14 @@ export class Person {
   @Expose()
   status: boolean;
 
+  @Column({ length: 20, unique: true })
+  @Expose()
+  username: string;
+
+  @Column({ type: 'text' })
+  @Exclude()
+  password: string;
+
   @OneToMany(() => Company, (company) => company.administrator)
   companies: Company[];
 }

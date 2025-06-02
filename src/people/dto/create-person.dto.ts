@@ -110,4 +110,13 @@ export class CreatePersonDto {
   @ApiProperty({ description: 'Status do cadastro da pessoa', example: true })
   @IsBoolean()
   status: boolean;
+
+  @ApiProperty({
+    maxLength: 20,
+    description: 'Nome de usuário da pessoa',
+    example: 'usuario123'
+  })
+  @IsString()
+  @MaxLength(20)
+  username: string;
 }
