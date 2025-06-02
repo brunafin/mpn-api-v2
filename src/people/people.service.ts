@@ -22,9 +22,22 @@ export class PeopleService {
     return bcrypt.hash(password, saltOrRounds);
   }
 
+  async canCreateUsername(username: string): Promise<{ canCreate: boolean; message?: string }> {
+    const existing = await this.peopleRepository.findOne({ where: { username } });
+    if (existing) {
+      return { canCreate: false, message: 'O usuário já existe' };
+    }
+    return { canCreate: true };
+  }
+
   async create(createPersonDto: CreatePersonDto) {
     const person = this.peopleRepository.create(createPersonDto);
+    const usernameCheck = await this.canCreateUsername(person.username);
+    if (!usernameCheck.canCreate) {
+      throw new NotFoundException(usernameCheck.message);
+    }
     const password = await this.hashPassword(process.env.DEFAULT_PASSWORD || 'defaultPassword');
+
     return this.peopleRepository.save({ ...person, password });
   }
 
