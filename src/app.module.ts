@@ -24,6 +24,7 @@ import { CompanyImage } from './company-images/entities/company-image.entity';
 import { SportsModule } from './sports/sports.module';
 import { Sport } from './sports/entities/sport.entity';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     CompanyImagesModule,
     CompanyImagesModule,
     SportsModule,
+    AuthModule
   ],
   controllers: [AppController],
   providers: [AppService],

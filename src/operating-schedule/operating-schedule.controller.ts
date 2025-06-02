@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { OperatingScheduleService } from './operating-schedule.service';
 import { CreateOperatingScheduleDto } from './dto/create-operating-schedule.dto';
 import {
@@ -7,9 +7,13 @@ import {
   ApiOperation,
   ApiQuery,
   ApiTags,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UrlQueryParamOperatingScheduleDto } from './dto/url-query-operating-schedule.dto';
+import { AuthGuard } from '@nestjs/passport';
 
+@UseGuards(AuthGuard('jwt'))
+@ApiBearerAuth()
 @Controller('operating-schedule')
 @ApiTags('operating-schedule')
 export class OperatingScheduleController {

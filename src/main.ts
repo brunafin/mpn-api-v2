@@ -14,6 +14,7 @@ async function bootstrap() {
     .setDescription('Rotas para o projeto Marca pra nós')
     .setVersion('1.0')
     .addTag('people')
+    .addBearerAuth()
     .build();
 
   if (process.env.TYPE_ENV === 'development') {
