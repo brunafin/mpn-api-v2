@@ -153,7 +153,7 @@ export class CourtSchedulesService {
     });
   }
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_DAY_AT_4AM)
   async handleCron() {
     const courts = await this.courtRepository.find();
     const today = new Date();
