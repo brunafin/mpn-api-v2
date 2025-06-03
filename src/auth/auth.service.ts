@@ -26,7 +26,7 @@ export class AuthService {
         'Acesso inválido. Por favor, verifique suas credenciais ou contate a nossa equipe.',
       );
     }
-    const payload = { sub: user.public_id, username: user.username };
+    const payload = { sub: user.public_id, username: user.username, companyPublicId: user?.companies ? user.companies[0].public_id : null };
     return {
       access_token: this.jwtService.sign(payload),
     };

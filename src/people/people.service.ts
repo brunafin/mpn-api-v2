@@ -22,9 +22,22 @@ export class PeopleService {
     return bcrypt.hash(password, saltOrRounds);
   }
 
+  async canCreateUsername(username: string): Promise<{ canCreate: boolean; message?: string }> {
+    const existing = await this.peopleRepository.findOne({ where: { username } });
+    if (existing) {
+      return { canCreate: false, message: 'O usuário já existe' };
+    }
+    return { canCreate: true };
+  }
+
   async create(createPersonDto: CreatePersonDto) {
     const person = this.peopleRepository.create(createPersonDto);
+    const usernameCheck = await this.canCreateUsername(person.username);
+    if (!usernameCheck.canCreate) {
+      throw new NotFoundException(usernameCheck.message);
+    }
     const password = await this.hashPassword(process.env.DEFAULT_PASSWORD || 'defaultPassword');
+
     return this.peopleRepository.save({ ...person, password });
   }
 
@@ -36,8 +49,22 @@ export class PeopleService {
     return this.peopleRepository.findOne({ where: { id } });
   }
 
-  findOneByUsername(username: string) {
-    return this.peopleRepository.findOne({ where: { username } });
+  async findOneByUsername(username: string) {
+    const person = await this.peopleRepository.findOne({
+      where: { username },
+      relations: ['companies'],
+    });
+
+    if (!person) {
+      return null;
+    }
+
+    return {
+      username: person.username,
+      password: person.password,
+      public_id: person.public_id,
+      companies: person.companies,
+    };
   }
 
   async update(id: number, updatePersonDto: UpdatePersonDto) {

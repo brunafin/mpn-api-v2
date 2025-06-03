@@ -25,6 +25,8 @@ import { SportsModule } from './sports/sports.module';
 import { Sport } from './sports/entities/sport.entity';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
+import { CompaniesCustomerModule } from './companies-customer/companies-customer.module';
+import { CompanyCustomer } from './companies-customer/entities/company-customer.entity';
 
 @Module({
   imports: [
@@ -49,6 +51,7 @@ import { AuthModule } from './auth/auth.module';
         Reservation,
         CompanyImage,
         Sport,
+        CompanyCustomer
       ],
     }),
     PeopleModule,
@@ -62,7 +65,8 @@ import { AuthModule } from './auth/auth.module';
     CompanyImagesModule,
     CompanyImagesModule,
     SportsModule,
-    AuthModule
+    AuthModule,
+    CompaniesCustomerModule
   ],
   controllers: [AppController],
   providers: [AppService],

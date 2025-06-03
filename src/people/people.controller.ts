@@ -14,12 +14,11 @@ import { UpdatePersonDto } from './dto/update-person.dto';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
-@UseGuards(AuthGuard('jwt'))
-@ApiBearerAuth()
 @Controller('people')
 @ApiTags('people')
 export class PeopleController {
   constructor(private readonly peopleService: PeopleService) { }
+
   @Post()
   @ApiOperation({ summary: 'Criar uma nova pessoa' })
   @ApiBody({
@@ -50,6 +49,8 @@ export class PeopleController {
     return this.peopleService.create(createPersonDto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Listar todas as pessoas' })
   @ApiOkResponse({
@@ -81,6 +82,8 @@ export class PeopleController {
     return this.peopleService.findAll();
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Get(':id')
   @ApiOperation({ summary: 'Obter uma pessoa pelo ID' })
   @ApiOkResponse({
@@ -109,6 +112,8 @@ export class PeopleController {
     return this.peopleService.findOne(+id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar uma pessoa pelo ID' })
   @ApiBody({
@@ -138,6 +143,8 @@ export class PeopleController {
     return this.peopleService.update(+id, updatePersonDto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Remover uma pessoa pelo ID' })
   remove(@Param('id') id: string) {
