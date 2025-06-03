@@ -22,4 +22,19 @@ export class CreateOperatingScheduleDto {
 
   @ApiProperty({ description: 'ID da quadra' })
   court_id: number;
+
+  @ApiProperty({
+    description: 'Indica se o horário é fixo',
+    default: false,
+    type: 'boolean'
+  })
+  is_fixed: boolean = false;
+
+  @ApiProperty({
+    description: 'ID do cliente da empresa',
+    type: 'number',
+    nullable: true,
+    default: null
+  })
+  company_customer_id: number | null = null;
 }

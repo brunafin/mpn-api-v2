@@ -10,8 +10,11 @@ export class OperatingScheduleService {
   constructor(
     @InjectRepository(OperatingSchedule)
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
-  ) {}
+  ) { }
   create(createOperatingScheduleDto: CreateOperatingScheduleDto) {
+    if (createOperatingScheduleDto.is_fixed === true && !createOperatingScheduleDto.company_customer_id) {
+      throw new Error('Horários fixos devem ter um cliente associado.');
+    }
     return this.operatingScheduleRepository.save(createOperatingScheduleDto);
   }
 

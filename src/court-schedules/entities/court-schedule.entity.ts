@@ -1,4 +1,5 @@
 import { Exclude, Expose } from 'class-transformer';
+import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { Court } from 'src/courts/entities/court.entity';
 import { DaysOfWeek } from 'src/days-of-week/entities/days-of-week.entity';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
@@ -65,4 +66,13 @@ export class CourtSchedule {
   @ManyToOne(() => DaysOfWeek, (day) => day.court_schedule)
   @JoinColumn({ name: 'day_of_week_id' })
   day_of_week: DaysOfWeek;
+
+  @Column({ nullable: true })
+  @Expose()
+  company_customer_id: number | null;
+
+  @ManyToOne(() => CompanyCustomer, { nullable: true })
+  @JoinColumn({ name: 'company_customer_id' })
+  @Expose()
+  company_customer: CompanyCustomer;
 }

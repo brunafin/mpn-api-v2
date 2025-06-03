@@ -11,5 +11,6 @@ import { EmailService } from 'src/email/email.service';
   imports: [TypeOrmModule.forFeature([Reservation, CourtSchedule])],
   controllers: [ReservationsController],
   providers: [ReservationsService, JwtService, EmailService],
+  exports: [ReservationsService],
 })
-export class ReservationsModule {}
+export class ReservationsModule { }

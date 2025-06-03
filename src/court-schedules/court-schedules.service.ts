@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +11,10 @@ import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
 import { formatDateDateToDDMMYYYY, formatDateTimestampToDDMMYYYY } from 'src/utils/formatDate';
 import { Court } from 'src/courts/entities/court.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Reservation } from 'src/reservations/entities/reservation.entity';
+import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
+import { ReservationsService } from 'src/reservations/reservations.service';
+import { JwtService } from 'src/jwt/jwt.service';
 
 export enum ReservationStatusEnum {
   FIXED = "fixed",
@@ -47,6 +51,9 @@ export class CourtSchedulesService {
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
     @InjectRepository(Court)
     private readonly courtRepository: Repository<Court>,
+    @InjectRepository(Reservation)
+    private readonly reservationRepository: Repository<Reservation>,
+    private readonly jwtService: JwtService
   ) { }
   create(createCourtScheduleDto: CreateCourtScheduleDto) {
     const courtSchedule = this.courtSchedulesRepository.create(
@@ -75,6 +82,7 @@ export class CourtSchedulesService {
     const startDate = new Date(start_date);
     const endDate = new Date(end_date);
     const newsCourtSchedule: CreateCourtScheduleDto[] = [];
+    const reservationsToCreate: Partial<Reservation>[] = [];
 
     const currentDate = new Date(startDate);
 
@@ -88,6 +96,7 @@ export class CourtSchedulesService {
           weekday_ref: item.day_of_week.ref,
           weekday_id: item.day_of_week_id,
           is_fixed: item.is_fixed,
+          company_customer_id: item.company_customer_id,
         }))
         .filter((element) => element.weekday_ref === weekdayRef);
 
@@ -103,8 +112,9 @@ export class CourtSchedulesService {
           day_of_week_id: operatingSchedule.weekday_id,
           price: operatingSchedule.price,
           court_id,
-          available: true,
+          available: !operatingSchedule.is_fixed,
           is_fixed: operatingSchedule.is_fixed,
+          company_customer_id: operatingSchedule.is_fixed ? operatingSchedule.company_customer_id : null,
         };
         newsCourtSchedule.push(newCourtSchedule);
       }
@@ -112,7 +122,23 @@ export class CourtSchedulesService {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    return this.courtSchedulesRepository.save(newsCourtSchedule);
+    const createdSchedules = await this.courtSchedulesRepository.save(newsCourtSchedule);
+
+    for (const schedule of createdSchedules) {
+      if (schedule.is_fixed && schedule.company_customer_id) {
+        reservationsToCreate.push({
+          court_schedule: schedule,
+          contact_name: schedule.company_customer.name,
+          contact_phone: schedule.company_customer.phone,
+        });
+      }
+    }
+
+    if (reservationsToCreate.length > 0) {
+      await this.reservationRepository.save(reservationsToCreate);
+    }
+
+    return createdSchedules;
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_10AM)
@@ -324,5 +350,130 @@ export class CourtSchedulesService {
       { public_id: publicId },
       { available }
     );
+  }
+
+  async fixSchedule(body: {
+    court_schedule_id: number;
+    company_customer_id?: number;
+    customer?: { name: string; phone: string; email?: string; company_id: number };
+  }) {
+    return await this.courtSchedulesRepository.manager.transaction(async (manager) => {
+      let companyCustomerId = body.company_customer_id;
+
+      if (!companyCustomerId && body.customer) {
+        const customerRepo = manager.getRepository(CompanyCustomer);
+        const customer = customerRepo.create(body.customer);
+        const saved = await customerRepo.save(customer);
+        companyCustomerId = saved.id;
+      }
+
+      if (!companyCustomerId) {
+        throw new NotFoundException('É necessário informar ou criar um cliente');
+      }
+
+      const courtSchedule = await manager.getRepository(CourtSchedule).findOne({
+        where: { id: body.court_schedule_id },
+      });
+      if (!courtSchedule) throw new NotFoundException('CourtSchedule não encontrado');
+      courtSchedule.is_fixed = true;
+      courtSchedule.company_customer_id = companyCustomerId;
+      await manager.getRepository(CourtSchedule).save(courtSchedule);
+
+      const operatingSchedule = await manager.getRepository(OperatingSchedule).findOne({
+        where: {
+          court_id: courtSchedule.court_id,
+          day_of_week_id: courtSchedule.day_of_week_id,
+          hour: courtSchedule.start_hour
+        },
+        relations: ['company_customer'],
+      });
+      if (!operatingSchedule) throw new NotFoundException('OperatingSchedule não encontrado');
+      operatingSchedule.is_fixed = true;
+      operatingSchedule.company_customer_id = companyCustomerId;
+      await manager.getRepository(OperatingSchedule).save(operatingSchedule);
+
+      const schedules = await manager.getRepository(CourtSchedule).find({
+        where: {
+          is_fixed: true,
+          company_customer_id: companyCustomerId,
+          start_hour: courtSchedule.start_hour,
+          day_of_week_id: courtSchedule.day_of_week_id,
+          court_id: courtSchedule.court_id,
+        },
+      });
+
+      for (const sched of schedules) {
+        const exists = await manager.getRepository(Reservation).findOne({
+          where: {
+            court_schedule: { id: sched.id },
+          },
+        });
+        if (!exists) {
+          let contactName: string | undefined;
+          let contactPhone: string | undefined;
+
+          if (body?.customer) {
+            contactName = body.customer.name;
+            contactPhone = body.customer.phone;
+          } else if (operatingSchedule?.company_customer) {
+            contactName = operatingSchedule.company_customer.name;
+            contactPhone = operatingSchedule.company_customer.phone;
+          } else if (body.company_customer_id) {
+            const customerRepo = manager.getRepository(CompanyCustomer);
+            const customer = await customerRepo.findOne({ where: { id: body.company_customer_id } });
+            if (customer) {
+              contactName = customer.name;
+              contactPhone = customer.phone;
+            }
+          }
+
+          if (!contactName || !contactPhone) {
+            throw new NotFoundException('É necessário informar ou criar um cliente com nome e telefone');
+          }
+
+          const reservationRepo = manager.getRepository(Reservation);
+          const reservation = reservationRepo.create({
+            court_schedule: sched,
+            contact_name: contactName,
+            contact_phone: contactPhone,
+          });
+          await reservationRepo.save(reservation);
+          reservation.token_to_cancel = this.jwtService.generateToken(reservation.id);
+          await reservationRepo.save(reservation);
+        }
+      }
+
+      return { message: 'Horário fixado com sucesso', company_customer_id: companyCustomerId };
+    });
+  }
+
+  async unfixSchedule(body: {
+    court_schedule_id: number;
+  }) {
+    const courtSchedule = await this.courtSchedulesRepository.findOne({
+      where: { id: body.court_schedule_id },
+    });
+    if (!courtSchedule) throw new NotFoundException('CourtSchedule não encontrado');
+    courtSchedule.is_fixed = false;
+    courtSchedule.company_customer_id = null;
+    await this.courtSchedulesRepository.save(courtSchedule);
+
+    const operatingSchedule = await this.operatingScheduleRepository.findOne({
+      where: {
+        court_id: courtSchedule.court_id,
+        day_of_week_id: courtSchedule.day_of_week_id,
+        hour: courtSchedule.start_hour
+      },
+    });
+    if (!operatingSchedule) throw new NotFoundException('OperatingSchedule não encontrado');
+    operatingSchedule.is_fixed = false;
+    operatingSchedule.company_customer_id = null;
+    await this.operatingScheduleRepository.save(operatingSchedule);
+
+    await this.reservationRepository.delete({
+      court_schedule: { id: courtSchedule.id },
+    });
+
+    return { message: 'Horário desafixado com sucesso' };
   }
 }

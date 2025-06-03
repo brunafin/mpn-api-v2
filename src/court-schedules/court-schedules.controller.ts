@@ -20,7 +20,9 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('court-schedules')
 @ApiTags('court-schedules')
 export class CourtSchedulesController {
-  constructor(private readonly courtSchedulesService: CourtSchedulesService) { }
+  constructor(
+    private readonly courtSchedulesService: CourtSchedulesService,
+  ) { }
 
   @Post()
   @ApiOperation({ summary: 'Criar um horário de quadra' })
@@ -148,5 +150,69 @@ export class CourtSchedulesController {
     @Body('available') available: boolean,
   ) {
     return this.courtSchedulesService.updateAvailability(publicId, available);
+  }
+
+  @Post('fix')
+  @ApiOperation({ summary: 'Fixar horário para um cliente' })
+  @ApiBody({
+    description: 'Dados para fixar o horário para um cliente',
+    schema: {
+      type: 'object',
+      properties: {
+        court_schedule_id: { type: 'number' },
+        company_customer_id: { type: 'number', nullable: true },
+        customer: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            name: { type: 'string' },
+            phone: { type: 'string' },
+            email: { type: 'string', nullable: true },
+            company_id: { type: 'number' },
+          },
+        },
+      },
+      example: {
+        court_schedule_id: 1,
+        company_customer_id: 2,
+        customer: {
+          name: 'João Silva',
+          phone: '11999999999',
+          email: 'joao@email.com',
+          company_id: 1,
+        },
+      },
+    },
+  })
+  async fixSchedule(
+    @Body() body: {
+      court_schedule_id: number;
+      company_customer_id?: number;
+      customer?: { name: string; phone: string; email?: string; company_id: number };
+    }
+  ) {
+    return this.courtSchedulesService.fixSchedule(body);
+  }
+
+  @Post('unfix')
+  @ApiOperation({ summary: 'Desafixar horário de um cliente' })
+  @ApiBody({
+    description: 'Dados para desafixar o horário',
+    schema: {
+      type: 'object',
+      properties: {
+        court_schedule_id: { type: 'number' },
+      },
+      example: {
+        court_schedule_id: 1,
+      },
+    },
+  })
+  async unfixSchedule(
+    @Body() body: {
+      court_schedule_id: number;
+    }
+  ) {
+    return this.courtSchedulesService.unfixSchedule(body);
   }
 }
