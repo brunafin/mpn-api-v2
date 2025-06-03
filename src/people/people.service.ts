@@ -49,8 +49,22 @@ export class PeopleService {
     return this.peopleRepository.findOne({ where: { id } });
   }
 
-  findOneByUsername(username: string) {
-    return this.peopleRepository.findOne({ where: { username } });
+  async findOneByUsername(username: string) {
+    const person = await this.peopleRepository.findOne({
+      where: { username },
+      relations: ['companies'],
+    });
+
+    if (!person) {
+      return null;
+    }
+
+    return {
+      username: person.username,
+      password: person.password,
+      public_id: person.public_id,
+      companies: person.companies,
+    };
   }
 
   async update(id: number, updatePersonDto: UpdatePersonDto) {
