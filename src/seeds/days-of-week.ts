@@ -7,7 +7,7 @@ export async function seedDaysOfWeek(app: INestApplicationContext) {
   const daysOfWeekRepo = app.get(getRepositoryToken(DaysOfWeek));
 
   const days = [
-    { abbreviation: 'DOM', description: 'Domingo', ref: 7 },
+    { abbreviation: 'DOM', description: 'Domingo', ref: 0 },
     { abbreviation: 'SEG', description: 'Segunda-feira', ref: 1 },
     { abbreviation: 'TER', description: 'Terça-feira', ref: 2 },
     { abbreviation: 'QUA', description: 'Quarta-feira', ref: 3 },

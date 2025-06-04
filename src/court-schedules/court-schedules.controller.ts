@@ -159,36 +159,16 @@ export class CourtSchedulesController {
     schema: {
       type: 'object',
       properties: {
-        court_schedule_id: { type: 'number' },
-        company_customer_id: { type: 'number', nullable: true },
-        customer: {
-          type: 'object',
-          nullable: true,
-          properties: {
-            name: { type: 'string' },
-            phone: { type: 'string' },
-            email: { type: 'string', nullable: true },
-            company_id: { type: 'number' },
-          },
-        },
+        court_schedule_public_id: { type: 'string', format: 'uuid' },
       },
       example: {
-        court_schedule_id: 1,
-        company_customer_id: 2,
-        customer: {
-          name: 'João Silva',
-          phone: '11999999999',
-          email: 'joao@email.com',
-          company_id: 1,
-        },
+        court_schedule_public_id: '123e4567-e89b-12d3-a456-426614174000',
       },
     },
   })
   async fixSchedule(
     @Body() body: {
-      court_schedule_id: number;
-      company_customer_id?: number;
-      customer?: { name: string; phone: string; email?: string; company_id: number };
+      court_schedule_public_id: string;
     }
   ) {
     return this.courtSchedulesService.fixSchedule(body);
@@ -201,16 +181,16 @@ export class CourtSchedulesController {
     schema: {
       type: 'object',
       properties: {
-        court_schedule_id: { type: 'number' },
+        court_schedule_public_id: { type: 'string', format: 'uuid' },
       },
       example: {
-        court_schedule_id: 1,
+        court_schedule_public_id: '123e4567-e89b-12d3-a456-426614174000',
       },
     },
   })
   async unfixSchedule(
     @Body() body: {
-      court_schedule_id: number;
+      court_schedule_public_id: string;
     }
   ) {
     return this.courtSchedulesService.unfixSchedule(body);

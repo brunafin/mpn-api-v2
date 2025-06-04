@@ -28,8 +28,11 @@ export class CompaniesCustomerService {
     return this.customerRepository.save(customer);
   }
 
-  async findAll(): Promise<CompanyCustomer[]> {
-    return this.customerRepository.find();
+  async findAllByCompany(companyId: number): Promise<Pick<CompanyCustomer, 'id' | 'name' | 'phone' | 'email'>[]> {
+    return this.customerRepository.find({
+      select: ['id', 'name', 'phone', 'email'],
+      where: { company_id: companyId },
+    });
   }
 
   async findOne(id: number): Promise<CompanyCustomer> {
