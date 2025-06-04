@@ -163,7 +163,7 @@ export class ReservationsService {
       await queryRunner.manager.update(
         CourtSchedule,
         reservation.court_schedule_id,
-        { available: true },
+        { available: true, is_fixed: false, company_customer_id: null },
       );
 
       const courtSchedule = await this.courtSchedulesRepository.findOne({

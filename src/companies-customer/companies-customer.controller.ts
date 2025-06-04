@@ -18,11 +18,12 @@ export class CompaniesCustomerController {
     return this.companiesCustomerService.create(createCompaniesCustomerDto);
   }
 
-  @Get()
-  @ApiOperation({ summary: 'Listar todos os clientes de empresa' })
-  @ApiResponse({ status: 200, description: 'Lista de clientes retornada com sucesso.' })
-  findAll() {
-    return this.companiesCustomerService.findAll();
+  @Get('company/:companyId')
+  @ApiOperation({ summary: 'Listar todos os clientes de uma empresa específica' })
+  @ApiParam({ name: 'companyId', type: Number, description: 'ID da empresa' })
+  @ApiResponse({ status: 200, description: 'Lista de clientes da empresa retornada com sucesso.' })
+  findAllByCompany(@Param('companyId') companyId: string) {
+    return this.companiesCustomerService.findAllByCompany(+companyId);
   }
 
   @Delete(':id')
