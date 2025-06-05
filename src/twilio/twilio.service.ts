@@ -17,19 +17,20 @@ export class TwilioService {
 
     this.client = Twilio(sid, token);
     this.from = from;
-
-    console.log('Twilio WhatsApp from:', this.from);
   }
 
   async sendWhatsApp(to: string, message: string): Promise<void> {
-    // Garantindo o prefixo whatsapp:
-    const toFormatted = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-    const fromFormatted = this.from.startsWith('whatsapp:') ? this.from : `whatsapp:${this.from}`;
+    try {
+      const toFormatted = to.startsWith('whatsapp:+55') ? to : `whatsapp:+55${to}`;
+      const fromFormatted = this.from.startsWith('whatsapp:') ? this.from : `whatsapp:${this.from}`;
 
-    await this.client.messages.create({
-      body: message,
-      from: fromFormatted,
-      to: toFormatted,
-    });
+      await this.client.messages.create({
+        body: message,
+        from: fromFormatted,
+        to: toFormatted,
+      });
+    } catch (error) {
+      throw new Error(`Ocorreu um erro ao enviar mensagem de aviso para o cliente: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
