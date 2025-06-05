@@ -67,6 +67,23 @@ export class PeopleService {
     };
   }
 
+  async findOneByCompanyPublicId(companyPublicId: string) {
+    const person = await this.peopleRepository
+      .createQueryBuilder('person')
+      .leftJoinAndSelect('person.companies', 'company')
+      .where('company.public_id = :companyPublicId', { companyPublicId })
+      .getOne();
+
+    if (!person) {
+      return null;
+    }
+
+    return {
+      id: person.id,
+      password: person.password,
+    };
+  }
+
   async update(id: number, updatePersonDto: UpdatePersonDto) {
     const person = await this.peopleRepository.findOne({ where: { id } });
     if (!person) {
@@ -74,6 +91,16 @@ export class PeopleService {
     }
     this.peopleRepository.merge(person, updatePersonDto);
     return this.peopleRepository.save(person);
+  }
+
+  async updatePassword(personId: number, hashedPassword: string) {
+    const person = await this.peopleRepository.findOne({ where: { id: personId } });
+    if (!person) {
+      throw new NotFoundException('Person not found');
+    }
+    person.password = hashedPassword;
+    await this.peopleRepository.save(person);
+    return { message: 'Password updated' };
   }
 
   remove(id: number) {

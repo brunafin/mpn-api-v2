@@ -27,6 +27,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesCustomerModule } from './companies-customer/companies-customer.module';
 import { CompanyCustomer } from './companies-customer/entities/company-customer.entity';
+import { TwilioModule } from './twilio/twilio.module';
 
 @Module({
   imports: [
@@ -66,7 +67,8 @@ import { CompanyCustomer } from './companies-customer/entities/company-customer.
     CompanyImagesModule,
     SportsModule,
     AuthModule,
-    CompaniesCustomerModule
+    CompaniesCustomerModule,
+    TwilioModule
   ],
   controllers: [AppController],
   providers: [AppService],
