@@ -10,8 +10,10 @@ import { Reservation } from './entities/reservation.entity';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { JwtService } from 'src/jwt/jwt.service';
-import { EmailService } from 'src/email/email.service';
+// import { EmailService } from 'src/email/email.service';
+import { TwilioService } from 'src/twilio/twilio.service';
 import { plainToInstance } from 'class-transformer';
+import { sanitizePhoneNumber } from 'src/utils/sanitizePhoneNumber';
 
 @Injectable()
 export class ReservationsService {
@@ -21,7 +23,8 @@ export class ReservationsService {
     @InjectRepository(CourtSchedule)
     private readonly courtSchedulesRepository: Repository<CourtSchedule>,
     private readonly jwtService: JwtService,
-    private readonly emailService: EmailService,
+    // private readonly emailService: EmailService,
+    private readonly twilioService: TwilioService,
     private readonly dataSource: DataSource,
   ) { }
   async create(createReservationDto: CreateReservationDto) {
@@ -94,6 +97,22 @@ export class ReservationsService {
       //   time: courtSchedule.start_hour,
       //   subjectPrefix: 'Reserva',
       // });
+
+      const message =
+        `*Reserva confirmada com sucesso!*\n` +
+        `Quadra: ${courtSchedule.court.company.name} - ${courtSchedule.court.name}\n` +
+        `Data: ${courtSchedule.date instanceof Date
+          ? courtSchedule.date.toLocaleDateString('pt-BR')
+          : new Date(courtSchedule.date).toLocaleDateString('pt-BR')}\n` +
+        `Horário: ${courtSchedule.start_hour}\n` +
+        `Valor: ${formattedPrice}\n\n` +
+        `📌 Endereço: Rua Soledade, 360, Vera Cruz, Gravataí, RS.\n\n` +
+        `- O pagamento deve ser efetuado diretamente no caixa da quadra.\n\n` +
+        `- Se você precisar cancelar a reserva, envie uma mensagem para ${courtSchedule.court.name} no whatsapp 51989589197 solicitando o cancelamento.\n\n` +
+        `Desejamos uma boa partida! 😉\n` +
+        `_Equipe Marca Pra Nós_`;
+
+      await this.twilioService.sendWhatsApp(sanitizePhoneNumber(createReservationDto.contactPhone), message);
 
       await queryRunner.commitTransaction();
       return plainToInstance(Reservation, reservation);
@@ -183,6 +202,24 @@ export class ReservationsService {
       //     subjectPrefix: 'Cancelamento de Reserva',
       //   });
       // }
+
+      const formattedPrice = courtSchedule
+        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(courtSchedule.price)
+        : '';
+
+      const message =
+        `*Reserva cancelada!*\n` +
+        `⚠️ A reserva foi cancelada com sucesso!\n` +
+        `Quadra: ${courtSchedule?.court.company.name} - ${courtSchedule?.court.name}\n` +
+        `Data: ${courtSchedule?.date instanceof Date
+          ? courtSchedule.date.toLocaleDateString('pt-BR')
+          : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')}\n` +
+        `Horário: ${courtSchedule?.start_hour}\n` +
+        `Valor: ${formattedPrice}\n\n` +
+        `_Equipe Marca Pra Nós_`;
+
+      const sanitizedPhone = sanitizePhoneNumber(reservation.contact_phone);
+      await this.twilioService.sendWhatsApp(sanitizedPhone, message);
 
       await queryRunner.commitTransaction();
       return 'Reserva cancelada com sucesso!';

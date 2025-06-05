@@ -6,11 +6,12 @@ import { Reservation } from './entities/reservation.entity';
 import { JwtService } from 'src/jwt/jwt.service';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { EmailService } from 'src/email/email.service';
+import { TwilioService } from 'src/twilio/twilio.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Reservation, CourtSchedule])],
   controllers: [ReservationsController],
-  providers: [ReservationsService, JwtService, EmailService],
+  providers: [ReservationsService, JwtService, EmailService, TwilioService],
   exports: [ReservationsService],
 })
 export class ReservationsModule { }

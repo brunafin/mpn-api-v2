@@ -24,6 +24,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // TO DO Habilitar somente o link do front
   app.enableCors({ origin: '*' })
 
   await app.listen(process.env.PORT ?? 3001);
