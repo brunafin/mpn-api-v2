@@ -96,11 +96,11 @@ export class PeopleService {
   async updatePassword(personId: number, hashedPassword: string) {
     const person = await this.peopleRepository.findOne({ where: { id: personId } });
     if (!person) {
-      throw new NotFoundException('Person not found');
+      throw new NotFoundException('Usuário não encontrado');
     }
     person.password = hashedPassword;
     await this.peopleRepository.save(person);
-    return { message: 'Password updated' };
+    return { message: 'Senha alterada' };
   }
 
   remove(id: number) {
