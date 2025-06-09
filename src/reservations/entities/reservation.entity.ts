@@ -51,6 +51,14 @@ export class Reservation {
   @Expose()
   is_prepaid: boolean;
 
+  @Column({ default: false })
+  @Expose()
+  is_barbecue_included: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  @Expose()
+  observation: string;
+
   @Column({ type: 'timestamp', nullable: true })
   @Expose()
   canceled_at: Date;

@@ -61,7 +61,6 @@ export class TwilioService {
   }
 
   async sendSms(to: string, message: string): Promise<void> {
-    console.log(`Enviando SMS para: ${to}, mensagem: ${message}`);
     try {
       const toFormatted = to.startsWith('+') ? to : `+55${to}`;
       await this.client.messages.create({

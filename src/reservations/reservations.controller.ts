@@ -28,7 +28,17 @@ export class ReservationsController {
   @ApiOperation({ summary: 'Criar uma nova reserva' })
   @ApiBody({
     description: 'Dados para criar uma nova reserva',
-    type: CreateReservationDto,
+    schema: {
+      type: 'object',
+      properties: {
+        contactName: { type: 'string', example: 'João da Silva' },
+        contactPhone: { type: 'string', example: '51912345678' },
+        courtSchedulePublicId: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
+        is_barbecue_included: { type: 'boolean', example: false },
+        observation: { type: 'string', example: 'Levar bolas próprias' },
+      },
+      required: ['contactName', 'contactPhone', 'courtSchedulePublicId'],
+    },
     examples: {
       exemplo1: {
         summary: 'Reserva com todos os dados preenchidos',
@@ -36,6 +46,8 @@ export class ReservationsController {
           contactName: 'João da Silva',
           contactPhone: '51912345678',
           courtSchedulePublicId: '550e8400-e29b-41d4-a716-446655440000',
+          is_barbecue_included: true,
+          observation: 'Levar bolas próprias',
         },
       },
     },
@@ -129,6 +141,25 @@ export class ReservationsController {
     @Body() updateReservationDto: UpdateReservationDto,
   ) {
     return this.reservationsService.updateByPublicId(public_id, updateReservationDto);
+  }
+
+  @Patch(':public_id/extra')
+  @ApiOperation({ summary: 'Atualizar apenas observation e is_barbecue_included de uma reserva' })
+  @ApiBody({
+    description: 'Campos opcionais para atualizar',
+    schema: {
+      type: 'object',
+      properties: {
+        observation: { type: 'string', example: 'Novo texto de observação' },
+        is_barbecue_included: { type: 'boolean', example: true },
+      },
+    },
+  })
+  async updateExtraFields(
+    @Param('public_id') public_id: string,
+    @Body() body: { observation?: string; is_barbecue_included?: boolean }
+  ) {
+    return this.reservationsService.updateExtraFields(public_id, body);
   }
 
   @Delete(':id')

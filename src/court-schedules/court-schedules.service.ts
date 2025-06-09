@@ -30,11 +30,14 @@ interface IReservationDetailsItemProps {
   status: ReservationStatusEnum;
   date: string;
   reservation: {
+    publicId: string;
     createdAt: string;
     isPrepaid: boolean;
     contactName: string;
     contactPhone: string;
     tokenToCancel: string;
+    observation?: string;
+    isBarbecueIncluded?: boolean;
   } | null;
   court: string;
   time: string;
@@ -175,7 +178,6 @@ export class CourtSchedulesService {
         d.setDate(d.getDate() + 1)
       ) {
         const weekdayRef = d.getDay();
-        console.log('weekdayRef', weekdayRef);
 
         const expectedSlots = operatingSchedule.filter(
           (os) => os.day_of_week.ref === weekdayRef
@@ -302,11 +304,14 @@ export class CourtSchedulesService {
         available: true,
         is_fixed: true,
         reservation: {
+          public_id: true,
           is_prepaid: true,
           contact_name: true,
           contact_phone: true,
           token_to_cancel: true,
           created_at: true,
+          observation: true,
+          is_barbecue_included: true,
         },
         court: {
           name: true,
@@ -332,6 +337,9 @@ export class CourtSchedulesService {
         contactName: courtSchedule.reservation?.contact_name,
         contactPhone: courtSchedule.reservation?.contact_phone,
         tokenToCancel: courtSchedule.reservation?.token_to_cancel,
+        observation: courtSchedule.reservation?.observation,
+        isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
+        publicId: courtSchedule.reservation?.public_id,
       } : null,
       court: courtSchedule.court.name,
       time: courtSchedule.start_hour.slice(0, 5),

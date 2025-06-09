@@ -69,6 +69,8 @@ export class ReservationsService {
         contact_name: createReservationDto.contactName,
         contact_phone: createReservationDto.contactPhone,
         court_schedule_id: courtSchedule.id,
+        observation: createReservationDto.observation,
+        is_barbecue_included: createReservationDto.isBarbecueIncluded,
       });
       reservation.token_to_cancel = this.jwtService.generateToken(
         reservation.id,
@@ -251,6 +253,16 @@ export class ReservationsService {
         contact_phone: updateReservationDto.contactPhone,
       },
     );
+  }
+
+  async updateExtraFields(
+    public_id: string,
+    fields: { observation?: string; is_barbecue_included?: boolean }
+  ) {
+    const updateData: any = {};
+    if (fields.observation !== undefined) updateData.observation = fields.observation;
+    if (fields.is_barbecue_included !== undefined) updateData.is_barbecue_included = fields.is_barbecue_included;
+    return this.reservationsRepository.update({ public_id }, updateData);
   }
 
   remove(id: number) {
