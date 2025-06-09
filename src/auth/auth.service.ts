@@ -45,18 +45,24 @@ export class AuthService {
   }
 
   async changePassword(companyPublicId: string, newPassword: string): Promise<any> {
-    if (!newPassword || newPassword.length < 6) {
-      throw new Error('A senha deve ter pelo menos 6 caracteres.');
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!newPassword || !passwordRegex.test(newPassword)) {
+      throw new Error(
+        'A senha deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais.'
+      );
     }
+
     const user = await this.peopleService.findOneByCompanyPublicId(companyPublicId);
     if (!user) {
-      throw new UnauthorizedException('Usuário não encontrado ou não autorizado.');
+      throw new UnauthorizedException('Não autorizado.');
     }
+
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      throw new Error('A nova senha não pode ser a mesma que a senha atual.');
+      throw new Error('A nova senha não pode ser igual à senha atual.');
     }
-    const hashed = await bcrypt.hash(newPassword, 10);
+
+    const hashed = await bcrypt.hash(newPassword, 12);
     await this.peopleService.updatePassword(user.id, hashed);
     return { message: 'Senha alterada com sucesso.' };
   }
