@@ -45,7 +45,6 @@ export class AuthService {
   }
 
   async changePassword(companyPublicId: string, newPassword: string): Promise<any> {
-    console.log('entrei', companyPublicId, newPassword);
     if (!newPassword || newPassword.length < 6) {
       throw new Error('A senha deve ter pelo menos 6 caracteres.');
     }

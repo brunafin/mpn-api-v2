@@ -20,6 +20,7 @@ export interface IReservationItemProps {
   court: string;
   time: string;
   customerName: string | null;
+  isBarbecueIncluded?: boolean;
 }
 
 @Injectable()
@@ -94,6 +95,8 @@ export class CompaniesService {
         'reservation.token_to_cancel',
         'reservation.created_at',
         'reservation.is_prepaid',
+        'reservation.observation',
+        'reservation.is_barbecue_included',
       ])
       .getOne();
 
@@ -107,6 +110,7 @@ export class CompaniesService {
           court: court.name,
           time: schedule.start_hour.slice(0, 5),
           customerName: schedule.reservation?.contact_name ?? null,
+          isBarbecueIncluded: schedule.reservation?.is_barbecue_included ?? false,
         }))
     }
     ).sort((a, b) => a.time.localeCompare(b.time)) ?? [];
