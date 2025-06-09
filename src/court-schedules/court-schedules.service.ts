@@ -37,9 +37,12 @@ interface IReservationDetailsItemProps {
     contactPhone: string;
     tokenToCancel: string;
     observation?: string;
-    isBarbecueIncluded?: boolean;
+    isBarbecueIncluded: boolean;
+    isNeedsNetting: boolean;
+    sportName: string;
   } | null;
   court: string;
+  sports: { id: number; name: string }[];
   time: string;
   price: number;
   weekday: string;
@@ -294,7 +297,7 @@ export class CourtSchedulesService {
   async findOneByPublicId(publicId: string) {
     const courtSchedule = await this.courtSchedulesRepository.findOne({
       where: { public_id: publicId },
-      relations: { day_of_week: true, court: true, reservation: true },
+      relations: { day_of_week: true, court: { court_sports: true }, reservation: { sport: true } },
       select: {
         id: true,
         public_id: true,
@@ -312,9 +315,14 @@ export class CourtSchedulesService {
           created_at: true,
           observation: true,
           is_barbecue_included: true,
+          sport: {
+            name: true,
+            needsNet: true,
+          },
         },
         court: {
           name: true,
+          court_sports: true,
         },
         price: true,
         day_of_week: {
@@ -339,15 +347,19 @@ export class CourtSchedulesService {
         tokenToCancel: courtSchedule.reservation?.token_to_cancel,
         observation: courtSchedule.reservation?.observation,
         isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
+        isNeedsNetting: courtSchedule.reservation?.sport?.needsNet,
+        sportName: courtSchedule.reservation?.sport?.name,
         publicId: courtSchedule.reservation?.public_id,
       } : null,
       court: courtSchedule.court.name,
+      sports: courtSchedule.court?.court_sports?.map(sport => ({
+        id: sport.id,
+        name: sport.name,
+      })),
       time: courtSchedule.start_hour.slice(0, 5),
       price: courtSchedule.price,
       weekday: courtSchedule.day_of_week.description
     }
-
-
 
     return instanceToPlain(obj);
   }
@@ -475,6 +487,7 @@ export class CourtSchedulesService {
             court_schedule_id: schedule.id,
             contact_name: courtSchedule.reservation.contact_name,
             contact_phone: courtSchedule.reservation.contact_phone,
+            sport_id: courtSchedule.reservation.sport_id,
           });
           await reservationRepo.save(reservation);
           reservation.token_to_cancel = this.jwtService.generateToken(reservation.id);

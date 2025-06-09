@@ -4,6 +4,7 @@ import { UpdateCourtDto } from './dto/update-court.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Court } from './entities/court.entity';
 import { Repository } from 'typeorm';
+import { Sport } from 'src/sports/entities/sport.entity';
 
 @Injectable()
 export class CourtsService {
@@ -12,8 +13,20 @@ export class CourtsService {
     private readonly courtRepository: Repository<Court>,
   ) { }
 
-  create(createCourtDto: CreateCourtDto) {
-    return this.courtRepository.save(createCourtDto);
+  async create(createCourtDto: CreateCourtDto) {
+    const { sports, ...courtData } = createCourtDto;
+    const sportsEntities = await this.courtRepository.manager.findByIds(Sport, sports);
+
+    if (sportsEntities.length !== sports.length) {
+      throw new NotFoundException('Um ou mais esportes não encontrados');
+    }
+
+    const court = this.courtRepository.create({
+      ...courtData,
+      court_sports: sportsEntities,
+    });
+
+    return this.courtRepository.save(court);
   }
 
   findAllByCompanyId(companyPublicId: string) {

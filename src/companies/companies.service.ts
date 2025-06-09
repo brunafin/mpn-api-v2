@@ -21,6 +21,7 @@ export interface IReservationItemProps {
   time: string;
   customerName: string | null;
   isBarbecueIncluded?: boolean;
+  isNeedsNetting?: boolean;
 }
 
 @Injectable()
@@ -74,6 +75,7 @@ export class CompaniesService {
         date: new Date(date).toISOString().split('T')[0],
       })
       .leftJoinAndSelect('schedule.reservation', 'reservation')
+      .leftJoinAndSelect('reservation.sport', 'sport')
       .where('company.public_id = :publicId', { publicId })
       .andWhere('schedule.id IS NOT NULL')
       .select([
@@ -97,9 +99,9 @@ export class CompaniesService {
         'reservation.is_prepaid',
         'reservation.observation',
         'reservation.is_barbecue_included',
+        'sport.needsNet'
       ])
       .getOne();
-
 
     const reservations: IReservationItemProps[] = company?.courts.flatMap((court) => {
       return court.court_schedule
@@ -111,6 +113,7 @@ export class CompaniesService {
           time: schedule.start_hour.slice(0, 5),
           customerName: schedule.reservation?.contact_name ?? null,
           isBarbecueIncluded: schedule.reservation?.is_barbecue_included ?? false,
+          isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
         }))
     }
     ).sort((a, b) => a.time.localeCompare(b.time)) ?? [];

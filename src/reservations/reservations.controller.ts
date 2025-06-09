@@ -34,10 +34,11 @@ export class ReservationsController {
         contactName: { type: 'string', example: 'João da Silva' },
         contactPhone: { type: 'string', example: '51912345678' },
         courtSchedulePublicId: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
-        is_barbecue_included: { type: 'boolean', example: false },
+        sportId: { type: 'number', example: 1 },
+        isBarbecueIncluded: { type: 'boolean', example: false },
         observation: { type: 'string', example: 'Levar bolas próprias' },
       },
-      required: ['contactName', 'contactPhone', 'courtSchedulePublicId'],
+      required: ['contactName', 'contactPhone', 'courtSchedulePublicId', 'sport_id'],
     },
     examples: {
       exemplo1: {
@@ -46,7 +47,8 @@ export class ReservationsController {
           contactName: 'João da Silva',
           contactPhone: '51912345678',
           courtSchedulePublicId: '550e8400-e29b-41d4-a716-446655440000',
-          is_barbecue_included: true,
+          sportId: 1,
+          isBarbecueIncluded: true,
           observation: 'Levar bolas próprias',
         },
       },

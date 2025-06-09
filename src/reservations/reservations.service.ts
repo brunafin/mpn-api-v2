@@ -71,6 +71,7 @@ export class ReservationsService {
         court_schedule_id: courtSchedule.id,
         observation: createReservationDto.observation,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
+        sport_id: createReservationDto.sportId,
       });
       reservation.token_to_cancel = this.jwtService.generateToken(
         reservation.id,
@@ -99,12 +100,13 @@ export class ReservationsService {
           ? courtSchedule.date.toLocaleDateString('pt-BR')
           : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}`;
+        `Valor: ${formattedPrice}\n` +
+        `${createReservationDto.isBarbecueIncluded && 'c/ churrasq.'}`;
 
-      await this.twilioService.sendSms(
-        createReservationDto.contactPhone,
-        message,
-      );
+      // await this.twilioService.sendSms(
+      //   createReservationDto.contactPhone,
+      //   message,
+      // );
 
       await queryRunner.commitTransaction();
       return plainToInstance(Reservation, reservation);
@@ -162,6 +164,7 @@ export class ReservationsService {
           court_schedule_id: true,
           contact_name: true,
           contact_phone: true,
+          is_barbecue_included: true,
           court_schedule: {
             court: {
               company: {
@@ -209,9 +212,10 @@ export class ReservationsService {
           ? courtSchedule.date.toLocaleDateString('pt-BR')
           : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}`;
+        `Valor: ${formattedPrice}\n` +
+        `${reservation.is_barbecue_included && 'c/ churrasq.'}`;
 
-      await this.twilioService.sendSms(reservation.contact_phone, message);
+      // await this.twilioService.sendSms(reservation.contact_phone, message);
 
       await queryRunner.commitTransaction();
       return 'Reserva cancelada com sucesso!';
