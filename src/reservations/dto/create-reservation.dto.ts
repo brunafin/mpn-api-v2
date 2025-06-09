@@ -15,4 +15,7 @@ export class CreateReservationDto {
 
   @ApiProperty({ required: false, description: 'Reserva inclui churrasqueira', example: true })
   isBarbecueIncluded?: boolean;
+
+  @ApiProperty({ description: 'ID do esporte relacionado à reserva', example: 1, type: Number })
+  sportId: number;
 }

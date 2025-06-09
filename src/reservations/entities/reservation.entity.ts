@@ -1,9 +1,11 @@
 import { Exclude, Expose } from 'class-transformer';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
+import { Sport } from 'src/sports/entities/sport.entity';
 import {
   Column,
   Entity,
   JoinColumn,
+  ManyToOne,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -62,6 +64,14 @@ export class Reservation {
   @Column({ type: 'timestamp', nullable: true })
   @Expose()
   canceled_at: Date;
+
+  @Column({ type: 'int', nullable: false })
+  @Expose()
+  sport_id: number;
+
+  @ManyToOne(() => Sport)
+  @JoinColumn({ name: 'sport_id', referencedColumnName: 'id' })
+  sport: Sport;
 
   @Column()
   @Exclude()

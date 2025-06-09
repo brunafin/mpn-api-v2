@@ -7,7 +7,7 @@ export async function seedTypeOfCourt(app: INestApplicationContext) {
   const typeOfCourts = [
     { name: 'Futsal', description: 'Quadra de futsal' },
     { name: 'Society', description: 'Quadra society' },
-    { name: 'Beach', description: 'Quadra de areia' },
+    { name: 'Areia', description: 'Quadra de areia' },
   ];
 
   for (const type of typeOfCourts) {

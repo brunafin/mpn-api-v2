@@ -73,6 +73,14 @@ export class Court {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
+  @Column({ default: true })
+  @Expose()
+  is_covered: boolean;
+
+  @Column({ default: false })
+  @Expose()
+  is_can_have_net: boolean;
+
   @ManyToOne(() => TypeOfCourt, (type) => type.id)
   @JoinColumn({ name: 'type_of_court_id' })
   type_of_court: TypeOfCourt;
@@ -89,5 +97,5 @@ export class Court {
       referencedColumnName: 'id',
     },
   })
-  sports: Sport[];
+  court_sports: Sport[];
 }

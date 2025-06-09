@@ -3,6 +3,7 @@ import { OperatingSchedule } from 'src/operating-schedule/entities/operating-sch
 import { Column, Entity, JoinTable, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Court } from 'src/courts/entities/court.entity';
 import { ManyToMany } from 'typeorm';
+import { Reservation } from 'src/reservations/entities/reservation.entity';
 
 @Entity({ name: 'sport' })
 export class Sport {
@@ -12,7 +13,13 @@ export class Sport {
   @Column({ length: 20 })
   name: string;
 
-  @ManyToMany(() => Court, (court) => court.sports)
+  @Column({ type: 'boolean', default: false })
+  needsNet: boolean;
+
+  @OneToMany(() => Reservation, (reservartion) => reservartion.sport)
+  reservations: Reservation[];
+
+  @ManyToMany(() => Court, (court) => court.court_sports)
   @JoinTable({
     name: 'court_sports',
     joinColumn: {
