@@ -15,7 +15,7 @@ export class CompaniesCustomerService {
   async create(createCompaniesCustomerDto: CreateCompaniesCustomerDto): Promise<CompanyCustomer> {
     const existingCustomer = await this.customerRepository.findOne({
       where: {
-        name: createCompaniesCustomerDto.name,
+        name: createCompaniesCustomerDto.name.trim(),
         phone: createCompaniesCustomerDto.phone,
       },
     });
