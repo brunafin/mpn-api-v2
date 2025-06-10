@@ -5,8 +5,8 @@ import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
-@ApiTags('whatsapp')
-@Controller('whatsapp')
+@ApiTags('twilio')
+@Controller('twilio')
 export class WhatsAppController {
   constructor(private readonly twilioService: TwilioService) { }
 

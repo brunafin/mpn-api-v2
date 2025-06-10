@@ -28,6 +28,7 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesCustomerModule } from './companies-customer/companies-customer.module';
 import { CompanyCustomer } from './companies-customer/entities/company-customer.entity';
 import { TwilioModule } from './twilio/twilio.module';
+import { ZenviaModule } from './zenvia-sms/zenvia-sms.module';
 
 @Module({
   imports: [
@@ -68,7 +69,8 @@ import { TwilioModule } from './twilio/twilio.module';
     SportsModule,
     AuthModule,
     CompaniesCustomerModule,
-    TwilioModule
+    TwilioModule,
+    ZenviaModule
   ],
   controllers: [AppController],
   providers: [AppService],
