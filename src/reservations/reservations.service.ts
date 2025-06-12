@@ -25,7 +25,7 @@ export class ReservationsService {
     private readonly twilioService: TwilioService,
     private readonly zenviaService: ZenviaService,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
   async create(createReservationDto: CreateReservationDto) {
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -71,7 +71,10 @@ export class ReservationsService {
         contact_name: createReservationDto.contactName,
         contact_phone: createReservationDto.contactPhone,
         court_schedule_id: courtSchedule.id,
-        observation: createReservationDto.observation,
+        observation:
+          createReservationDto.observation && createReservationDto.observation?.length > 0
+            ? createReservationDto.observation
+            : undefined,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
         sport_id: createReservationDto.sportId,
       });
@@ -98,9 +101,10 @@ export class ReservationsService {
         `Marca Pra Nos:\n` +
         `Reserva confirmada!\n` +
         `Quadra: ${courtSchedule.court.company.name} - Q.${courtSchedule.court.name}\n` +
-        `${courtSchedule.date instanceof Date
-          ? courtSchedule.date.toLocaleDateString('pt-BR')
-          : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
+        `${
+          courtSchedule.date instanceof Date
+            ? courtSchedule.date.toLocaleDateString('pt-BR')
+            : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
         `Valor: ${formattedPrice}\n` +
         `${createReservationDto.isBarbecueIncluded && 'c/ churrasq.'}`;
@@ -203,10 +207,10 @@ export class ReservationsService {
 
       const formattedPrice = courtSchedule
         ? new Intl.NumberFormat('pt-BR', {
-          style: 'decimal',
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(courtSchedule.price)
+            style: 'decimal',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }).format(courtSchedule.price)
         : '';
 
       const startHourFormatted = courtSchedule?.start_hour
@@ -217,9 +221,10 @@ export class ReservationsService {
         `Marca Pra Nos:\n` +
         `Reserva cancelada!\n` +
         `Quadra: ${courtSchedule?.court.company.name} - Q.${courtSchedule?.court.name}\n` +
-        `${courtSchedule?.date instanceof Date
-          ? courtSchedule.date.toLocaleDateString('pt-BR')
-          : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
+        `${
+          courtSchedule?.date instanceof Date
+            ? courtSchedule.date.toLocaleDateString('pt-BR')
+            : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
         `Valor: ${formattedPrice}\n` +
         `${reservation.is_barbecue_included && 'c/ churrasq.'}`;
@@ -230,10 +235,7 @@ export class ReservationsService {
         //   'Essa mensagem é um teste\n' + message,
         // );
       } else {
-        await this.zenviaService.sendSms(
-          reservation.contact_phone,
-          message,
-        );
+        await this.zenviaService.sendSms(reservation.contact_phone, message);
       }
 
       await queryRunner.commitTransaction();
@@ -280,11 +282,13 @@ export class ReservationsService {
 
   async updateExtraFields(
     public_id: string,
-    fields: { observation?: string; is_barbecue_included?: boolean }
+    fields: { observation?: string; is_barbecue_included?: boolean },
   ) {
     const updateData: any = {};
-    if (fields.observation !== undefined) updateData.observation = fields.observation;
-    if (fields.is_barbecue_included !== undefined) updateData.is_barbecue_included = fields.is_barbecue_included;
+    if (fields.observation !== undefined)
+      updateData.observation = fields.observation;
+    if (fields.is_barbecue_included !== undefined)
+      updateData.is_barbecue_included = fields.is_barbecue_included;
     return this.reservationsRepository.update({ public_id }, updateData);
   }
 

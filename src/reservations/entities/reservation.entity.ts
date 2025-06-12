@@ -47,10 +47,6 @@ export class Reservation {
 
   @Column({ default: false })
   @Expose()
-  is_canceled: boolean;
-
-  @Column({ default: false })
-  @Expose()
   is_prepaid: boolean;
 
   @Column({ default: false })
@@ -61,11 +57,7 @@ export class Reservation {
   @Expose()
   observation: string;
 
-  @Column({ type: 'timestamp', nullable: true })
-  @Expose()
-  canceled_at: Date;
-
-  @Column({ type: 'int', nullable: false })
+  @Column({ type: 'int' })
   @Expose()
   sport_id: number;
 
