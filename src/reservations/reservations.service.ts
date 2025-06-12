@@ -109,7 +109,7 @@ export class ReservationsService {
         `Valor: ${formattedPrice}\n`;
 
       if (createReservationDto.isBarbecueIncluded) {
-        message = message + '\n c/ churrasq.';
+        message = message + 'c/ churrasq.';
       }
 
       if (process.env.TYPE_ENV !== 'production') {
@@ -231,7 +231,7 @@ export class ReservationsService {
         `Valor: ${formattedPrice}\n`;
 
       if (reservation.is_barbecue_included) {
-        message = message + '\n c/ churrasq.';
+        message = message + 'c/ churrasq.';
       }
 
       if (process.env.TYPE_ENV !== 'production') {
