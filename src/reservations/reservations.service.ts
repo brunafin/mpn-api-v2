@@ -72,7 +72,8 @@ export class ReservationsService {
         contact_phone: createReservationDto.contactPhone,
         court_schedule_id: courtSchedule.id,
         observation:
-          createReservationDto.observation && createReservationDto.observation?.length > 0
+          createReservationDto.observation &&
+          createReservationDto.observation?.length > 0
             ? createReservationDto.observation
             : undefined,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
@@ -97,7 +98,7 @@ export class ReservationsService {
         ? courtSchedule.start_hour.slice(0, 5)
         : '';
 
-      const message =
+      let message =
         `Reserva confirmada!\n` +
         `Quadra: ${courtSchedule.court.company.name} - Q.${courtSchedule.court.name}\n` +
         `${
@@ -105,8 +106,11 @@ export class ReservationsService {
             ? courtSchedule.date.toLocaleDateString('pt-BR')
             : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}\n` +
-        `${createReservationDto.isBarbecueIncluded && 'c/ churrasq.'}`;
+        `Valor: ${formattedPrice}\n`;
+
+      if (createReservationDto.isBarbecueIncluded) {
+        message = message + '\n c/ churrasq.';
+      }
 
       if (process.env.TYPE_ENV !== 'production') {
         await this.twilioService.sendSms(
@@ -216,7 +220,7 @@ export class ReservationsService {
         ? courtSchedule.start_hour.slice(0, 5)
         : '';
 
-      const message =
+      let message =
         `Reserva cancelada!\n` +
         `Quadra: ${courtSchedule?.court.company.name} - Q.${courtSchedule?.court.name}\n` +
         `${
@@ -224,8 +228,11 @@ export class ReservationsService {
             ? courtSchedule.date.toLocaleDateString('pt-BR')
             : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}\n` +
-        `${reservation.is_barbecue_included && 'c/ churrasq.'}`;
+        `Valor: ${formattedPrice}\n`;
+
+      if (reservation.is_barbecue_included) {
+        message = message + '\n c/ churrasq.';
+      }
 
       if (process.env.TYPE_ENV !== 'production') {
         await this.twilioService.sendSms(
