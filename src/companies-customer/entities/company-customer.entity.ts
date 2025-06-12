@@ -4,7 +4,7 @@ import { CourtSchedule } from "src/court-schedules/entities/court-schedule.entit
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, Unique } from "typeorm";
 
 @Entity({ name: 'company_customer' })
-@Unique(['name', 'phone'])
+@Unique(['name', 'phone', 'company_id'])
 export class CompanyCustomer {
   @PrimaryGeneratedColumn()
   @Exclude()

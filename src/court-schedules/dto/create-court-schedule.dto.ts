@@ -36,6 +36,9 @@ export class CreateCourtScheduleDto {
   @ApiProperty({ description: 'ID da quadra' })
   court_id: number;
 
+  @ApiProperty({ description: 'ID do esporte' })
+  sport_id: number | null;
+
   @ApiProperty({ description: 'ID do dia da semana' })
   day_of_week_id: number;
 

@@ -9,6 +9,7 @@ import {
   PrimaryColumn,
   Unique,
 } from 'typeorm';
+import { Sport } from 'src/sports/entities/sport.entity';
 
 @Entity()
 @Unique(['hour', 'court_id', 'day_of_week_id'])
@@ -31,6 +32,9 @@ export class OperatingSchedule {
   @Column({ nullable: true })
   company_customer_id: number | null;
 
+  @Column({ type: 'int', nullable: true })
+  sport_id: number | null;
+
   @ManyToOne(() => Court, (court) => court.operating_schedule)
   @JoinColumn({ name: 'court_id' })
   court: Court;
@@ -42,4 +46,8 @@ export class OperatingSchedule {
   @ManyToOne(() => CompanyCustomer, { nullable: true })
   @JoinColumn({ name: 'company_customer_id' })
   company_customer: CompanyCustomer;
+
+  @ManyToOne(() => Sport)
+  @JoinColumn({ name: 'sport_id', referencedColumnName: 'id' })
+  sport: Sport;
 }

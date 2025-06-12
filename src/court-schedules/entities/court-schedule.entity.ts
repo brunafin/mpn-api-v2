@@ -3,6 +3,7 @@ import { CompanyCustomer } from 'src/companies-customer/entities/company-custome
 import { Court } from 'src/courts/entities/court.entity';
 import { DaysOfWeek } from 'src/days-of-week/entities/days-of-week.entity';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
+import { Sport } from 'src/sports/entities/sport.entity';
 import {
   Column,
   Entity,
@@ -71,8 +72,16 @@ export class CourtSchedule {
   @Expose()
   company_customer_id: number | null;
 
+  @Column({ type: 'int', nullable: true })
+  @Expose()
+  sport_id: number | null;
+
   @ManyToOne(() => CompanyCustomer, { nullable: true })
   @JoinColumn({ name: 'company_customer_id' })
   @Expose()
   company_customer: CompanyCustomer;
+
+  @ManyToOne(() => Sport)
+  @JoinColumn({ name: 'sport_id', referencedColumnName: 'id' })
+  sport: Sport;
 }
