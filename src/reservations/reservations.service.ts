@@ -98,7 +98,6 @@ export class ReservationsService {
         : '';
 
       const message =
-        `Marca Pra Nos:\n` +
         `Reserva confirmada!\n` +
         `Quadra: ${courtSchedule.court.company.name} - Q.${courtSchedule.court.name}\n` +
         `${
@@ -110,10 +109,10 @@ export class ReservationsService {
         `${createReservationDto.isBarbecueIncluded && 'c/ churrasq.'}`;
 
       if (process.env.TYPE_ENV !== 'production') {
-        // await this.twilioService.sendSms(
-        //   createReservationDto.contactPhone,
-        //   'Essa mensagem é um teste\n' + message,
-        // );
+        await this.twilioService.sendSms(
+          createReservationDto.contactPhone,
+          'Essa mensagem é um teste\n' + message,
+        );
       } else {
         await this.zenviaService.sendSms(
           createReservationDto.contactPhone,
@@ -218,7 +217,6 @@ export class ReservationsService {
         : '';
 
       const message =
-        `Marca Pra Nos:\n` +
         `Reserva cancelada!\n` +
         `Quadra: ${courtSchedule?.court.company.name} - Q.${courtSchedule?.court.name}\n` +
         `${
@@ -230,10 +228,10 @@ export class ReservationsService {
         `${reservation.is_barbecue_included && 'c/ churrasq.'}`;
 
       if (process.env.TYPE_ENV !== 'production') {
-        // await this.twilioService.sendSms(
-        //   reservation.contact_phone,
-        //   'Essa mensagem é um teste\n' + message,
-        // );
+        await this.twilioService.sendSms(
+          reservation.contact_phone,
+          'Essa mensagem é um teste\n' + message,
+        );
       } else {
         await this.zenviaService.sendSms(reservation.contact_phone, message);
       }
