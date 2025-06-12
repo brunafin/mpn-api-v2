@@ -13,6 +13,8 @@ import { JwtService } from 'src/jwt/jwt.service';
 import { TwilioService } from 'src/twilio/twilio.service';
 import { plainToInstance } from 'class-transformer';
 import { ZenviaService } from 'src/zenvia-sms/zenvia-sms.service';
+import { checkIsCellphoneNumberBR } from 'src/utils/checkIsCellphoneNumberBR';
+import { normalizeText } from 'src/utils/normalizeText';
 
 @Injectable()
 export class ReservationsService {
@@ -100,28 +102,30 @@ export class ReservationsService {
 
       let message =
         `Reserva confirmada!\n` +
-        `Quadra: ${courtSchedule.court.company.name} - Q.${courtSchedule.court.name}\n` +
+        `Quadra: ${normalizeText(courtSchedule?.court.company.name)} - Q.${courtSchedule.court.name}\n` +
         `${
           courtSchedule.date instanceof Date
             ? courtSchedule.date.toLocaleDateString('pt-BR')
             : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}\n`;
+        `Valor: ${formattedPrice}`;
 
       if (createReservationDto.isBarbecueIncluded) {
-        message = message + 'c/ churrasq.';
+        message = message + '\nc/ churrasq.';
       }
 
-      if (process.env.TYPE_ENV !== 'production') {
-        await this.twilioService.sendSms(
-          createReservationDto.contactPhone,
-          'Essa mensagem é um teste\n' + message,
-        );
-      } else {
-        await this.zenviaService.sendSms(
-          createReservationDto.contactPhone,
-          message,
-        );
+      if (checkIsCellphoneNumberBR(createReservationDto.contactPhone)) {
+        if (process.env.TYPE_ENV !== 'production') {
+          await this.twilioService.sendSms(
+            createReservationDto.contactPhone,
+            'Essa mensagem é um teste\n' + message,
+          );
+        } else {
+          await this.zenviaService.sendSms(
+            createReservationDto.contactPhone,
+            message,
+          );
+        }
       }
 
       await queryRunner.commitTransaction();
@@ -222,26 +226,29 @@ export class ReservationsService {
 
       let message =
         `Reserva cancelada!\n` +
-        `Quadra: ${courtSchedule?.court.company.name} - Q.${courtSchedule?.court.name}\n` +
+        `Quadra: ${normalizeText(courtSchedule?.court.company.name!)} - Q.${courtSchedule?.court.name}\n` +
         `${
           courtSchedule?.date instanceof Date
             ? courtSchedule.date.toLocaleDateString('pt-BR')
             : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}\n`;
+        `Valor: ${formattedPrice}`;
 
       if (reservation.is_barbecue_included) {
-        message = message + 'c/ churrasq.';
+        message = message + '\nc/ churrasq.';
       }
 
-      if (process.env.TYPE_ENV !== 'production') {
-        await this.twilioService.sendSms(
-          reservation.contact_phone,
-          'Essa mensagem é um teste\n' + message,
-        );
-      } else {
-        await this.zenviaService.sendSms(reservation.contact_phone, message);
+      if(checkIsCellphoneNumberBR(reservation.contact_phone)){
+        if (process.env.TYPE_ENV !== 'production') {
+          await this.twilioService.sendSms(
+            reservation.contact_phone,
+            'Essa mensagem é um teste\n' + message,
+          );
+        } else {
+          await this.zenviaService.sendSms(reservation.contact_phone, message);
+        }
       }
+
 
       await queryRunner.commitTransaction();
       return 'Reserva cancelada com sucesso!';
