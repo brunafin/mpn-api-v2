@@ -18,6 +18,7 @@ import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { JwtService } from 'src/jwt/jwt.service';
+import { IPublicCourtSchedule } from './interfaces';
 
 export enum ReservationStatusEnum {
   FIXED = 'fixed',
@@ -63,7 +64,7 @@ export class CourtSchedulesService {
     @InjectRepository(Reservation)
     private readonly reservationRepository: Repository<Reservation>,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
   create(createCourtScheduleDto: CreateCourtScheduleDto) {
     const courtSchedule = this.courtSchedulesRepository.create(
       createCourtScheduleDto,
@@ -371,19 +372,19 @@ export class CourtSchedulesService {
       date: formatDateDateToDDMMYYYY(String(courtSchedule.date)),
       reservation: courtSchedule.reservation
         ? {
-            createdAt: formatDateTimestampToDDMMYYYY(
-              courtSchedule?.reservation?.created_at,
-            ),
-            isPrepaid: courtSchedule.reservation?.is_prepaid,
-            contactName: courtSchedule.reservation?.contact_name,
-            contactPhone: courtSchedule.reservation?.contact_phone,
-            tokenToCancel: courtSchedule.reservation?.token_to_cancel,
-            observation: courtSchedule.reservation?.observation,
-            isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
-            isNeedsNetting: courtSchedule.reservation?.sport?.needsNet,
-            sportName: courtSchedule.reservation?.sport?.name,
-            publicId: courtSchedule.reservation?.public_id,
-          }
+          createdAt: formatDateTimestampToDDMMYYYY(
+            courtSchedule?.reservation?.created_at,
+          ),
+          isPrepaid: courtSchedule.reservation?.is_prepaid,
+          contactName: courtSchedule.reservation?.contact_name,
+          contactPhone: courtSchedule.reservation?.contact_phone,
+          tokenToCancel: courtSchedule.reservation?.token_to_cancel,
+          observation: courtSchedule.reservation?.observation,
+          isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
+          isNeedsNetting: courtSchedule.reservation?.sport?.needsNet,
+          sportName: courtSchedule.reservation?.sport?.name,
+          publicId: courtSchedule.reservation?.public_id,
+        }
         : null,
       court: courtSchedule.court.name,
       sports: courtSchedule.court?.court_sports?.map((sport) => ({
@@ -521,9 +522,9 @@ export class CourtSchedulesService {
             existingReservations.some(
               (reservation) =>
                 reservation.contact_name !==
-                  courtSchedule.reservation.contact_name ||
+                courtSchedule.reservation.contact_name ||
                 reservation.contact_phone !==
-                  courtSchedule.reservation.contact_phone,
+                courtSchedule.reservation.contact_phone,
             )
           ) {
             throw new NotFoundException(
@@ -610,5 +611,88 @@ export class CourtSchedulesService {
         return { message: 'Horário desafixado com sucesso' };
       },
     );
+  }
+
+  // Marca Pra Nós público
+  async findWhereToPlay({
+    city,
+    date,
+  }: { city?: string; date?: Date }) {
+    const courtSchedule = await this.courtSchedulesRepository.find({
+      where: {
+        available: true,
+        date,
+        court: {
+          company: { city: ILike(`%${city}%`) },
+        }
+      },
+      relations: {
+        court: {
+          company: true,
+          court_sports: true,
+        },
+        day_of_week: true,
+      },
+      select: {
+        date: true,
+        start_hour: true,
+        price: true,
+        court: {
+          name: true,
+          company: {
+            logo_url: true,
+            instagram_url: true,
+            name: true,
+            phone: true,
+            street: true,
+            number: true,
+            neighborhood: true,
+            city: true,
+            uf: true,
+          },
+          court_sports: {
+            name: true,
+          }
+        },
+        day_of_week: {
+          description: true,
+        },
+      },
+    });
+
+    // Agrupa os horários por company
+    const groupedByCompany = courtSchedule.reduce((acc, item) => {
+      const companyKey = item.court.company.name + item.court.company.phone;
+      if (!acc[companyKey]) {
+        acc[companyKey] = {
+          logoUrl: item.court.company.logo_url,
+          name: item.court.company.name,
+          phone: item.court.company.phone,
+          instagramUrl: item.court.company.instagram_url || '',
+          address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
+          sports: item.court.court_sports.map(sport => sport.name).join(', '),
+          availableHours: [] as {
+            date: string;
+            startHour: string;
+            price: number;
+            courtName: string;
+            courtSports: string;
+            dayOfWeekAbb: string;
+          }[],
+        };
+      }
+      acc[companyKey].availableHours.push({
+        date: formatDateDateToDDMMYYYY(String(item.date)),
+        startHour: item.start_hour.slice(0, 5),
+        courtName: item.court.name,
+        price: item.price,
+        courtSports: item.court.court_sports.map(sport => sport.name).join(', '),
+        dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
+      });
+      return acc;
+    }, {} as Record<string, IPublicCourtSchedule>);
+
+    const objToFront: IPublicCourtSchedule[] = Object.values(groupedByCompany);
+    return objToFront;
   }
 }
