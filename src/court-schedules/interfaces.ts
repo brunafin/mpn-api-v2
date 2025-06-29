@@ -6,7 +6,7 @@ export interface IPublicCourtSchedule {
     sports: string;
     instagramUrl: string;
     availableHours: {
-        date: string;
+        date: Date;
         startHour: string;
         price: number;
         courtName: string;
