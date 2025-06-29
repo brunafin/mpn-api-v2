@@ -18,7 +18,8 @@ import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { JwtService } from 'src/jwt/jwt.service';
-import { IPublicCourtSchedule } from './interfaces';
+import { IAvailableHours, IDetailsCourt, IWhereToPlayCourtList } from './interfaces';
+import { Company } from 'src/companies/entities/company.entity';
 
 export enum ReservationStatusEnum {
   FIXED = 'fixed',
@@ -57,6 +58,8 @@ export class CourtSchedulesService {
   constructor(
     @InjectRepository(CourtSchedule)
     private readonly courtSchedulesRepository: Repository<CourtSchedule>,
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
     @InjectRepository(OperatingSchedule)
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
     @InjectRepository(Court)
@@ -689,10 +692,120 @@ export class CourtSchedulesService {
         dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
       });
       return acc;
-    }, {} as Record<string, IPublicCourtSchedule>);
+    }, {} as Record<string, IWhereToPlayCourtList>);
 
+
+    const objToFront: IWhereToPlayCourtList[] = Object.values(groupedByCompany);
+    return objToFront;
+  }
+
+  async findDetailsCourt({
+    slug,
+    date
+  }: { slug?: string, date: Date }): Promise<IDetailsCourt> {
+    const company = await this.companyRepository.findOne({
+      where: {
+        instagram_url: ILike(`%/${slug}`),
+      },
+      relations: {
+        courts: {
+          court_sports: true,
+          court_schedule: true,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        logo_url: true,
+        instagram_url: true,
+        street: true,
+        number: true,
+        neighborhood: true,
+        city: true,
+        uf: true,
+        courts: {
+          id: true,
+          name: true,
+          court_sports: {
+            id: true,
+            name: true,
+          },
+          court_schedule: true,
+        },
+      },
+    });
     
-    const objToFront: IPublicCourtSchedule[] = Object.values(groupedByCompany);
+    if (!company) {
+      throw new NotFoundException('Quadra não encontrada');
+    }
+
+    const objToFront: IDetailsCourt = {
+      logoUrl: company.logo_url,
+      name: company.name,
+      phone: company.phone,
+      instagramUrl: company.instagram_url || '',
+      address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
+      sports: company.courts.flatMap(court => court.court_sports.map(sport => sport.name)).join(', '),
+      availableHours: [],
+      characteristics: ['Estacionamento pago/R$4,00'],
+      photoHighlightUrl: '',
+    };
+
+    return objToFront;
+  }
+
+  async findAvailableHoursByCourt({
+    slug,
+    date
+  }: { slug?: string, date: Date }): Promise<IAvailableHours[]> {
+    const courtSchedule = await this.courtSchedulesRepository.find({
+      where: {
+        available: true,
+        date,
+        court: {
+          company: {
+            instagram_url: ILike(`%/${slug}`)
+          },
+        }
+      },
+      relations: {
+        court: {
+          court_sports: true,
+        },
+        day_of_week: true,
+      },
+      select: {
+        date: true,
+        start_hour: true,
+        price: true,
+        court: {
+          name: true,
+          court_sports: {
+            name: true,
+          }
+        },
+        day_of_week: {
+          description: true,
+        },
+      },
+    });
+
+    if (courtSchedule.length === 0) {
+      return [];
+    }
+
+    const objToFront: IAvailableHours[] =
+      courtSchedule.map(item => ({
+        date: item.date,
+        startHour: item.start_hour.slice(0, 5),
+        price: item.price,
+        courtName: item.court.name,
+        courtSports: item.court.court_sports.map(sport => sport.name).join(', '),
+        dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
+      }))
+
+
     return objToFront;
   }
 }
