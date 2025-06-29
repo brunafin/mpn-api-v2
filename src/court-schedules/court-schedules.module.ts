@@ -10,9 +10,10 @@ import { AuthModule } from 'src/auth/auth.module';
 import { JwtService } from 'src/jwt/jwt.service';
 import { JwtModule } from 'src/jwt/jwt.module';
 import { PublicCourtSchedulesController } from './public-court-schedules.controller';
+import { Company } from 'src/companies/entities/company.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CourtSchedule, OperatingSchedule, Court, Reservation]), JwtModule],
+  imports: [TypeOrmModule.forFeature([CourtSchedule, OperatingSchedule, Court, Reservation, Company]), JwtModule],
   controllers: [CourtSchedulesController, PublicCourtSchedulesController],
   providers: [CourtSchedulesService],
 })
