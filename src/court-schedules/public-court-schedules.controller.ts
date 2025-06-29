@@ -15,8 +15,6 @@ import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
-// @UseGuards(AuthGuard('jwt'))
-// @ApiBearerAuth()
 @Controller('public-court-schedules')
 @ApiTags('public-court-schedules')
 export class PublicCourtSchedulesController {

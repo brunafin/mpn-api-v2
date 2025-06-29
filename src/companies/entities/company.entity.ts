@@ -49,6 +49,10 @@ export class Company {
 
   @Column({ nullable: true, type: 'text' })
   @Expose()
+  photoHighlightUrl: string;
+
+  @Column({ nullable: true, type: 'text' })
+  @Expose()
   instagram_url: string;
 
   @Column({ nullable: true, type: 'text' })
@@ -86,6 +90,14 @@ export class Company {
   @Column()
   @Exclude()
   administrator_id: number;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  @Expose()
+  characteristics: string[];
+
+  @Column({ type: 'boolean', default: true })
+  @Expose()
+  is_active: boolean;
 
   @ManyToOne(() => Person, (person) => person.companies, {
     onDelete: 'CASCADE',
