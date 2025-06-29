@@ -626,7 +626,7 @@ export class CourtSchedulesService {
         available: true,
         date,
         court: {
-          company: { city: ILike(`%${city}%`) },
+          company: { city: ILike(`%${city}%`), is_active: true },
         }
       },
       relations: {
@@ -706,6 +706,7 @@ export class CourtSchedulesService {
     const company = await this.companyRepository.findOne({
       where: {
         instagram_url: ILike(`%/${slug}`),
+        is_active: true,
       },
       relations: {
         courts: {
@@ -724,6 +725,8 @@ export class CourtSchedulesService {
         neighborhood: true,
         city: true,
         uf: true,
+        photoHighlightUrl: true,
+        characteristics: true,
         courts: {
           id: true,
           name: true,
@@ -748,8 +751,8 @@ export class CourtSchedulesService {
       address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
       sports: company.courts.flatMap(court => court.court_sports.map(sport => sport.name)).join(', '),
       availableHours: [],
-      characteristics: ['Estacionamento pago/R$4,00'],
-      photoHighlightUrl: '',
+      characteristics: company.characteristics || [],
+      photoHighlightUrl: company.photoHighlightUrl || '',
     };
 
     return objToFront;
@@ -765,7 +768,8 @@ export class CourtSchedulesService {
         date,
         court: {
           company: {
-            instagram_url: ILike(`%/${slug}`)
+            instagram_url: ILike(`%/${slug}`),
+            is_active: true,
           },
         }
       },
