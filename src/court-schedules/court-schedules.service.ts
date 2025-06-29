@@ -660,7 +660,6 @@ export class CourtSchedulesService {
       },
     });
 
-    // Agrupa os horários por company
     const groupedByCompany = courtSchedule.reduce((acc, item) => {
       const companyKey = item.court.company.name + item.court.company.phone;
       if (!acc[companyKey]) {
@@ -672,7 +671,7 @@ export class CourtSchedulesService {
           address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
           sports: item.court.court_sports.map(sport => sport.name).join(', '),
           availableHours: [] as {
-            date: string;
+            date: Date;
             startHour: string;
             price: number;
             courtName: string;
@@ -682,7 +681,7 @@ export class CourtSchedulesService {
         };
       }
       acc[companyKey].availableHours.push({
-        date: formatDateDateToDDMMYYYY(String(item.date)),
+        date: item.date,
         startHour: item.start_hour.slice(0, 5),
         courtName: item.court.name,
         price: item.price,
@@ -692,6 +691,7 @@ export class CourtSchedulesService {
       return acc;
     }, {} as Record<string, IPublicCourtSchedule>);
 
+    
     const objToFront: IPublicCourtSchedule[] = Object.values(groupedByCompany);
     return objToFront;
   }
