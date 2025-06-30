@@ -18,7 +18,11 @@ import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { ReservationsService } from 'src/reservations/reservations.service';
 import { JwtService } from 'src/jwt/jwt.service';
-import { IAvailableHours, IDetailsCourt, IWhereToPlayCourtList } from './interfaces';
+import {
+  IAvailableHours,
+  IDetailsCourt,
+  IWhereToPlayCourtList,
+} from './interfaces';
 import { Company } from 'src/companies/entities/company.entity';
 
 export enum ReservationStatusEnum {
@@ -67,7 +71,7 @@ export class CourtSchedulesService {
     @InjectRepository(Reservation)
     private readonly reservationRepository: Repository<Reservation>,
     private readonly jwtService: JwtService,
-  ) { }
+  ) {}
   create(createCourtScheduleDto: CreateCourtScheduleDto) {
     const courtSchedule = this.courtSchedulesRepository.create(
       createCourtScheduleDto,
@@ -375,19 +379,19 @@ export class CourtSchedulesService {
       date: formatDateDateToDDMMYYYY(String(courtSchedule.date)),
       reservation: courtSchedule.reservation
         ? {
-          createdAt: formatDateTimestampToDDMMYYYY(
-            courtSchedule?.reservation?.created_at,
-          ),
-          isPrepaid: courtSchedule.reservation?.is_prepaid,
-          contactName: courtSchedule.reservation?.contact_name,
-          contactPhone: courtSchedule.reservation?.contact_phone,
-          tokenToCancel: courtSchedule.reservation?.token_to_cancel,
-          observation: courtSchedule.reservation?.observation,
-          isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
-          isNeedsNetting: courtSchedule.reservation?.sport?.needsNet,
-          sportName: courtSchedule.reservation?.sport?.name,
-          publicId: courtSchedule.reservation?.public_id,
-        }
+            createdAt: formatDateTimestampToDDMMYYYY(
+              courtSchedule?.reservation?.created_at,
+            ),
+            isPrepaid: courtSchedule.reservation?.is_prepaid,
+            contactName: courtSchedule.reservation?.contact_name,
+            contactPhone: courtSchedule.reservation?.contact_phone,
+            tokenToCancel: courtSchedule.reservation?.token_to_cancel,
+            observation: courtSchedule.reservation?.observation,
+            isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
+            isNeedsNetting: courtSchedule.reservation?.sport?.needsNet,
+            sportName: courtSchedule.reservation?.sport?.name,
+            publicId: courtSchedule.reservation?.public_id,
+          }
         : null,
       court: courtSchedule.court.name,
       sports: courtSchedule.court?.court_sports?.map((sport) => ({
@@ -525,9 +529,9 @@ export class CourtSchedulesService {
             existingReservations.some(
               (reservation) =>
                 reservation.contact_name !==
-                courtSchedule.reservation.contact_name ||
+                  courtSchedule.reservation.contact_name ||
                 reservation.contact_phone !==
-                courtSchedule.reservation.contact_phone,
+                  courtSchedule.reservation.contact_phone,
             )
           ) {
             throw new NotFoundException(
@@ -617,17 +621,14 @@ export class CourtSchedulesService {
   }
 
   // Marca Pra Nós público
-  async findWhereToPlay({
-    city,
-    date,
-  }: { city?: string; date?: Date }) {
+  async findWhereToPlay({ city, date }: { city?: string; date?: Date }) {
     const courtSchedule = await this.courtSchedulesRepository.find({
       where: {
         available: true,
         date,
         court: {
           company: { city: ILike(`%${city}%`), is_active: true },
-        }
+        },
       },
       relations: {
         court: {
@@ -655,7 +656,7 @@ export class CourtSchedulesService {
           },
           court_sports: {
             name: true,
-          }
+          },
         },
         day_of_week: {
           description: true,
@@ -663,37 +664,43 @@ export class CourtSchedulesService {
       },
     });
 
-    const groupedByCompany = courtSchedule.reduce((acc, item) => {
-      const companyKey = item.court.company.name + item.court.company.phone;
-      if (!acc[companyKey]) {
-        acc[companyKey] = {
-          logoUrl: item.court.company.logo_url,
-          name: item.court.company.name,
-          phone: item.court.company.phone,
-          instagramUrl: item.court.company.instagram_url || '',
-          address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
-          sports: item.court.court_sports.map(sport => sport.name).join(', '),
-          availableHours: [] as {
-            date: Date;
-            startHour: string;
-            price: number;
-            courtName: string;
-            courtSports: string;
-            dayOfWeekAbb: string;
-          }[],
-        };
-      }
-      acc[companyKey].availableHours.push({
-        date: item.date,
-        startHour: item.start_hour.slice(0, 5),
-        courtName: item.court.name,
-        price: item.price,
-        courtSports: item.court.court_sports.map(sport => sport.name).join(', '),
-        dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
-      });
-      return acc;
-    }, {} as Record<string, IWhereToPlayCourtList>);
-
+    const groupedByCompany = courtSchedule.reduce(
+      (acc, item) => {
+        const companyKey = item.court.company.name + item.court.company.phone;
+        if (!acc[companyKey]) {
+          acc[companyKey] = {
+            logoUrl: item.court.company.logo_url,
+            name: item.court.company.name,
+            phone: item.court.company.phone,
+            instagramUrl: item.court.company.instagram_url || '',
+            address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
+            sports: item.court.court_sports
+              .map((sport) => sport.name)
+              .join(', '),
+            availableHours: [] as {
+              date: Date;
+              startHour: string;
+              price: number;
+              courtName: string;
+              courtSports: string;
+              dayOfWeekAbb: string;
+            }[],
+          };
+        }
+        acc[companyKey].availableHours.push({
+          date: item.date,
+          startHour: item.start_hour.slice(0, 5),
+          courtName: item.court.name,
+          price: item.price,
+          courtSports: item.court.court_sports
+            .map((sport) => sport.name)
+            .join(', '),
+          dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
+        });
+        return acc;
+      },
+      {} as Record<string, IWhereToPlayCourtList>,
+    );
 
     const objToFront: IWhereToPlayCourtList[] = Object.values(groupedByCompany);
     return objToFront;
@@ -701,8 +708,11 @@ export class CourtSchedulesService {
 
   async findDetailsCourt({
     slug,
-    date
-  }: { slug?: string, date: Date }): Promise<IDetailsCourt> {
+    date,
+  }: {
+    slug?: string;
+    date: Date;
+  }): Promise<IDetailsCourt> {
     const company = await this.companyRepository.findOne({
       where: {
         instagram_url: ILike(`%/${slug}`),
@@ -738,7 +748,7 @@ export class CourtSchedulesService {
         },
       },
     });
-    
+
     if (!company) {
       throw new NotFoundException('Quadra não encontrada');
     }
@@ -749,7 +759,9 @@ export class CourtSchedulesService {
       phone: company.phone,
       instagramUrl: company.instagram_url || '',
       address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
-      sports: company.courts.flatMap(court => court.court_sports.map(sport => sport.name)).join(', '),
+      sports: company.courts
+        .flatMap((court) => court.court_sports.map((sport) => sport.name))
+        .join(', '),
       availableHours: [],
       characteristics: company.characteristics || [],
       photoHighlightUrl: company.photoHighlightUrl || '',
@@ -760,8 +772,11 @@ export class CourtSchedulesService {
 
   async findAvailableHoursByCourt({
     slug,
-    date
-  }: { slug?: string, date: Date }): Promise<IAvailableHours[]> {
+    date,
+  }: {
+    slug?: string;
+    date: Date;
+  }): Promise<IAvailableHours[]> {
     const courtSchedule = await this.courtSchedulesRepository.find({
       where: {
         available: true,
@@ -771,7 +786,7 @@ export class CourtSchedulesService {
             instagram_url: ILike(`%/${slug}`),
             is_active: true,
           },
-        }
+        },
       },
       relations: {
         court: {
@@ -787,7 +802,7 @@ export class CourtSchedulesService {
           name: true,
           court_sports: {
             name: true,
-          }
+          },
         },
         day_of_week: {
           description: true,
@@ -799,16 +814,35 @@ export class CourtSchedulesService {
       return [];
     }
 
-    const objToFront: IAvailableHours[] =
-      courtSchedule.map(item => ({
-        date: item.date,
-        startHour: item.start_hour.slice(0, 5),
-        price: item.price,
-        courtName: item.court.name,
-        courtSports: item.court.court_sports.map(sport => sport.name).join(', '),
-        dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
-      }))
+    const objToFront: IAvailableHours[] = courtSchedule.map((item) => ({
+      date: item.date,
+      startHour: item.start_hour.slice(0, 5),
+      price: item.price,
+      courtName: item.court.name,
+      courtSports: item.court.court_sports
+        .map((sport) => sport.name)
+        .join(', '),
+      dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
+    }));
 
+    return objToFront;
+  }
+
+  async findAllCourts(): Promise<{slug: string; updatedAt: Date}[]> {
+    const companies = await this.companyRepository.find({
+      where: {
+        is_active: true,
+      },
+      select: {
+        instagram_url: true,
+        updated_at: true,
+      },
+    });
+
+    const objToFront: {slug: string; updatedAt: Date}[] = companies.map((item) => ({
+      slug: item.instagram_url?.split('/').filter(Boolean).pop() || '',
+      updatedAt: item.updated_at
+    }))
 
     return objToFront;
   }
