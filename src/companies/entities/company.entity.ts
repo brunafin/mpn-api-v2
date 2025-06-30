@@ -95,7 +95,7 @@ export class Company {
   @Expose()
   characteristics: string[];
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: false })
   @Expose()
   is_active: boolean;
 
