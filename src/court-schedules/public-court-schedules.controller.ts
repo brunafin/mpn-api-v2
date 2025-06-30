@@ -12,25 +12,26 @@ import {
 import { CourtSchedulesService } from './court-schedules.service';
 import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @Controller('public-court-schedules')
 @ApiTags('public-court-schedules')
 export class PublicCourtSchedulesController {
-  constructor(
-    private readonly courtSchedulesService: CourtSchedulesService,
-  ) { }
+  constructor(private readonly courtSchedulesService: CourtSchedulesService) {}
 
   @Get('/where-to-play')
   @ApiTags('Marca Pra Nós - Público')
   @ApiOperation({ summary: 'Encontre onde jogar' })
   @ApiQuery({ name: 'date', type: String, format: 'date', required: true })
   @ApiQuery({ name: 'city', type: String, required: true })
-  findWhereToPlay(
-    @Query('date') date: Date,
-    @Query('city') city: string,
-  ) {
+  findWhereToPlay(@Query('date') date: Date, @Query('city') city: string) {
     return this.courtSchedulesService.findWhereToPlay({
       city,
       date,
@@ -42,17 +43,14 @@ export class PublicCourtSchedulesController {
   @ApiOperation({ summary: 'Detalhes da quadra' })
   @ApiQuery({ name: 'date', type: String, format: 'date', required: true })
   @ApiQuery({ name: 'slug', type: String, required: true })
-  findDetailsCourt(
-    @Query('slug') slug: string,
-    @Query('date') date: Date,
-  ) {
+  findDetailsCourt(@Query('slug') slug: string, @Query('date') date: Date) {
     return this.courtSchedulesService.findDetailsCourt({
       slug,
-      date
+      date,
     });
   }
 
-    @Get('/available-hours-by-court')
+  @Get('/available-hours-by-court')
   @ApiTags('Marca Pra Nós - Público')
   @ApiOperation({ summary: 'Horários detalhes da quadra' })
   @ApiQuery({ name: 'date', type: String, format: 'date', required: true })
@@ -63,7 +61,14 @@ export class PublicCourtSchedulesController {
   ) {
     return this.courtSchedulesService.findAvailableHoursByCourt({
       slug,
-      date
+      date,
     });
+  }
+
+  @Get('/all-courts')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({ summary: 'Slug das quadras para sitemap' })
+  findAllCourts() {
+    return this.courtSchedulesService.findAllCourts();
   }
 }
