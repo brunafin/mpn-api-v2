@@ -1,10 +1,10 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ZenviaService } from './zenvia-sms.service'; // Altere aqui
+import { ZenviaService } from './zenvia-sms.service';
 import { AuthGuard } from '@nestjs/passport';
 
-// @UseGuards(AuthGuard('jwt'))
-// @ApiBearerAuth()
+@UseGuards(AuthGuard('jwt'))
+@ApiBearerAuth()
 @ApiTags('zenvia')
 @Controller('zenvia')
 export class ZenviaController {

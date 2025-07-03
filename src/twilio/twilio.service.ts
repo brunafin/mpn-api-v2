@@ -3,9 +3,9 @@ import * as Twilio from 'twilio';
 
 @Injectable()
 export class TwilioService {
-  private client: Twilio.Twilio;
-  private from_whatsapp: string;
-  private from_sms: string;
+  private readonly client: Twilio.Twilio;
+  private readonly from_whatsapp: string;
+  private readonly from_sms: string;
 
   constructor() {
     const sid = process.env.TWILIO_ACCOUNT_SID;

@@ -3,7 +3,7 @@ import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CourtSchedule } from './entities/court-schedule.entity';
-import { Between, ILike, In, MoreThan, Not, Repository } from 'typeorm';
+import { ILike, In, MoreThan, Not, Repository } from 'typeorm';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { UrlQueryParamCourtScheduleDto } from './dto/url-query-param-court-schedule.dto';
 import { instanceToPlain } from 'class-transformer';
@@ -16,7 +16,6 @@ import { Court } from 'src/courts/entities/court.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
-import { ReservationsService } from 'src/reservations/reservations.service';
 import { JwtService } from 'src/jwt/jwt.service';
 import {
   IAvailableHours,
