@@ -1,8 +1,5 @@
-import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
-import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
-import { Column, Entity, JoinTable, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinTable, OneToMany, PrimaryGeneratedColumn, ManyToMany } from 'typeorm';
 import { Court } from 'src/courts/entities/court.entity';
-import { ManyToMany } from 'typeorm';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
 
 @Entity({ name: 'sport' })
