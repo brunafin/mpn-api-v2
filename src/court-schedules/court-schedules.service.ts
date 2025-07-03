@@ -662,6 +662,9 @@ export class CourtSchedulesService {
           description: true,
         },
       },
+      order:{
+        start_hour: 'ASC'
+      }
     });
 
     const groupedByCompany = courtSchedule.reduce(
@@ -808,6 +811,9 @@ export class CourtSchedulesService {
           description: true,
         },
       },
+      order: {
+        start_hour: 'ASC'
+      }
     });
 
     if (courtSchedule.length === 0) {
