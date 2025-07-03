@@ -18,13 +18,7 @@ async function createDatabaseIfNotExists() {
   if (!/^[a-zA-Z0-9_]+$/.test(dbName || "")) {
     throw new Error("Invalid database name");
   }
-
-  const res = await client.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [dbName]);
-
-  if (res.rowCount === 0) {
-    await client.query(`CREATE DATABASE ${dbName}`);
-  }
-
+  
   await client.end();
 }
 
