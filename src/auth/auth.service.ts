@@ -6,8 +6,8 @@ import { JwtService } from '@nestjs/jwt';
 @Injectable()
 export class AuthService {
   constructor(
-    private peopleService: PeopleService,
-    private jwtService: JwtService
+    private readonly peopleService: PeopleService,
+    private readonly jwtService: JwtService
   ) { }
 
   async signIn(username: string, pass: string): Promise<any> {

@@ -3,8 +3,8 @@ import { Client, TextContent } from '@zenvia/sdk';
 
 @Injectable()
 export class ZenviaService {
-  private sms: ReturnType<Client['getChannel']>;
-  private from: string;
+  private readonly sms: ReturnType<Client['getChannel']>;
+  private readonly from: string;
 
   constructor() {
     const zenviaToken = process.env.ZENVIA_TOKEN;

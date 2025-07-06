@@ -4,7 +4,6 @@ import { CourtsController } from './courts.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Court } from './entities/court.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
-import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Court, OperatingSchedule])],

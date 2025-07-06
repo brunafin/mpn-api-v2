@@ -8,10 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Company } from './entities/company.entity';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
 import { ReservationStatusEnum } from 'src/court-schedules/court-schedules.service';
-import { formatDateDateToDDMMYYYY } from 'src/utils/formatDate';
 
 export interface IReservationItemProps {
   scheduleId: string;

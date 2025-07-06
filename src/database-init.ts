@@ -3,8 +3,6 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const dbName = process.env.POSTGRES_DB;
-
 async function createDatabaseIfNotExists() {
   const client = new Client({
     host: process.env.POSTGRES_HOST,
@@ -15,16 +13,6 @@ async function createDatabaseIfNotExists() {
   });
 
   await client.connect();
-  if (!/^[a-zA-Z0-9_]+$/.test(dbName || "")) {
-    throw new Error("Invalid database name");
-  }
-
-  const res = await client.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [dbName]);
-
-  if (res.rowCount === 0) {
-    await client.query(`CREATE DATABASE ${dbName}`);
-  }
-
   await client.end();
 }
 

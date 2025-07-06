@@ -3,7 +3,7 @@ import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CourtSchedule } from './entities/court-schedule.entity';
-import { Between, ILike, In, MoreThan, Not, Repository } from 'typeorm';
+import { ILike, In, MoreThan, Not, Repository } from 'typeorm';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { UrlQueryParamCourtScheduleDto } from './dto/url-query-param-court-schedule.dto';
 import { instanceToPlain } from 'class-transformer';
@@ -16,7 +16,6 @@ import { Court } from 'src/courts/entities/court.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
-import { ReservationsService } from 'src/reservations/reservations.service';
 import { JwtService } from 'src/jwt/jwt.service';
 import {
   IAvailableHours,
@@ -675,7 +674,7 @@ export class CourtSchedulesService {
             logoUrl: item.court.company.logo_url,
             name: item.court.company.name,
             phone: item.court.company.phone,
-            instagramUrl: item.court.company.instagram_url || '',
+            instagramUrl: item.court.company.instagram_url ?? '',
             address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
             sports: item.court.court_sports
               .map((sport) => sport.name)
@@ -760,14 +759,14 @@ export class CourtSchedulesService {
       logoUrl: company.logo_url,
       name: company.name,
       phone: company.phone,
-      instagramUrl: company.instagram_url || '',
+      instagramUrl: company.instagram_url ?? '',
       address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
       sports: company.courts
         .flatMap((court) => court.court_sports.map((sport) => sport.name))
         .join(', '),
       availableHours: [],
-      characteristics: company.characteristics || [],
-      photoHighlightUrl: company.photoHighlightUrl || '',
+      characteristics: company.characteristics ?? [],
+      photoHighlightUrl: company.photoHighlightUrl ?? '',
     };
 
     return objToFront;
@@ -846,7 +845,7 @@ export class CourtSchedulesService {
     });
 
     const objToFront: {slug: string; updatedAt: Date}[] = companies.map((item) => ({
-      slug: item.instagram_url?.split('/').filter(Boolean).pop() || '',
+      slug: item.instagram_url?.split('/').filter(Boolean).pop() ?? '',
       updatedAt: item.updated_at
     }))
 

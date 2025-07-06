@@ -36,7 +36,7 @@ export class PeopleService {
     if (!usernameCheck.canCreate) {
       throw new NotFoundException(usernameCheck.message);
     }
-    const password = await this.hashPassword(process.env.DEFAULT_PASSWORD || 'defaultPassword');
+    const password = await this.hashPassword(process.env.DEFAULT_PASSWORD ?? 'defaultPassword');
 
     return this.peopleRepository.save({ ...person, password });
   }
