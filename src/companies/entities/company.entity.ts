@@ -49,7 +49,7 @@ export class Company {
 
   @Column({ nullable: true, type: 'text' })
   @Expose()
-  photoHighlightUrl: string;
+  photo_highlight_url: string;
 
   @Column({ nullable: true, type: 'text' })
   @Expose()
