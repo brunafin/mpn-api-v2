@@ -662,6 +662,7 @@ export class CourtSchedulesService {
         },
       },
       order:{
+        id: 'ASC',
         start_hour: 'ASC'
       }
     });
@@ -737,7 +738,7 @@ export class CourtSchedulesService {
         neighborhood: true,
         city: true,
         uf: true,
-        photoHighlightUrl: true,
+        photo_highlight_url: true,
         characteristics: true,
         courts: {
           id: true,
@@ -766,7 +767,7 @@ export class CourtSchedulesService {
         .join(', '),
       availableHours: [],
       characteristics: company.characteristics ?? [],
-      photoHighlightUrl: company.photoHighlightUrl ?? '',
+      photoHighlightUrl: company.photo_highlight_url ?? '',
     };
 
     return objToFront;
