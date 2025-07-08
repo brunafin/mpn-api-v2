@@ -707,8 +707,10 @@ export class CourtSchedulesService {
         },
       },
       order: {
-        id: 'ASC',
-        start_hour: 'ASC'
+        court: {
+          company_id: 'ASC'
+        },
+        start_hour: 'ASC',
       }
     });
 
