@@ -519,6 +519,7 @@ export class CourtSchedulesService {
         courtSchedule.is_fixed = true;
         courtSchedule.available = false;
         courtSchedule.company_customer_id = companyCustomerId;
+        courtSchedule.sport_id = courtSchedule.reservation.sport_id;
 
         await manager.getRepository(CourtSchedule).save(courtSchedule);
 
@@ -540,6 +541,7 @@ export class CourtSchedulesService {
 
         operatingSchedule.is_fixed = true;
         operatingSchedule.company_customer_id = companyCustomerId;
+        operatingSchedule.sport_id = courtSchedule.reservation.sport_id
 
         await manager.getRepository(OperatingSchedule).save(operatingSchedule);
 
@@ -558,6 +560,7 @@ export class CourtSchedulesService {
           schedule.is_fixed = true;
           schedule.available = false;
           schedule.company_customer_id = companyCustomerId;
+          schedule.sport_id = courtSchedule.reservation.sport_id;
           await manager.getRepository(CourtSchedule).save(schedule);
 
           const existingReservations = await manager
@@ -616,6 +619,7 @@ export class CourtSchedulesService {
 
         courtSchedule.is_fixed = false;
         courtSchedule.company_customer_id = null;
+        courtSchedule.sport_id = null;
         courtSchedule.available = true;
         await manager.getRepository(CourtSchedule).save(courtSchedule);
 
@@ -632,6 +636,7 @@ export class CourtSchedulesService {
           throw new NotFoundException('OperatingSchedule não encontrado');
         operatingSchedule.is_fixed = false;
         operatingSchedule.company_customer_id = null;
+        operatingSchedule.sport_id = null;
         await manager.getRepository(OperatingSchedule).save(operatingSchedule);
 
         await manager.getRepository(Reservation).delete({
@@ -652,6 +657,7 @@ export class CourtSchedulesService {
         for (const schedule of futureCourtSchedules) {
           schedule.is_fixed = false;
           schedule.company_customer_id = null;
+          schedule.sport_id = null;
           schedule.available = true;
           await manager.getRepository(CourtSchedule).save(schedule);
           await manager.getRepository(Reservation).delete({
