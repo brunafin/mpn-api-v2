@@ -69,15 +69,24 @@ export class ReservationsService {
         { available: false },
       );
 
+      // Normaliza o telefone de contato conforme as regras especificadas
+      let contactPhone = createReservationDto.contactPhone?.replace(/\s+/g, '') || '';
+
+      if (!contactPhone) {
+        contactPhone = courtSchedule.court.company.phone.replace(/\s+/g, '');
+      } else if (contactPhone.length === 9 && contactPhone.startsWith('9')) {
+        contactPhone = '51' + contactPhone;
+      }
+
       const reservation = this.reservationsRepository.create({
         contact_name: createReservationDto.contactName,
-        contact_phone: createReservationDto.contactPhone.trim().length > 0 ? createReservationDto.contactPhone : courtSchedule.court.company.phone,
+        contact_phone: contactPhone,
         court_schedule_id: courtSchedule.id,
         observation:
           createReservationDto.observation &&
           createReservationDto.observation?.length > 0
-            ? createReservationDto.observation
-            : undefined,
+        ? createReservationDto.observation
+        : undefined,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
         sport_id: createReservationDto.sportId,
       });
