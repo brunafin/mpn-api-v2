@@ -123,15 +123,15 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      if (checkIsCellphoneNumberBR(createReservationDto.contactPhone)) {
+      if (checkIsCellphoneNumberBR(contactPhone)) {
         if (process.env.TYPE_ENV !== 'production') {
           await this.twilioService.sendSms(
-            createReservationDto.contactPhone,
+            contactPhone,
             'Essa mensagem é um teste\n' + message,
           );
         } else {
           await this.zenviaService.sendSms(
-            createReservationDto.contactPhone,
+            contactPhone,
             message,
           );
         }
