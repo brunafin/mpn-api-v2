@@ -123,7 +123,7 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      if (checkIsCellphoneNumberBR(contactPhone)) {
+      if (createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 && checkIsCellphoneNumberBR(contactPhone)) {
         if (process.env.TYPE_ENV !== 'production') {
           await this.twilioService.sendSms(
             contactPhone,
@@ -213,7 +213,7 @@ export class ReservationsService {
       await queryRunner.manager.update(
         CourtSchedule,
         reservation.court_schedule_id,
-        { available: true, is_fixed: false, company_customer_id: null },
+        { available: true, is_fixed: false, company_customer_id: null, sport_id: null },
       );
 
       const courtSchedule = await this.courtSchedulesRepository.findOne({
