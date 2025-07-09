@@ -71,7 +71,7 @@ export class ReservationsService {
 
       const reservation = this.reservationsRepository.create({
         contact_name: createReservationDto.contactName,
-        contact_phone: createReservationDto.contactPhone,
+        contact_phone: createReservationDto.contactPhone.trim().length > 0 ? createReservationDto.contactPhone : courtSchedule.court.company.phone,
         court_schedule_id: courtSchedule.id,
         observation:
           createReservationDto.observation &&
