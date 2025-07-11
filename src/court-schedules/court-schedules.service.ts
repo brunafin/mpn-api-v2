@@ -118,6 +118,7 @@ export class CourtSchedulesService {
               is_fixed: item.is_fixed,
               company_customer_id: item.company_customer_id,
               sport_id: item.sport_id,
+              is_active: item.is_active
             }))
             .filter((element) => element.weekday_ref === weekdayRef);
 
@@ -139,7 +140,7 @@ export class CourtSchedulesService {
               day_of_week_id: operatingSchedule.weekday_id,
               price: operatingSchedule.price,
               court_id,
-              available: !operatingSchedule.is_fixed,
+              available: !operatingSchedule.is_fixed && operatingSchedule.is_active,
               is_fixed: operatingSchedule.is_fixed,
               company_customer_id: operatingSchedule.is_fixed
                 ? operatingSchedule.company_customer_id
