@@ -35,6 +35,9 @@ export class OperatingSchedule {
   @Column({ type: 'int', nullable: true })
   sport_id: number | null;
 
+  @Column({ type: 'boolean', default: true })
+  is_active: boolean;
+
   @ManyToOne(() => Court, (court) => court.operating_schedule)
   @JoinColumn({ name: 'court_id' })
   court: Court;
