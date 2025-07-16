@@ -401,7 +401,6 @@ export class ReservationsService {
       if (!reservation) {
         throw new NotFoundException('Reserva não encontrada.');
       }
-      console.log(reservation)
       reservation.contact_name = contactName;
       reservation.contact_phone = contactPhoneSanitized;
       await this.reservationsRepository.save(reservation);
