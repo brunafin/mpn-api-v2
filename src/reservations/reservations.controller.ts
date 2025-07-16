@@ -169,4 +169,24 @@ export class ReservationsController {
   remove(@Param('id') id: string) {
     return this.reservationsService.remove(+id);
   }
+
+  @Patch(':court_schedule_public_id/contact')
+  @ApiOperation({ summary: 'Atualizar dados de contato da reserva' })
+  @ApiBody({
+    description: 'Campos para atualizar o contato da reserva',
+    schema: {
+      type: 'object',
+      properties: {
+        contactName: { type: 'string', example: 'Maria Oliveira' },
+        contactPhone: { type: 'string', example: '51987654321' },
+      },
+      required: ['contactName', 'contactPhone'],
+    },
+  })
+  async updateContact(
+    @Param('court_schedule_public_id') courtSchedulePublicId: string,
+    @Body() body: { contactName: string; contactPhone: string; }
+  ) {
+    return this.reservationsService.updateContact(courtSchedulePublicId, body.contactName, body.contactPhone);
+  }
 }
