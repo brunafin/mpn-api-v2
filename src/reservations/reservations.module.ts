@@ -8,9 +8,11 @@ import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entit
 import { EmailService } from 'src/email/email.service';
 import { TwilioService } from 'src/twilio/twilio.service';
 import { ZenviaService } from 'src/zenvia-sms/zenvia-sms.service';
+import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Reservation, CourtSchedule])],
+  imports: [TypeOrmModule.forFeature([Reservation, CourtSchedule, CompanyCustomer, OperatingSchedule])],
   controllers: [ReservationsController],
   providers: [ReservationsService, JwtService, EmailService, TwilioService, ZenviaService],
   exports: [ReservationsService],

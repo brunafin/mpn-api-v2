@@ -7,7 +7,7 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Reservation } from './entities/reservation.entity';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { DataSource, MoreThanOrEqual, QueryRunner, Repository } from 'typeorm';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { JwtService } from 'src/jwt/jwt.service';
 import { TwilioService } from 'src/twilio/twilio.service';
@@ -15,6 +15,8 @@ import { plainToInstance } from 'class-transformer';
 import { ZenviaService } from 'src/zenvia-sms/zenvia-sms.service';
 import { checkIsCellphoneNumberBR } from 'src/utils/checkIsCellphoneNumberBR';
 import { normalizeText } from 'src/utils/normalizeText';
+import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 
 @Injectable()
 export class ReservationsService {
@@ -23,11 +25,16 @@ export class ReservationsService {
     private readonly reservationsRepository: Repository<Reservation>,
     @InjectRepository(CourtSchedule)
     private readonly courtSchedulesRepository: Repository<CourtSchedule>,
+    @InjectRepository(CompanyCustomer)
+    private readonly companyCustomerRepository: Repository<CompanyCustomer>,
+    @InjectRepository(OperatingSchedule)
+    private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
+
     private readonly jwtService: JwtService,
     private readonly twilioService: TwilioService,
     private readonly zenviaService: ZenviaService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
   async create(createReservationDto: CreateReservationDto) {
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -84,9 +91,9 @@ export class ReservationsService {
         court_schedule_id: courtSchedule.id,
         observation:
           createReservationDto.observation &&
-          createReservationDto.observation?.length > 0
-        ? createReservationDto.observation
-        : undefined,
+            createReservationDto.observation?.length > 0
+            ? createReservationDto.observation
+            : undefined,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
         sport_id: createReservationDto.sportId,
       });
@@ -112,10 +119,9 @@ export class ReservationsService {
       let message =
         `Reserva confirmada!\n` +
         `Quadra: ${normalizeText(courtSchedule?.court.company.name)} - Q.${courtSchedule.court.name}\n` +
-        `${
-          courtSchedule.date instanceof Date
-            ? courtSchedule.date.toLocaleDateString('pt-BR')
-            : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
+        `${courtSchedule.date instanceof Date
+          ? courtSchedule.date.toLocaleDateString('pt-BR')
+          : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
         `Valor: ${formattedPrice}`;
 
@@ -223,10 +229,10 @@ export class ReservationsService {
 
       const formattedPrice = courtSchedule
         ? new Intl.NumberFormat('pt-BR', {
-            style: 'decimal',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }).format(courtSchedule.price)
+          style: 'decimal',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(courtSchedule.price)
         : '';
 
       const startHourFormatted = courtSchedule?.start_hour
@@ -236,10 +242,9 @@ export class ReservationsService {
       let message =
         `Reserva cancelada!\n` +
         `Quadra: ${normalizeText(courtSchedule?.court.company.name!)} - Q.${courtSchedule?.court.name}\n` +
-        `${
-          courtSchedule?.date instanceof Date
-            ? courtSchedule.date.toLocaleDateString('pt-BR')
-            : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
+        `${courtSchedule?.date instanceof Date
+          ? courtSchedule.date.toLocaleDateString('pt-BR')
+          : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
         } - ${startHourFormatted}\n` +
         `Valor: ${formattedPrice}`;
 
@@ -247,7 +252,7 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      if(checkIsCellphoneNumberBR(reservation.contact_phone)){
+      if (checkIsCellphoneNumberBR(reservation.contact_phone)) {
         if (process.env.TYPE_ENV !== 'production') {
           await this.twilioService.sendSms(
             reservation.contact_phone,
@@ -315,5 +320,91 @@ export class ReservationsService {
 
   remove(id: number) {
     return `This action removes a #${id} reservation`;
+  }
+
+  async updateContact(courtSchedulePublicId: string, contactName: string, contactPhone: string) {
+    const courtSchedule = await this.courtSchedulesRepository.findOne({ where: { public_id: courtSchedulePublicId }, relations: { court: true } });
+    if (!courtSchedule) {
+      throw new NotFoundException('Horário não encontrado.');
+    }
+
+    let contactPhoneSanitized = contactPhone?.replace(/\s+/g, '') || '';
+
+    if (!contactPhoneSanitized) {
+      contactPhoneSanitized = courtSchedule.court.company.phone.replace(/\s+/g, '');
+    } else if (contactPhoneSanitized.length === 9 && contactPhoneSanitized.startsWith('9')) {
+      contactPhoneSanitized = '51' + contactPhoneSanitized;
+    }
+
+    if (courtSchedule.is_fixed) {
+      const allSchedules = await this.courtSchedulesRepository.find({
+        where: {
+          court: { id: courtSchedule.court_id },
+          start_hour: courtSchedule.start_hour,
+          day_of_week_id: courtSchedule.day_of_week_id,
+          is_fixed: true,
+          date: MoreThanOrEqual(courtSchedule.date),
+        },
+        select: ['id'],
+      });
+
+      const scheduleIds = allSchedules.map(s => s.id);
+
+      let customerId: number | null = null;
+      const foundCustomer = await this.companyCustomerRepository.findOne({
+        where: {
+          company_id: courtSchedule.court.company_id,
+          name: contactName,
+          phone: contactPhoneSanitized
+        }
+      });
+
+      if (!foundCustomer) {
+        const newCustomer = await this.companyCustomerRepository.save({
+          company_id: courtSchedule.court.company_id,
+          name: contactName,
+          phone: contactPhoneSanitized
+        })
+        customerId = newCustomer.id;
+      } else {
+        customerId = foundCustomer.id;
+      }
+
+      await this.operatingScheduleRepository
+        .createQueryBuilder()
+        .update()
+        .set({ company_customer_id: customerId })
+        .where('hour = :hour', { hour: courtSchedule.start_hour })
+        .andWhere('court_id = :courtId', { courtId: courtSchedule.court_id })
+        .andWhere('day_of_week_id = :dayOfWeekId', { dayOfWeekId: courtSchedule.day_of_week_id })
+        .execute();
+
+      if (scheduleIds.length > 0) {
+        await this.courtSchedulesRepository
+          .createQueryBuilder()
+          .update()
+          .set({ company_customer_id: customerId })
+          .where('id IN (:...ids)', { ids: scheduleIds })
+          .execute();
+      }
+
+      if (scheduleIds.length > 0) {
+        await this.reservationsRepository
+          .createQueryBuilder()
+          .update()
+          .set({ contact_name: contactName, contact_phone: contactPhoneSanitized })
+          .where('court_schedule_id IN (:...ids)', { ids: scheduleIds })
+          .execute();
+      }
+    } else {
+      const reservation = await this.reservationsRepository.findOne({ where: { court_schedule_id: courtSchedule.id } });
+      if (!reservation) {
+        throw new NotFoundException('Reserva não encontrada.');
+      }
+      console.log(reservation)
+      reservation.contact_name = contactName;
+      reservation.contact_phone = contactPhoneSanitized;
+      await this.reservationsRepository.save(reservation);
+    }
   }
 }

@@ -730,6 +730,7 @@ export class CourtSchedulesService {
             name: item.court.company.name,
             phone: item.court.company.phone,
             instagramUrl: item.court.company.instagram_url ?? '',
+            city: item.court.company.city,
             address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
             sports: item.court.court_sports
               .map((sport) => sport.name)

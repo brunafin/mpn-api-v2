@@ -11,6 +11,7 @@ export interface IWhereToPlayCourtList {
     logoUrl: string;
     name: string;
     phone: string;
+    city?: string;
     address: string;
     sports: string;
     instagramUrl: string;
