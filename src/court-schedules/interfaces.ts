@@ -15,7 +15,17 @@ export interface IWhereToPlayCourtList {
     address: string;
     sports: string;
     instagramUrl: string;
-    availableHours: IAvailableHours[]
+    courts: {
+        courtName: string;
+        courtSports: string;
+        schedules: IAvailableHours[];
+    }[]
+}
+
+export interface ICourt {
+    courtName: string;
+    courtSports: string;
+    schedules: IAvailableHours[];
 }
 
 export interface IDetailsCourt extends IWhereToPlayCourtList {

@@ -19,6 +19,7 @@ import { CompanyCustomer } from 'src/companies-customer/entities/company-custome
 import { JwtService } from 'src/jwt/jwt.service';
 import {
   IAvailableHours,
+  ICourt,
   IDetailsCourt,
   IWhereToPlayCourtList,
 } from './interfaces';
@@ -721,9 +722,12 @@ export class CourtSchedulesService {
       }
     });
 
+
     const groupedByCompany = courtSchedule.reduce(
       (acc, item) => {
-        const companyKey = item.court.company.name + item.court.company.phone;
+        const companyId = item.court.company.id; // ou public_id
+        const companyKey = `${item.court.company.name}-${item.court.company.phone}`;
+
         if (!acc[companyKey]) {
           acc[companyKey] = {
             logoUrl: item.court.company.logo_url,
@@ -732,36 +736,45 @@ export class CourtSchedulesService {
             instagramUrl: item.court.company.instagram_url ?? '',
             city: item.court.company.city,
             address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
-            sports: item.court.court_sports
-              .map((sport) => sport.name)
-              .join(', '),
-            availableHours: [] as {
-              date: Date;
-              startHour: string;
-              price: number;
-              courtName: string;
-              courtSports: string;
-              dayOfWeekAbb: string;
-            }[],
+            sports: item.court.court_sports.map((sport) => sport.name).join(', '),
+            courts: [],
           };
         }
-        acc[companyKey].availableHours.push({
+
+        const courtKey = `${item.court.name}-${companyId}`;
+        let courtGroup = acc[companyKey].courts.find(
+          (court) => `${court.courtName}-${companyId}` === courtKey
+        );
+
+        if (!courtGroup) {
+          courtGroup = {
+            courtName: item.court.name,
+            courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+            schedules: [],
+          };
+          acc[companyKey].courts.push(courtGroup);
+        }
+
+        const schedule: IAvailableHours = {
           date: item.date,
           startHour: item.start_hour.slice(0, 5),
-          courtName: item.court.name,
           price: item.price,
-          courtSports: item.court.court_sports
-            .map((sport) => sport.name)
-            .join(', '),
+          courtName: item.court.name,
+          courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
           dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
-        });
+        };
+
+        courtGroup.schedules.push(schedule);
+
         return acc;
       },
-      {} as Record<string, IWhereToPlayCourtList>,
+      {} as Record<string, IWhereToPlayCourtList>
     );
 
-    const objToFront: IWhereToPlayCourtList[] = Object.values(groupedByCompany);
-    return objToFront;
+    const result: IWhereToPlayCourtList[] = Object.values(groupedByCompany);
+
+
+    return result;
   }
 
   async findDetailsCourt({
@@ -820,10 +833,22 @@ export class CourtSchedulesService {
       sports: company.courts
         .flatMap((court) => court.court_sports.map((sport) => sport.name))
         .join(', '),
-      availableHours: [],
+      courts: company.courts.map((court) => ({
+        courtName: court.name,
+        courtSports: court.court_sports.map((sport) => sport.name).join(', '),
+        schedules: court.court_schedule.map((schedule) => ({
+          date: schedule.date,
+          startHour: schedule.start_hour.slice(0, 5),
+          price: schedule.price,
+          courtName: court.name,
+          courtSports: court.court_sports.map((sport) => sport.name).join(', '),
+          dayOfWeekAbb: `(${schedule.day_of_week?.description.slice(0, 3).toLowerCase()})`,
+        })),
+      })),
       characteristics: company.characteristics ?? [],
       photoHighlightUrl: company.photo_highlight_url ?? '',
     };
+
 
     return objToFront;
   }
@@ -834,7 +859,7 @@ export class CourtSchedulesService {
   }: {
     slug?: string;
     date: Date;
-  }): Promise<IAvailableHours[]> {
+  }): Promise<ICourt[]> {
     const courtSchedule = await this.courtSchedulesRepository.find({
       where: {
         available: true,
@@ -875,17 +900,30 @@ export class CourtSchedulesService {
       return [];
     }
 
-    const objToFront: IAvailableHours[] = courtSchedule.map((item) => ({
-      date: item.date,
-      startHour: item.start_hour.slice(0, 5),
-      price: item.price,
-      courtName: item.court.name,
-      courtSports: item.court.court_sports
-        .map((sport) => sport.name)
-        .join(', '),
-      dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
-    }));
+    const groupedCourts: Record<string, ICourt> = {};
 
+    courtSchedule.forEach((item) => {
+      const courtKey = item.court.name; // ou `${item.court.name}-${item.court.company_id}` se quiser segurança
+
+      if (!groupedCourts[courtKey]) {
+        groupedCourts[courtKey] = {
+          courtName: item.court.name,
+          courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+          schedules: [],
+        };
+      }
+
+      groupedCourts[courtKey].schedules.push({
+        date: item.date,
+        startHour: item.start_hour.slice(0, 5),
+        price: item.price,
+        courtName: item.court.name,
+        courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+        dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
+      });
+    });
+
+    const objToFront: ICourt[] = Object.values(groupedCourts);
     return objToFront;
   }
 
