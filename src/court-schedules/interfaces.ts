@@ -3,7 +3,7 @@ export interface IAvailableHours {
     startHour: string;
     price: number;
     courtName: string;
-    courtSports: string;
+    courtSports: {label: string; value: string}[];
     dayOfWeekAbb: string;
 }
 
@@ -13,18 +13,17 @@ export interface IWhereToPlayCourtList {
     phone: string;
     city?: string;
     address: string;
-    sports: string;
     instagramUrl: string;
     courts: {
         courtName: string;
-        courtSports: string;
+        courtSports: {label: string; value: string}[];
         schedules: IAvailableHours[];
     }[]
 }
 
 export interface ICourt {
     courtName: string;
-    courtSports: string;
+    courtSports: {label: string; value: string}[];
     schedules: IAvailableHours[];
 }
 
