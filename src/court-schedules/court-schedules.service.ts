@@ -707,6 +707,7 @@ export class CourtSchedulesService {
             uf: true,
           },
           court_sports: {
+            id: true,
             name: true,
           },
         },
@@ -736,7 +737,6 @@ export class CourtSchedulesService {
             instagramUrl: item.court.company.instagram_url ?? '',
             city: item.court.company.city,
             address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
-            sports: item.court.court_sports.map((sport) => sport.name).join(', '),
             courts: [],
           };
         }
@@ -749,7 +749,7 @@ export class CourtSchedulesService {
         if (!courtGroup) {
           courtGroup = {
             courtName: item.court.name,
-            courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+            courtSports: item.court.court_sports.map((sport) => ({ label: sport.name, value: String(sport.id) })),
             schedules: [],
           };
           acc[companyKey].courts.push(courtGroup);
@@ -760,7 +760,7 @@ export class CourtSchedulesService {
           startHour: item.start_hour.slice(0, 5),
           price: item.price,
           courtName: item.court.name,
-          courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+          courtSports: item.court.court_sports.map((sport) => ({ label: sport.name, value: String(sport.id) })),
           dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
         };
 
@@ -775,6 +775,43 @@ export class CourtSchedulesService {
 
 
     return result;
+  }
+
+  async findCitiesToPlay() {
+    const companies = await this.companyRepository.find({
+      where: { is_active: true },
+      select: ['city'],
+      order: { city: 'ASC' }
+    })
+
+    return companies.map((item) => ({
+      label: item.city, value: item.city
+    }));
+  }
+
+  async findSportsToPlay() {
+    const courts = await this.courtRepository.find({
+      where: { company: { is_active: true } },
+      relations: {
+        court_sports: true
+      },
+      select: ['court_sports']
+    })
+
+    const sportMap = new Map<number, { label: string; value: number }>();
+
+    courts.forEach(court => {
+      court.court_sports.forEach((sport: any) => {
+        if (!sportMap.has(sport.id)) {
+          sportMap.set(sport.id, { label: sport.name, value: sport.id });
+        }
+      });
+    });
+
+    const uniqueSportOptions = Array.from(sportMap.values()).sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+    return uniqueSportOptions;
   }
 
   async findDetailsCourt({
@@ -830,18 +867,15 @@ export class CourtSchedulesService {
       phone: company.phone,
       instagramUrl: company.instagram_url ?? '',
       address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
-      sports: company.courts
-        .flatMap((court) => court.court_sports.map((sport) => sport.name))
-        .join(', '),
       courts: company.courts.map((court) => ({
         courtName: court.name,
-        courtSports: court.court_sports.map((sport) => sport.name).join(', '),
+        courtSports: court.court_sports.map((sport) => ({ label: sport.name, value: String(sport.id) })),
         schedules: court.court_schedule.map((schedule) => ({
           date: schedule.date,
           startHour: schedule.start_hour.slice(0, 5),
           price: schedule.price,
           courtName: court.name,
-          courtSports: court.court_sports.map((sport) => sport.name).join(', '),
+          courtSports: court.court_sports.map((sport) => ({ label: sport.name, value: String(sport.id) })),
           dayOfWeekAbb: `(${schedule.day_of_week?.description.slice(0, 3).toLowerCase()})`,
         })),
       })),
@@ -908,7 +942,7 @@ export class CourtSchedulesService {
       if (!groupedCourts[courtKey]) {
         groupedCourts[courtKey] = {
           courtName: item.court.name,
-          courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+          courtSports: item.court.court_sports.map((sport) => ({ label: sport.name, value: String(sport.id) })),
           schedules: [],
         };
       }
@@ -918,7 +952,10 @@ export class CourtSchedulesService {
         startHour: item.start_hour.slice(0, 5),
         price: item.price,
         courtName: item.court.name,
-        courtSports: item.court.court_sports.map((sport) => sport.name).join(', '),
+        courtSports: item.court.court_sports.map((sport) => ({
+          label: sport.name,
+          value: String(sport.id)
+        })),
         dayOfWeekAbb: `(${item.day_of_week.description.slice(0, 3).toLowerCase()})`,
       });
     });

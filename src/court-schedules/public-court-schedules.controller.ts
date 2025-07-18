@@ -13,7 +13,7 @@ import {
 @Controller('public-court-schedules')
 @ApiTags('public-court-schedules')
 export class PublicCourtSchedulesController {
-  constructor(private readonly courtSchedulesService: CourtSchedulesService) {}
+  constructor(private readonly courtSchedulesService: CourtSchedulesService) { }
 
   @Get('/where-to-play')
   @ApiTags('Marca Pra Nós - Público')
@@ -25,6 +25,20 @@ export class PublicCourtSchedulesController {
       city,
       date,
     });
+  }
+
+  @Get('/where-to-play/cities')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({ summary: 'Cidades' })
+  findCitiesToPlay() {
+    return this.courtSchedulesService.findCitiesToPlay();
+  }
+
+    @Get('/where-to-play/sports')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({ summary: 'Esportes' })
+  findSportsToPlay() {
+    return this.courtSchedulesService.findSportsToPlay();
   }
 
   @Get('/details')
