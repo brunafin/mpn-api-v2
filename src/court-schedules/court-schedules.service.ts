@@ -784,8 +784,13 @@ export class CourtSchedulesService {
       order: { city: 'ASC' }
     })
 
-    return companies.map((item) => ({
-      label: item.city, value: item.city
+    const uniqueCities = Array.from(
+      new Set(companies.map((item) => item.city))
+    );
+
+    return uniqueCities.map((city) => ({
+      label: city,
+      value: city,
     }));
   }
 
