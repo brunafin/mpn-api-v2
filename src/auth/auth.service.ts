@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PeopleService } from '../people/people.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { getInstagramUserFromUrl } from 'src/utils/getInstagramUserFromUrl';
 
 @Injectable()
 export class AuthService {
@@ -37,6 +38,7 @@ export class AuthService {
       username: user.username,
       companyPublicId: user?.companies.length > 0 ? user.companies[0].public_id : null,
       companyName: user?.companies.length > 0 ? user.companies[0].name : null,
+      link: `https://marcapranos.com.br/encontre-onde-jogar/${getInstagramUserFromUrl(user.companies[0].instagram_url)}`,
       updatedPassword: !isDefaultPassword,
     };
     return {
