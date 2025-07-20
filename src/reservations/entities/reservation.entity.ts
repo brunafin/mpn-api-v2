@@ -53,6 +53,10 @@ export class Reservation {
   @Expose()
   is_barbecue_included: boolean;
 
+  @Column({ default: false })
+  @Expose()
+  is_event: boolean;
+
   @Column({ type: 'text', nullable: true })
   @Expose()
   observation: string;

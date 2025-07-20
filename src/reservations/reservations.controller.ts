@@ -159,7 +159,7 @@ export class ReservationsController {
   })
   async updateExtraFields(
     @Param('public_id') public_id: string,
-    @Body() body: { observation?: string; is_barbecue_included?: boolean }
+    @Body() body: { observation?: string; is_barbecue_included?: boolean; is_event?: boolean }
   ) {
     return this.reservationsService.updateExtraFields(public_id, body);
   }
