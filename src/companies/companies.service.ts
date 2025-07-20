@@ -19,6 +19,7 @@ export interface IReservationItemProps {
   time: string;
   customerName: string | null;
   isBarbecueIncluded?: boolean;
+  isEvent?: boolean;
   isNeedsNetting?: boolean;
 }
 
@@ -97,6 +98,7 @@ export class CompaniesService {
         'reservation.is_prepaid',
         'reservation.observation',
         'reservation.is_barbecue_included',
+        'reservation.is_event',
         'sport.needsNet'
       ])
       .getOne();
@@ -111,6 +113,7 @@ export class CompaniesService {
           time: schedule.start_hour.slice(0, 5),
           customerName: schedule.reservation?.contact_name ?? null,
           isBarbecueIncluded: schedule.reservation?.is_barbecue_included ?? false,
+          isEvent: schedule.reservation?.is_event ?? false,
           isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
         }))
     }

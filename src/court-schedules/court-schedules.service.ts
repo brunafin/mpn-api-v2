@@ -47,6 +47,7 @@ interface IReservationDetailsItemProps {
     tokenToCancel: string;
     observation?: string;
     isBarbecueIncluded: boolean;
+    isEvent: boolean;
     isNeedsNetting: boolean;
     sportName: string;
   } | null;
@@ -399,6 +400,7 @@ export class CourtSchedulesService {
           created_at: true,
           observation: true,
           is_barbecue_included: true,
+          is_event: true,
           sport: {
             name: true,
             needsNet: true,
@@ -434,6 +436,7 @@ export class CourtSchedulesService {
           tokenToCancel: courtSchedule.reservation?.token_to_cancel,
           observation: courtSchedule.reservation?.observation,
           isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
+          isEvent: courtSchedule.reservation?.is_event,
           isNeedsNetting: courtSchedule.reservation?.sport?.needsNet,
           sportName: courtSchedule.reservation?.sport?.name,
           publicId: courtSchedule.reservation?.public_id,

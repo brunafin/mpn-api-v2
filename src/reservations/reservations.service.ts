@@ -95,6 +95,7 @@ export class ReservationsService {
             ? createReservationDto.observation
             : undefined,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
+        is_event: createReservationDto.isEvent,
         sport_id: createReservationDto.sportId,
       });
       reservation.token_to_cancel = this.jwtService.generateToken(
@@ -129,19 +130,19 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      if (createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 && checkIsCellphoneNumberBR(contactPhone)) {
-        if (process.env.TYPE_ENV !== 'production') {
-          await this.twilioService.sendSms(
-            contactPhone,
-            'Essa mensagem é um teste\n' + message,
-          );
-        } else {
-          await this.zenviaService.sendSms(
-            contactPhone,
-            message,
-          );
-        }
-      }
+      // if (createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 && checkIsCellphoneNumberBR(contactPhone)) {
+      //   if (process.env.TYPE_ENV !== 'production') {
+      //     await this.twilioService.sendSms(
+      //       contactPhone,
+      //       'Essa mensagem é um teste\n' + message,
+      //     );
+      //   } else {
+      //     await this.zenviaService.sendSms(
+      //       contactPhone,
+      //       message,
+      //     );
+      //   }
+      // }
 
       await queryRunner.commitTransaction();
       return plainToInstance(Reservation, reservation);
@@ -308,13 +309,15 @@ export class ReservationsService {
 
   async updateExtraFields(
     public_id: string,
-    fields: { observation?: string; is_barbecue_included?: boolean },
+    fields: { observation?: string; is_barbecue_included?: boolean; is_event?: boolean },
   ) {
     const updateData: any = {};
     if (fields.observation !== undefined)
       updateData.observation = fields.observation;
     if (fields.is_barbecue_included !== undefined)
       updateData.is_barbecue_included = fields.is_barbecue_included;
+    if (fields.is_event !== undefined)
+      updateData.is_event = fields.is_event;
     return this.reservationsRepository.update({ public_id }, updateData);
   }
 
