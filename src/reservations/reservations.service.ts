@@ -130,19 +130,19 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      // if (createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 && checkIsCellphoneNumberBR(contactPhone)) {
-      //   if (process.env.TYPE_ENV !== 'production') {
-      //     await this.twilioService.sendSms(
-      //       contactPhone,
-      //       'Essa mensagem é um teste\n' + message,
-      //     );
-      //   } else {
-      //     await this.zenviaService.sendSms(
-      //       contactPhone,
-      //       message,
-      //     );
-      //   }
-      // }
+      if (createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 && checkIsCellphoneNumberBR(contactPhone)) {
+        if (process.env.TYPE_ENV !== 'production') {
+          await this.twilioService.sendSms(
+            contactPhone,
+            'Essa mensagem é um teste\n' + message,
+          );
+        } else {
+          await this.zenviaService.sendSms(
+            contactPhone,
+            message,
+          );
+        }
+      }
 
       await queryRunner.commitTransaction();
       return plainToInstance(Reservation, reservation);
