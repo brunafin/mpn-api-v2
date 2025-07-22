@@ -24,8 +24,10 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // TO DO Habilitar somente o link do front
-  app.enableCors({ origin: '*' })
+app.enableCors({
+  origin: ['https://sistemamarcapranos-stable.up.railway.app/', 'https://marcapranos.up.railway.app/', 'https://sistema.marcapranos.com.br/', 'https://marcapranos.com.br/', 'http://localhost:5173'],
+  methods: 'GET,POST,PUT,DELETE',
+});
 
   await app.listen(process.env.PORT ?? 3001);
 }
