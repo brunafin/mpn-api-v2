@@ -254,13 +254,15 @@ export class ReservationsService {
       }
 
       if (checkIsCellphoneNumberBR(reservation.contact_phone)) {
-        if (process.env.TYPE_ENV !== 'production') {
-          await this.twilioService.sendSms(
-            reservation.contact_phone,
-            'Essa mensagem é um teste\n' + message,
-          );
-        } else {
-          await this.zenviaService.sendSms(reservation.contact_phone, message);
+        if (process.env.TYPE_ENV !== 'development') {
+          if (process.env.TYPE_ENV !== 'production') {
+            await this.twilioService.sendSms(
+              reservation.contact_phone,
+              'Essa mensagem é um teste\n' + message,
+            );
+          } else {
+            await this.zenviaService.sendSms(reservation.contact_phone, message);
+          }
         }
       }
 
