@@ -25,7 +25,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
 app.enableCors({
-  origin: ['https://sistemamarcapranos-stable.up.railway.app/', 'https://marcapranos.up.railway.app/', 'https://sistema.marcapranos.com.br/', 'https://marcapranos.com.br/', 'http://localhost:5173'],
+  origin: ['https://sistemamarcapranos-stable.up.railway.app', 'https://marcapranos.up.railway.app', 'https://sistema.marcapranos.com.br', 'https://marcapranos.com.br', 'http://localhost:5173'],
   methods: 'GET,POST,PUT,DELETE',
 });
 
