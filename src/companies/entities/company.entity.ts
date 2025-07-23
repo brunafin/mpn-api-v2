@@ -99,6 +99,10 @@ export class Company {
   @Expose()
   is_active: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  @Expose()
+  preferences_is_hidden_inactive_hours: boolean;
+
   @ManyToOne(() => Person, (person) => person.companies, {
     onDelete: 'CASCADE',
   })
