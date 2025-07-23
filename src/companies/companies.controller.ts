@@ -143,6 +143,28 @@ export class CompaniesController {
     return this.companiesService.findSchedulesByDate(public_id, date);
   }
 
+    @Get(':public_id/all-schedules/:date')
+  @ApiOperation({ summary: 'Obter horários de um dia específico para uma empresa' })
+  @ApiOkResponse({
+    description: 'Horários retornados com sucesso',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          time: { type: 'string', example: '09:00' },
+          available: { type: 'boolean', example: true },
+        },
+      },
+    },
+  })
+  findAllSchedules(
+    @Param('public_id') public_id: string,
+    @Param('date') date: string,
+  ) {
+    return this.companiesService.findAllSchedulesByDate(public_id, date);
+  }
+
   @Patch(':public_id')
   @ApiOperation({ summary: 'Atualizar uma empresa' })
   @ApiBody({
@@ -186,5 +208,37 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Remover uma empresa pelo public_id' })
   remove(@Param('public_id') public_id: string) {
     return this.companiesService.removeByPublicId(public_id);
+  }
+
+  @Patch('/preferences-hidden-inactive-hours/:public_id')
+  @ApiOperation({ summary: 'Alterar preferência ocultar horários inativos' })
+  @ApiBody({
+    description: 'Flag para ocultar horários inativos',
+    schema: {
+      type: 'object',
+      properties: {
+        isHiddenInactiveHour: {
+          type: 'boolean',
+          example: true,
+        },
+      },
+      required: ['isHiddenInactiveHour'],
+    },
+  })
+  patch(
+    @Param('public_id') public_id: string,
+    @Body('isHiddenInactiveHours') isHiddenInactiveHours: boolean,
+  ) {
+    return this.companiesService.changePreferencesHiddenInactiveHoursByPublicId(public_id, isHiddenInactiveHours);
+  }
+
+  @Get('/:public_id/infos')
+  @ApiOperation({ summary: 'Obter informações de uma empresa' })
+  @ApiOkResponse({
+    description: 'Informações da empresa retornados com sucesso',
+  })
+
+  findInfosByPublicId(@Param('public_id') public_id: string) {
+    return this.companiesService.findInfosByPublicId(public_id);
   }
 }
