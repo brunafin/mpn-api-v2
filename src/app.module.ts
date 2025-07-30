@@ -29,6 +29,8 @@ import { CompaniesCustomerModule } from './companies-customer/companies-customer
 import { CompanyCustomer } from './companies-customer/entities/company-customer.entity';
 import { TwilioModule } from './twilio/twilio.module';
 import { ZenviaModule } from './zenvia-sms/zenvia-sms.module';
+import { NotesModule } from './notes/notes.module';
+import { Note } from './notes/entities/note.entity';
 
 @Module({
   imports: [
@@ -53,7 +55,8 @@ import { ZenviaModule } from './zenvia-sms/zenvia-sms.module';
         Reservation,
         CompanyImage,
         Sport,
-        CompanyCustomer
+        CompanyCustomer,
+        Note,
       ],
     }),
     PeopleModule,
@@ -70,7 +73,8 @@ import { ZenviaModule } from './zenvia-sms/zenvia-sms.module';
     AuthModule,
     CompaniesCustomerModule,
     TwilioModule,
-    ZenviaModule
+    ZenviaModule,
+    NotesModule
   ],
   controllers: [AppController],
   providers: [AppService],

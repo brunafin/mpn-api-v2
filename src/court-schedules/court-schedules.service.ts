@@ -56,6 +56,7 @@ interface IReservationDetailsItemProps {
   time: string;
   price: number;
   weekday: string;
+  companyPublicId: string;
 }
 
 @Injectable()
@@ -380,7 +381,7 @@ export class CourtSchedulesService {
       where: { public_id: publicId },
       relations: {
         day_of_week: true,
-        court: { court_sports: true },
+        court: { court_sports: true, company: true },
         reservation: { sport: true },
       },
       select: {
@@ -409,6 +410,9 @@ export class CourtSchedulesService {
         court: {
           name: true,
           court_sports: true,
+          company:{
+            public_id: true,
+          }
         },
         price: true,
         day_of_week: {
@@ -450,6 +454,7 @@ export class CourtSchedulesService {
       time: courtSchedule.start_hour.slice(0, 5),
       price: courtSchedule.price,
       weekday: courtSchedule.day_of_week.description,
+      companyPublicId: courtSchedule.court.company.public_id,
     };
 
     return instanceToPlain(obj);
