@@ -68,12 +68,15 @@ export class NotesService {
       throw new Error('Não foi possível encontrar lembretes. Empresa não encontrada');
     }
     const notes = await this.notesRepository.find({
-      select: ['id', 'sender', 'message'],
+      select: ['id', 'sender', 'message', 'title'],
       where: {
         company_id: company.id,
         date,
         is_read: false,
       },
+      order: {
+        id: 'DESC',
+      }
     });
     return notes;
   }

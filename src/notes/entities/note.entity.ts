@@ -12,6 +12,10 @@ export class Note {
     @Expose()
     date: Date;
 
+    @Column({ type: 'text', nullable: true })
+    @Expose()
+    title: string | null;
+
     @Column({ type: 'text' })
     @Expose()
     message: string;
