@@ -24,6 +24,7 @@ import {
   IWhereToPlayCourtList,
 } from './interfaces';
 import { Company } from 'src/companies/entities/company.entity';
+import { addHours, format, parse } from 'date-fns';
 
 export enum ReservationStatusEnum {
   FIXED = 'fixed',
@@ -410,7 +411,7 @@ export class CourtSchedulesService {
         court: {
           name: true,
           court_sports: true,
-          company:{
+          company: {
             public_id: true,
           }
         },
@@ -994,5 +995,53 @@ export class CourtSchedulesService {
     }))
 
     return objToFront;
+  }
+
+  async quickCreate(
+    body: { start_hour: string; date: string; court_id: number },
+  ) {
+
+    const existingSchedule = await this.courtSchedulesRepository.findOne({
+      where: {
+        start_hour: body.start_hour,
+        date: new Date(body.date),
+        court_id: body.court_id,
+      },
+    });
+
+    if (existingSchedule) {
+      throw new Error('O horário já existe');
+    }
+
+    const operatingSchedule = await this.operatingScheduleRepository.findOne({
+      where: {
+        court_id: body.court_id,
+        hour: body.start_hour,
+      },
+      select: {
+        price: true,
+      }
+    })
+
+    const startTime = parse(body.start_hour, 'HH:mm', new Date());
+    const endTime = addHours(startTime, 1);
+    const end_hour = format(endTime, 'HH:mm');
+
+    const dateObj = new Date(body.date);
+    const day_of_week_id = dateObj.getDay() + 1;
+
+    const schedule: CreateCourtScheduleDto = {
+      start_hour: body.start_hour,
+      end_hour,
+      date: new Date(body.date),
+      available: true,
+      price: operatingSchedule?.price ?? 0,
+      is_fixed: false,
+      court_id: body.court_id,
+      day_of_week_id,
+      sport_id: null,
+    };
+
+    return this.create(schedule);
   }
 }

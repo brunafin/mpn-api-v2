@@ -14,6 +14,15 @@ import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { ApiBody, ApiOperation, ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const CurrentUser = createParamDecorator(
+  (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest<Request>();
+    return request.user;
+  },
+);
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
@@ -194,5 +203,25 @@ export class CourtSchedulesController {
     }
   ) {
     return this.courtSchedulesService.unfixSchedule(body);
+  }
+
+  @Post('quick-create')
+  @ApiOperation({ summary: 'Criar horário de quadra rapidamente para o usuário logado' })
+  @ApiBody({
+    description: 'Dados mínimos para criar um horário de quadra',
+    schema: {
+      type: 'object',
+      properties: {
+        start_hour: { type: 'string', example: '10:00' },
+        date: { type: 'string', format: 'date', example: '2025-08-20' },
+        court_id: { type: 'number', example: 2 },
+      },
+      required: ['start_hour', 'date', 'court_id'],
+    },
+  })
+  async quickCreate(
+    @Body() body: { start_hour: string; date: string; court_id: number },
+  ) {
+    return this.courtSchedulesService.quickCreate(body);
   }
 }
