@@ -23,7 +23,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const responseObject = exceptionResponse as any;
-        message = responseObject.message ?? message;
+
+        // ✅ Tratamento especial para 401
+        if (status === HttpStatus.UNAUTHORIZED) {
+          // se a mensagem default for "Unauthorized", então é token expirado
+          if (
+            responseObject.message === 'Unauthorized' ||
+            responseObject.message === 'jwt expired' ||
+            responseObject.message === 'invalid token'
+          ) {
+            message = 'Acesso expirado';
+          } else {
+            // se for outro Unauthorized, mantém a mensagem que você definiu
+            message = responseObject.message ?? message;
+          }
+        } else {
+          // outros erros normais
+          message = responseObject.message ?? message;
+        }
+
         errorDetails = responseObject.error ?? null;
       } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
