@@ -31,6 +31,10 @@ import { TwilioModule } from './twilio/twilio.module';
 import { ZenviaModule } from './zenvia-sms/zenvia-sms.module';
 import { NotesModule } from './notes/notes.module';
 import { Note } from './notes/entities/note.entity';
+import { PlansModule } from './plans/plans.module';
+import { Plan } from './plans/entities/plan.entity';
+import { PaymentCompanyModule } from './payment_company/payment_company.module';
+import { PaymentCompany } from './payment_company/entities/payment_company.entity';
 
 @Module({
   imports: [
@@ -57,6 +61,8 @@ import { Note } from './notes/entities/note.entity';
         Sport,
         CompanyCustomer,
         Note,
+        Plan,
+        PaymentCompany
       ],
     }),
     PeopleModule,
@@ -74,7 +80,9 @@ import { Note } from './notes/entities/note.entity';
     CompaniesCustomerModule,
     TwilioModule,
     ZenviaModule,
-    NotesModule
+    NotesModule,
+    PlansModule,
+    PaymentCompanyModule
   ],
   controllers: [AppController],
   providers: [AppService],

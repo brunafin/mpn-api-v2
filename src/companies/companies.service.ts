@@ -206,14 +206,25 @@ export class CompaniesService {
   }
 
   async findInfosByPublicId(uuid: string) {
-    const company = await this.companiesRepository.findOne({
-      where: { public_id: uuid },
-      select: {
-        name: true,
-        instagram_url: true,
-        preferences_is_hidden_inactive_hours: true,
-      },
-    });
+    const company = await this.companiesRepository
+      .createQueryBuilder('company')
+      .leftJoinAndSelect('company.plan', 'plan')
+      .leftJoinAndSelect('company.payments', 'payments')
+      .where('company.public_id = :uuid', { uuid })
+      .select([
+      'company.name',
+      'company.instagram_url',
+      'company.preferences_is_hidden_inactive_hours',
+      'company.day_due',
+      'plan.name',
+      'plan.price',
+      'payments.dt_payment',
+      'payments.price',
+      'payments.form_of_payment',
+      ])
+      .orderBy('payments.dt_payment', 'DESC')
+      .getOne();
+
 
     if (!company) {
       throw new NotFoundException();
@@ -225,6 +236,17 @@ export class CompaniesService {
         isHiddenInactiveHours: company.preferences_is_hidden_inactive_hours,
       },
       companyName: company.name,
+      plan: {
+        name: company.plan?.name || 'Gratuito (Teste)',
+        price: company.plan?.price || 0,
+        day_due: company?.day_due || null,
+        history: company.payments?.map(payment => ({
+          date: payment.dt_payment || `${new Date().getFullYear()}-${new Date().getMonth()}-${company.day_due}`,
+          value: payment.price,
+          form_of_payment: payment.form_of_payment,
+          paied: !!payment.dt_payment,
+        })) || [],
+      }
     }
 
     return objToFront;

@@ -2,7 +2,9 @@ import { Exclude, Expose } from 'class-transformer';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { CompanyImage } from 'src/company-images/entities/company-image.entity';
 import { Court } from 'src/courts/entities/court.entity';
+import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
+import { Plan } from 'src/plans/entities/plan.entity';
 import {
   Column,
   Entity,
@@ -87,9 +89,16 @@ export class Company {
   @Expose()
   uf: string;
 
+  @Column({ type: 'int', nullable: true })
+  @Expose()
+  day_due: number | null;
+
   @Column()
   @Exclude()
   administrator_id: number;
+
+  @Column({ type: 'int', nullable: true })
+  plan_id: number;
 
   @Column({ type: 'text', array: true, nullable: true })
   @Expose()
@@ -110,6 +119,11 @@ export class Company {
   @Exclude()
   administrator: Person;
 
+  @ManyToOne(() => Plan, (plan) => plan.companies)
+  @JoinColumn({ name: 'plan_id' })
+  @Expose()
+  plan: Plan;
+
   @OneToMany(() => Court, (court) => court.company)
   @Expose()
   courts: Court[];
@@ -121,4 +135,8 @@ export class Company {
   @OneToMany(() => CompanyCustomer, (customer) => customer.company)
   @Expose()
   customers: CompanyCustomer[];
+
+  @OneToMany(() => PaymentCompany, (paymentCompany) => paymentCompany.company)
+  @Expose()
+  payments: PaymentCompany[];
 }
