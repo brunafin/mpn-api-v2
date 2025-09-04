@@ -241,7 +241,7 @@ export class CompaniesService {
         price: company.plan?.price || 0,
         day_due: company?.day_due || null,
         history: company.payments?.map(payment => ({
-          date: payment.dt_payment || `${new Date().getFullYear()}-${new Date().getMonth()}-${company.day_due}`,
+          date: payment.dt_payment ?? `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${company.day_due}`,
           value: payment.price,
           form_of_payment: payment.form_of_payment,
           paied: !!payment.dt_payment,
