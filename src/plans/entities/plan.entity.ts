@@ -29,7 +29,4 @@ export class Plan {
 
     @Column({ type: 'decimal', precision: 10, scale: 2 })
     price: number;
-
-    @OneToMany(() => Company, company => company.plan)
-    companies: Company[];
 }
