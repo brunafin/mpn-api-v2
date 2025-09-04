@@ -11,6 +11,7 @@ import { plainToInstance } from 'class-transformer';
 import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
 import { ReservationStatusEnum } from 'src/court-schedules/court-schedules.service';
 import { getInstagramUserFromUrl } from 'src/utils/getInstagramUserFromUrl';
+import { format } from 'date-fns';
 
 export interface IReservationItemProps {
   scheduleId: string;
@@ -212,15 +213,15 @@ export class CompaniesService {
       .leftJoinAndSelect('company.payments', 'payments')
       .where('company.public_id = :uuid', { uuid })
       .select([
-      'company.name',
-      'company.instagram_url',
-      'company.preferences_is_hidden_inactive_hours',
-      'company.day_due',
-      'plan.name',
-      'plan.price',
-      'payments.dt_payment',
-      'payments.price',
-      'payments.form_of_payment',
+        'company.name',
+        'company.instagram_url',
+        'company.preferences_is_hidden_inactive_hours',
+        'company.day_due',
+        'plan.name',
+        'plan.price',
+        'payments.dt_payment',
+        'payments.price',
+        'payments.form_of_payment',
       ])
       .orderBy('payments.dt_payment', 'DESC')
       .getOne();
@@ -229,6 +230,13 @@ export class CompaniesService {
     if (!company) {
       throw new NotFoundException();
     }
+
+
+    const today = new Date();
+    const fallbackDate = format(
+      new Date(today.getFullYear(), today.getMonth(), company.day_due ?? 10),
+      'yyyy-MM-dd'
+    );
 
     const objToFront = {
       link: `https://marcapranos.com.br/encontre-onde-jogar/${getInstagramUserFromUrl(company.instagram_url)}`,
@@ -241,7 +249,7 @@ export class CompaniesService {
         price: company.plan?.price || 0,
         day_due: company?.day_due || null,
         history: company.payments?.map(payment => ({
-          date: payment.dt_payment ?? `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${company.day_due}`,
+          date: payment.dt_payment ?? fallbackDate,
           value: payment.price,
           form_of_payment: payment.form_of_payment,
           paied: !!payment.dt_payment,
