@@ -82,8 +82,8 @@ export class CourtsController {
       },
     },
   })
-  findAllByCompanyId(@Param('company_public_id') company_public_id: string) {
-    return this.courtsService.findAllByCompanyId(company_public_id);
+  findAllByCompanyId(@Param('public_id') public_id: string) {
+    return this.courtsService.findAllByCompanyId(public_id);
   }
 
   @Get()

@@ -998,7 +998,7 @@ export class CourtSchedulesService {
   }
 
   async quickCreate(
-    body: { start_hour: string; date: string; court_id: number },
+    body: { start_hour: string; date: string; court_id: number, price?: number },
   ) {
 
     const existingSchedule = await this.courtSchedulesRepository.findOne({
@@ -1035,7 +1035,7 @@ export class CourtSchedulesService {
       end_hour,
       date: new Date(body.date),
       available: true,
-      price: operatingSchedule?.price ?? 0,
+      price: body.price ?? 0,
       is_fixed: false,
       court_id: body.court_id,
       day_of_week_id,
