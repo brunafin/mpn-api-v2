@@ -132,10 +132,12 @@ export class ReservationsService {
 
       if (createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 && checkIsCellphoneNumberBR(contactPhone)) {
         if (process.env.TYPE_ENV === 'production') {
-          await this.twilioService.sendSms(
-            contactPhone,
-            message,
-          );
+          // await this.twilioService.sendSms(
+          //   contactPhone,
+          //   message,
+          // );
+
+          await this.zenviaService.sendSms(contactPhone, message);
         }
       }
 
