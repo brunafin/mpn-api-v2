@@ -1,5 +1,5 @@
-import { ReservationStatusEnum } from "src/court-schedules/court-schedules.service";
-import { CourtSchedule } from "src/court-schedules/entities/court-schedule.entity";
+import { ReservationStatusEnum } from 'src/court-schedules/court-schedules.service';
+import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 
 /**
  * Determines the status of a court schedule based on its properties.
@@ -13,7 +13,9 @@ import { CourtSchedule } from "src/court-schedules/entities/court-schedule.entit
  * - `'unknown'` if none of the above conditions are met.
  */
 
-export const getStatusCourtSchedule = (courtSchedule: CourtSchedule): ReservationStatusEnum => {
+export const getStatusCourtSchedule = (
+  courtSchedule: CourtSchedule,
+): ReservationStatusEnum => {
   if (courtSchedule.is_fixed) {
     return ReservationStatusEnum.FIXED;
   }

@@ -10,7 +10,13 @@ import {
 } from '@nestjs/common';
 import { CompanyImagesService } from './company-images.service';
 import { CreateCompanyImageDto } from './dto/create-company-image.dto';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -18,7 +24,7 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('company-images')
 @ApiTags('company-images')
 export class CompanyImagesController {
-  constructor(private readonly companyImagesService: CompanyImagesService) { }
+  constructor(private readonly companyImagesService: CompanyImagesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar imagem para empresa' })

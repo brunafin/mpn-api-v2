@@ -11,11 +11,14 @@ export class CourtsService {
   constructor(
     @InjectRepository(Court)
     private readonly courtRepository: Repository<Court>,
-  ) { }
+  ) {}
 
   async create(createCourtDto: CreateCourtDto) {
     const { sports, ...courtData } = createCourtDto;
-    const sportsEntities = await this.courtRepository.manager.findByIds(Sport, sports);
+    const sportsEntities = await this.courtRepository.manager.findByIds(
+      Sport,
+      sports,
+    );
 
     if (sportsEntities.length !== sports.length) {
       throw new NotFoundException('Um ou mais esportes não encontrados');
@@ -56,7 +59,9 @@ export class CourtsService {
   }
 
   async updateByPublicId(publicId: string, updateCourtDto: UpdateCourtDto) {
-    const court = await this.courtRepository.findOne({ where: { public_id: publicId } });
+    const court = await this.courtRepository.findOne({
+      where: { public_id: publicId },
+    });
     if (!court) {
       throw new NotFoundException();
     }

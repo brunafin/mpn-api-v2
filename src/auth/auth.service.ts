@@ -7,8 +7,8 @@ import { JwtService } from '@nestjs/jwt';
 export class AuthService {
   constructor(
     private readonly peopleService: PeopleService,
-    private readonly jwtService: JwtService
-  ) { }
+    private readonly jwtService: JwtService,
+  ) {}
 
   async signIn(username: string, pass: string): Promise<any> {
     const user = await this.peopleService.findOneByUsername(username);
@@ -28,14 +28,20 @@ export class AuthService {
     }
     const defaultPassword = process.env.DEFAULT_PASSWORD;
     if (!defaultPassword) {
-      throw new Error('A variável de ambiente DEFAULT_PASSWORD não está definida.');
+      throw new Error(
+        'A variável de ambiente DEFAULT_PASSWORD não está definida.',
+      );
     }
-    const isDefaultPassword = await bcrypt.compare(defaultPassword, user.password);
+    const isDefaultPassword = await bcrypt.compare(
+      defaultPassword,
+      user.password,
+    );
 
     const payload = {
       sub: user.public_id,
       username: user.username,
-      companyPublicId: user?.companies.length > 0 ? user.companies[0].public_id : null,
+      companyPublicId:
+        user?.companies.length > 0 ? user.companies[0].public_id : null,
       companyName: user?.companies.length > 0 ? user.companies[0].name : null,
       updatedPassword: !isDefaultPassword,
     };
@@ -44,15 +50,19 @@ export class AuthService {
     };
   }
 
-  async changePassword(companyPublicId: string, newPassword: string): Promise<any> {
+  async changePassword(
+    companyPublicId: string,
+    newPassword: string,
+  ): Promise<any> {
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!newPassword || !passwordRegex.test(newPassword)) {
       throw new Error(
-        'A senha deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais.'
+        'A senha deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais.',
       );
     }
 
-    const user = await this.peopleService.findOneByCompanyPublicId(companyPublicId);
+    const user =
+      await this.peopleService.findOneByCompanyPublicId(companyPublicId);
     if (!user) {
       throw new UnauthorizedException('Não autorizado.');
     }

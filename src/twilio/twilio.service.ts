@@ -24,8 +24,12 @@ export class TwilioService {
 
   async sendWhatsApp(to: string, message: string): Promise<void> {
     try {
-      const toFormatted = to.startsWith('whatsapp:+55') ? to : `whatsapp:+55${to}`;
-      const fromFormatted = this.from_whatsapp.startsWith('whatsapp:') ? this.from_whatsapp : `whatsapp:${this.from_whatsapp}`;
+      const toFormatted = to.startsWith('whatsapp:+55')
+        ? to
+        : `whatsapp:+55${to}`;
+      const fromFormatted = this.from_whatsapp.startsWith('whatsapp:')
+        ? this.from_whatsapp
+        : `whatsapp:${this.from_whatsapp}`;
 
       await this.client.messages.create({
         body: message,
@@ -33,18 +37,22 @@ export class TwilioService {
         to: toFormatted,
       });
     } catch (error) {
-      throw new Error(`Ocorreu um erro ao enviar mensagem de aviso para o cliente: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Ocorreu um erro ao enviar mensagem de aviso para o cliente: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   async sendWhatsAppTemplate(
     to: string,
     contentSid: string,
-    contentVariables: Record<string, string>
+    contentVariables: Record<string, string>,
   ): Promise<void> {
     try {
       const toFormatted = to.startsWith('whatsapp:') ? to : `whatsapp:+55${to}`;
-      const fromFormatted = this.from_whatsapp.startsWith('whatsapp:') ? this.from_whatsapp : `whatsapp:${this.from_whatsapp}`;
+      const fromFormatted = this.from_whatsapp.startsWith('whatsapp:')
+        ? this.from_whatsapp
+        : `whatsapp:${this.from_whatsapp}`;
 
       await this.client.messages.create({
         from: fromFormatted,
@@ -54,8 +62,9 @@ export class TwilioService {
       });
     } catch (error) {
       throw new Error(
-        `Ocorreu um erro ao enviar mensagem de template para o cliente: ${error instanceof Error ? error.message : String(error)
-        }`
+        `Ocorreu um erro ao enviar mensagem de template para o cliente: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }
@@ -70,7 +79,7 @@ export class TwilioService {
       });
     } catch (error) {
       throw new Error(
-        `Ocorreu um erro ao enviar SMS para o cliente: ${error instanceof Error ? error.message : String(error)}`
+        `Ocorreu um erro ao enviar SMS para o cliente: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

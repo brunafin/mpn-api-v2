@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { Person } from './entities/person.entity';
@@ -15,15 +12,19 @@ export class PeopleService {
   constructor(
     @InjectRepository(Person)
     private readonly peopleRepository: Repository<Person>,
-  ) { }
+  ) {}
 
   async hashPassword(password: string): Promise<string> {
     const saltOrRounds = 10;
     return bcrypt.hash(password, saltOrRounds);
   }
 
-  async canCreateUsername(username: string): Promise<{ canCreate: boolean; message?: string }> {
-    const existing = await this.peopleRepository.findOne({ where: { username } });
+  async canCreateUsername(
+    username: string,
+  ): Promise<{ canCreate: boolean; message?: string }> {
+    const existing = await this.peopleRepository.findOne({
+      where: { username },
+    });
     if (existing) {
       return { canCreate: false, message: 'O usuário já existe' };
     }
@@ -36,7 +37,9 @@ export class PeopleService {
     if (!usernameCheck.canCreate) {
       throw new NotFoundException(usernameCheck.message);
     }
-    const password = await this.hashPassword(process.env.DEFAULT_PASSWORD ?? 'defaultPassword');
+    const password = await this.hashPassword(
+      process.env.DEFAULT_PASSWORD ?? 'defaultPassword',
+    );
 
     return this.peopleRepository.save({ ...person, password });
   }
@@ -94,7 +97,9 @@ export class PeopleService {
   }
 
   async updatePassword(personId: number, hashedPassword: string) {
-    const person = await this.peopleRepository.findOne({ where: { id: personId } });
+    const person = await this.peopleRepository.findOne({
+      where: { id: personId },
+    });
     if (!person) {
       throw new NotFoundException('Usuário não encontrado');
     }

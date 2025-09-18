@@ -5,7 +5,7 @@ export class CreateOperatingScheduleDto {
     type: 'string',
     format: 'time',
     description: 'Hora do agendamento',
-    example: '10:00'
+    example: '10:00',
   })
   hour: string;
 
@@ -13,7 +13,7 @@ export class CreateOperatingScheduleDto {
     type: 'number',
     format: 'decimal',
     description: 'Preço do agendamento',
-    example: '90.00'
+    example: '90.00',
   })
   price: number;
 
@@ -26,7 +26,7 @@ export class CreateOperatingScheduleDto {
   @ApiProperty({
     description: 'Indica se o horário é fixo',
     default: false,
-    type: 'boolean'
+    type: 'boolean',
   })
   is_fixed: boolean = false;
 
@@ -34,7 +34,7 @@ export class CreateOperatingScheduleDto {
     description: 'ID do cliente da empresa',
     type: 'number',
     nullable: true,
-    default: null
+    default: null,
   })
   company_customer_id: number | null = null;
 }

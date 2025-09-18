@@ -22,7 +22,7 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('reservation')
 @ApiTags('reservations')
 export class ReservationsController {
-  constructor(private readonly reservationsService: ReservationsService) { }
+  constructor(private readonly reservationsService: ReservationsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar uma nova reserva' })
@@ -33,12 +33,20 @@ export class ReservationsController {
       properties: {
         contactName: { type: 'string', example: 'João da Silva' },
         contactPhone: { type: 'string', example: '51912345678' },
-        courtSchedulePublicId: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
+        courtSchedulePublicId: {
+          type: 'string',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+        },
         sportId: { type: 'number', example: 1 },
         isBarbecueIncluded: { type: 'boolean', example: false },
         observation: { type: 'string', example: 'Levar bolas próprias' },
       },
-      required: ['contactName', 'contactPhone', 'courtSchedulePublicId', 'sport_id'],
+      required: [
+        'contactName',
+        'contactPhone',
+        'courtSchedulePublicId',
+        'sport_id',
+      ],
     },
     examples: {
       exemplo1: {
@@ -142,11 +150,17 @@ export class ReservationsController {
     @Param('public_id') public_id: string,
     @Body() updateReservationDto: UpdateReservationDto,
   ) {
-    return this.reservationsService.updateByPublicId(public_id, updateReservationDto);
+    return this.reservationsService.updateByPublicId(
+      public_id,
+      updateReservationDto,
+    );
   }
 
   @Patch(':public_id/extra')
-  @ApiOperation({ summary: 'Atualizar apenas observation e is_barbecue_included de uma reserva' })
+  @ApiOperation({
+    summary:
+      'Atualizar apenas observation e is_barbecue_included de uma reserva',
+  })
   @ApiBody({
     description: 'Campos opcionais para atualizar',
     schema: {
@@ -159,7 +173,12 @@ export class ReservationsController {
   })
   async updateExtraFields(
     @Param('public_id') public_id: string,
-    @Body() body: { observation?: string; is_barbecue_included?: boolean; is_event?: boolean }
+    @Body()
+    body: {
+      observation?: string;
+      is_barbecue_included?: boolean;
+      is_event?: boolean;
+    },
   ) {
     return this.reservationsService.updateExtraFields(public_id, body);
   }
@@ -185,8 +204,12 @@ export class ReservationsController {
   })
   async updateContact(
     @Param('court_schedule_public_id') courtSchedulePublicId: string,
-    @Body() body: { contactName: string; contactPhone: string; }
+    @Body() body: { contactName: string; contactPhone: string },
   ) {
-    return this.reservationsService.updateContact(courtSchedulePublicId, body.contactName, body.contactPhone);
+    return this.reservationsService.updateContact(
+      courtSchedulePublicId,
+      body.contactName,
+      body.contactPhone,
+    );
   }
 }

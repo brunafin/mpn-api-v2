@@ -12,7 +12,13 @@ import {
 import { CourtSchedulesService } from './court-schedules.service';
 import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
@@ -29,9 +35,7 @@ export const CurrentUser = createParamDecorator(
 @Controller('court-schedules')
 @ApiTags('court-schedules')
 export class CourtSchedulesController {
-  constructor(
-    private readonly courtSchedulesService: CourtSchedulesService,
-  ) { }
+  constructor(private readonly courtSchedulesService: CourtSchedulesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar um horário de quadra' })
@@ -113,7 +117,9 @@ export class CourtSchedulesController {
   }
 
   @Get(':public_id')
-  @ApiOperation({ summary: 'Obter um horário de quadra pelo public_id da quadra' })
+  @ApiOperation({
+    summary: 'Obter um horário de quadra pelo public_id da quadra',
+  })
   findOne(@Param('public_id') publicId: string) {
     return this.courtSchedulesService.findOneByPublicId(publicId);
   }
@@ -143,7 +149,10 @@ export class CourtSchedulesController {
     @Param('public_id') publicId: string,
     @Body() updateCourtScheduleDto: UpdateCourtScheduleDto,
   ) {
-    return this.courtSchedulesService.updateByPublicId(publicId, updateCourtScheduleDto);
+    return this.courtSchedulesService.updateByPublicId(
+      publicId,
+      updateCourtScheduleDto,
+    );
   }
 
   @Delete(':public_id')
@@ -153,7 +162,9 @@ export class CourtSchedulesController {
   }
 
   @Patch(':public_id/availability')
-  @ApiOperation({ summary: 'Atualizar a disponibilidade de um horário de quadra' })
+  @ApiOperation({
+    summary: 'Atualizar a disponibilidade de um horário de quadra',
+  })
   updateAvailability(
     @Param('public_id') publicId: string,
     @Body('available') available: boolean,
@@ -175,11 +186,7 @@ export class CourtSchedulesController {
       },
     },
   })
-  async fixSchedule(
-    @Body() body: {
-      court_schedule_public_id: string;
-    }
-  ) {
+  async fixSchedule(@Body() body: { court_schedule_public_id: string }) {
     return this.courtSchedulesService.fixSchedule(body);
   }
 
@@ -197,16 +204,14 @@ export class CourtSchedulesController {
       },
     },
   })
-  async unfixSchedule(
-    @Body() body: {
-      court_schedule_public_id: string;
-    }
-  ) {
+  async unfixSchedule(@Body() body: { court_schedule_public_id: string }) {
     return this.courtSchedulesService.unfixSchedule(body);
   }
 
   @Post('quick-create')
-  @ApiOperation({ summary: 'Criar horário de quadra rapidamente para o usuário logado' })
+  @ApiOperation({
+    summary: 'Criar horário de quadra rapidamente para o usuário logado',
+  })
   @ApiBody({
     description: 'Dados mínimos para criar um horário de quadra',
     schema: {

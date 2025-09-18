@@ -1,7 +1,15 @@
-import { Exclude, Expose } from "class-transformer";
-import { Company } from "src/companies/entities/company.entity";
-import { CourtSchedule } from "src/court-schedules/entities/court-schedule.entity";
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, Unique } from "typeorm";
+import { Exclude, Expose } from 'class-transformer';
+import { Company } from 'src/companies/entities/company.entity';
+import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  Unique,
+} from 'typeorm';
 
 @Entity({ name: 'company_customer' })
 @Unique(['name', 'phone', 'company_id'])

@@ -11,7 +11,13 @@ import {
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -19,7 +25,7 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('companies')
 @ApiTags('companies')
 export class CompaniesController {
-  constructor(private readonly companiesService: CompaniesService) { }
+  constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar uma nova empresa' })
@@ -61,12 +67,22 @@ export class CompaniesController {
       items: {
         type: 'object',
         properties: {
-          public_id: { type: 'string', format: 'uuid', example: 'f4609a1d-6be9-4eda-9ca2-7f6d29a301f3' },
+          public_id: {
+            type: 'string',
+            format: 'uuid',
+            example: 'f4609a1d-6be9-4eda-9ca2-7f6d29a301f3',
+          },
           name: { type: 'string', example: 'Nena Esportes' },
           phone: { type: 'string', example: '51999365300' },
           logo_url: { type: 'string', nullable: true, example: null },
-          instagram_url: { type: 'string', example: 'https://instagram.com/marcapranos' },
-          facebook_url: { type: 'string', example: 'https://facebook.com/marcapranos' },
+          instagram_url: {
+            type: 'string',
+            example: 'https://instagram.com/marcapranos',
+          },
+          facebook_url: {
+            type: 'string',
+            example: 'https://facebook.com/marcapranos',
+          },
           cep: { type: 'string', example: '94090000' },
           street: { type: 'string', example: 'Rua das Quadras' },
           number: { type: 'string', example: '123' },
@@ -88,12 +104,22 @@ export class CompaniesController {
     schema: {
       type: 'object',
       properties: {
-        public_id: { type: 'string', format: 'uuid', example: 'f4609a1d-6be9-4eda-9ca2-7f6d29a301f3' },
+        public_id: {
+          type: 'string',
+          format: 'uuid',
+          example: 'f4609a1d-6be9-4eda-9ca2-7f6d29a301f3',
+        },
         name: { type: 'string', example: 'Nena Esportes' },
         phone: { type: 'string', example: '51999365300' },
         logo_url: { type: 'string', nullable: true, example: null },
-        instagram_url: { type: 'string', example: 'https://instagram.com/marcapranos' },
-        facebook_url: { type: 'string', example: 'https://facebook.com/marcapranos' },
+        instagram_url: {
+          type: 'string',
+          example: 'https://instagram.com/marcapranos',
+        },
+        facebook_url: {
+          type: 'string',
+          example: 'https://facebook.com/marcapranos',
+        },
         cep: { type: 'string', example: '94090000' },
         street: { type: 'string', example: 'Rua das Quadras' },
         number: { type: 'string', example: '123' },
@@ -107,8 +133,7 @@ export class CompaniesController {
             properties: {
               url: {
                 type: 'string',
-                example:
-                  'https://storage.googleapis.com/bucket/image1.jpg',
+                example: 'https://storage.googleapis.com/bucket/image1.jpg',
               },
             },
           },
@@ -116,13 +141,14 @@ export class CompaniesController {
       },
     },
   })
-
   findOne(@Param('public_id') public_id: string) {
     return this.companiesService.findOneByPublicId(public_id);
   }
 
   @Get(':public_id/schedules/:date')
-  @ApiOperation({ summary: 'Obter horários de um dia específico para uma empresa' })
+  @ApiOperation({
+    summary: 'Obter horários de um dia específico para uma empresa',
+  })
   @ApiOkResponse({
     description: 'Horários retornados com sucesso',
     schema: {
@@ -143,8 +169,10 @@ export class CompaniesController {
     return this.companiesService.findSchedulesByDate(public_id, date);
   }
 
-    @Get(':public_id/all-schedules/:date')
-  @ApiOperation({ summary: 'Obter horários de um dia específico para uma empresa' })
+  @Get(':public_id/all-schedules/:date')
+  @ApiOperation({
+    summary: 'Obter horários de um dia específico para uma empresa',
+  })
   @ApiOkResponse({
     description: 'Horários retornados com sucesso',
     schema: {
@@ -200,7 +228,10 @@ export class CompaniesController {
       },
     },
   })
-  update(@Param('public_id') public_id: string, @Body() updateCompanyDto: UpdateCompanyDto) {
+  update(
+    @Param('public_id') public_id: string,
+    @Body() updateCompanyDto: UpdateCompanyDto,
+  ) {
     return this.companiesService.updateByPublicId(public_id, updateCompanyDto);
   }
 
@@ -229,7 +260,10 @@ export class CompaniesController {
     @Param('public_id') public_id: string,
     @Body('isHiddenInactiveHours') isHiddenInactiveHours: boolean,
   ) {
-    return this.companiesService.changePreferencesHiddenInactiveHoursByPublicId(public_id, isHiddenInactiveHours);
+    return this.companiesService.changePreferencesHiddenInactiveHoursByPublicId(
+      public_id,
+      isHiddenInactiveHours,
+    );
   }
 
   @Get('/:public_id/infos')
@@ -237,7 +271,6 @@ export class CompaniesController {
   @ApiOkResponse({
     description: 'Informações da empresa retornados com sucesso',
   })
-
   findInfosByPublicId(@Param('public_id') public_id: string) {
     return this.companiesService.findInfosByPublicId(public_id);
   }

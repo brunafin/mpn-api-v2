@@ -7,4 +7,4 @@ import { ZenviaController } from './zenvia-sms.controller';
   providers: [ZenviaService],
   exports: [ZenviaService],
 })
-export class ZenviaModule { }
+export class ZenviaModule {}

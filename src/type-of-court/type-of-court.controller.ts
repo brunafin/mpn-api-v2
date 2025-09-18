@@ -11,7 +11,13 @@ import {
 import { TypeOfCourtService } from './type-of-court.service';
 import { CreateTypeOfCourtDto } from './dto/create-type-of-court.dto';
 import { UpdateTypeOfCourtDto } from './dto/update-type-of-court.dto';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -19,7 +25,7 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('type-of-court')
 @ApiTags('type-of-court')
 export class TypeOfCourtController {
-  constructor(private readonly typeOfCourtService: TypeOfCourtService) { }
+  constructor(private readonly typeOfCourtService: TypeOfCourtService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar um tipo de quadra' })

@@ -4,7 +4,11 @@ export class CreateCompanyDto {
   @ApiProperty({ description: 'Nome da empresa' })
   name: string;
 
-  @ApiProperty({ description: 'Telefone da empresa', required: false, maxLength: 11 })
+  @ApiProperty({
+    description: 'Telefone da empresa',
+    required: false,
+    maxLength: 11,
+  })
   phone: string;
 
   @ApiProperty({ description: 'URL do Instagram da empresa', required: false })

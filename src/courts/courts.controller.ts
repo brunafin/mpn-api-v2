@@ -11,7 +11,13 @@ import {
 import { CourtsService } from './courts.service';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -19,7 +25,7 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('courts')
 @ApiTags('courts')
 export class CourtsController {
-  constructor(private readonly courtsService: CourtsService) { }
+  constructor(private readonly courtsService: CourtsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar uma quadra' })
@@ -72,9 +78,15 @@ export class CourtsController {
       items: {
         type: 'object',
         properties: {
-          public_id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
+          public_id: {
+            type: 'string',
+            example: '550e8400-e29b-41d4-a716-246655440000',
+          },
           name: { type: 'string', example: 'Quadra 1' },
-          company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
+          company_id: {
+            type: 'string',
+            example: '550e8400-e29b-41d4-a716-446655440000',
+          },
           show: { type: 'boolean', example: true },
           is_covered: { type: 'boolean', example: false },
           is_can_have_net: { type: 'boolean', example: true },
@@ -95,9 +107,15 @@ export class CourtsController {
       items: {
         type: 'object',
         properties: {
-          id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
+          id: {
+            type: 'string',
+            example: '550e8400-e29b-41d4-a716-246655440000',
+          },
           name: { type: 'string', example: 'Quadra 1' },
-          company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
+          company_id: {
+            type: 'string',
+            example: '550e8400-e29b-41d4-a716-446655440000',
+          },
           show: { type: 'boolean', example: true },
           is_covered: { type: 'boolean', example: false },
           is_can_have_net: { type: 'boolean', example: true },
@@ -116,9 +134,15 @@ export class CourtsController {
     schema: {
       type: 'object',
       properties: {
-        public_id: { type: 'string', example: '550e8400-e29b-41d4-a716-246655440000' },
+        public_id: {
+          type: 'string',
+          example: '550e8400-e29b-41d4-a716-246655440000',
+        },
         name: { type: 'string', example: 'Quadra 1' },
-        company_id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
+        company_id: {
+          type: 'string',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+        },
         show: { type: 'boolean', example: true },
         is_covered: { type: 'boolean', example: false },
         is_can_have_net: { type: 'boolean', example: true },
@@ -147,7 +171,10 @@ export class CourtsController {
       },
     },
   })
-  update(@Param('public_id') public_id: string, @Body() updateCourtDto: UpdateCourtDto) {
+  update(
+    @Param('public_id') public_id: string,
+    @Body() updateCourtDto: UpdateCourtDto,
+  ) {
     return this.courtsService.updateByPublicId(public_id, updateCourtDto);
   }
 

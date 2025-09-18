@@ -1,19 +1,11 @@
-import {
-  Controller,
-  Get,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { CourtSchedulesService } from './court-schedules.service';
-import {
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 
 @Controller('public-court-schedules')
 @ApiTags('public-court-schedules')
 export class PublicCourtSchedulesController {
-  constructor(private readonly courtSchedulesService: CourtSchedulesService) { }
+  constructor(private readonly courtSchedulesService: CourtSchedulesService) {}
 
   @Get('/where-to-play')
   @ApiTags('Marca Pra Nós - Público')
@@ -34,7 +26,7 @@ export class PublicCourtSchedulesController {
     return this.courtSchedulesService.findCitiesToPlay();
   }
 
-    @Get('/where-to-play/sports')
+  @Get('/where-to-play/sports')
   @ApiTags('Marca Pra Nós - Público')
   @ApiOperation({ summary: 'Esportes' })
   findSportsToPlay() {

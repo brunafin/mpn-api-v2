@@ -11,7 +11,9 @@ export async function seedTypeOfCourt(app: INestApplicationContext) {
   ];
 
   for (const type of typeOfCourts) {
-    const exists = await typeOfCourtRepo.findOne({ where: { name: type.name } });
+    const exists = await typeOfCourtRepo.findOne({
+      where: { name: type.name },
+    });
     if (!exists) {
       await typeOfCourtRepo.save(type);
     }

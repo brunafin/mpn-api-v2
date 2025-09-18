@@ -1,5 +1,11 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBody,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { ZenviaService } from './zenvia-sms.service';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -8,7 +14,7 @@ import { AuthGuard } from '@nestjs/passport';
 @ApiTags('zenvia')
 @Controller('zenvia')
 export class ZenviaController {
-  constructor(private readonly zenviaService: ZenviaService) { }
+  constructor(private readonly zenviaService: ZenviaService) {}
 
   @Post('send-sms')
   @ApiOperation({ summary: 'Envia uma mensagem SMS via Zenvia' })
@@ -17,7 +23,10 @@ export class ZenviaController {
       type: 'object',
       properties: {
         to: { type: 'string', example: '51999999999' },
-        message: { type: 'string', example: 'Olá, esta é uma mensagem SMS da Zenvia!' },
+        message: {
+          type: 'string',
+          example: 'Olá, esta é uma mensagem SMS da Zenvia!',
+        },
       },
       required: ['to', 'message'],
     },

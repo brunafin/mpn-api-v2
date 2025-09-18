@@ -8,22 +8,23 @@ import { Company } from 'src/companies/entities/company.entity';
 import { format, startOfDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
-
 @Injectable()
 export class NotesService {
-
   constructor(
     @InjectRepository(Note)
     private readonly notesRepository: Repository<Note>,
     @InjectRepository(Company)
     private readonly companiesRepository: Repository<Company>,
-
-  ) { }
+  ) {}
 
   async create(createNoteDto: CreateNoteDto) {
-    const company = await this.companiesRepository.findOne({ where: { public_id: createNoteDto.companyPublicId } });
+    const company = await this.companiesRepository.findOne({
+      where: { public_id: createNoteDto.companyPublicId },
+    });
     if (!company) {
-      throw new Error('Não foi possível criar o lembrete. Empresa não encontrada');
+      throw new Error(
+        'Não foi possível criar o lembrete. Empresa não encontrada',
+      );
     }
     await this.notesRepository.save({
       ...createNoteDto,
@@ -33,16 +34,22 @@ export class NotesService {
       await this.notesRepository.save({
         ...createNoteDto,
         company_id: company.id,
-        date: new Date(new Date(createNoteDto.date).getTime() - 24 * 60 * 60 * 1000),
+        date: new Date(
+          new Date(createNoteDto.date).getTime() - 24 * 60 * 60 * 1000,
+        ),
       });
     }
     return { message: 'Lembrete criado com sucesso' };
   }
 
   async counter(companyPublicId: string) {
-    const company = await this.companiesRepository.findOne({ where: { public_id: companyPublicId } });
+    const company = await this.companiesRepository.findOne({
+      where: { public_id: companyPublicId },
+    });
     if (!company) {
-      throw new Error('Não foi possível encontrar lembretes. Empresa não encontrada');
+      throw new Error(
+        'Não foi possível encontrar lembretes. Empresa não encontrada',
+      );
     }
 
     const timeZone = 'America/Sao_Paulo';
@@ -63,9 +70,13 @@ export class NotesService {
   }
 
   async findByDate(companyPublicId: string, date: Date) {
-    const company = await this.companiesRepository.findOne({ where: { public_id: companyPublicId } });
+    const company = await this.companiesRepository.findOne({
+      where: { public_id: companyPublicId },
+    });
     if (!company) {
-      throw new Error('Não foi possível encontrar lembretes. Empresa não encontrada');
+      throw new Error(
+        'Não foi possível encontrar lembretes. Empresa não encontrada',
+      );
     }
     const notes = await this.notesRepository.find({
       select: ['id', 'sender', 'message', 'title'],
@@ -76,7 +87,7 @@ export class NotesService {
       },
       order: {
         id: 'DESC',
-      }
+      },
     });
     return notes;
   }

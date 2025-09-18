@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsString, IsArray, ArrayNotEmpty } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsString,
+  IsArray,
+  ArrayNotEmpty,
+} from 'class-validator';
 import { Sport } from 'src/sports/entities/sport.entity';
 
 export class CreateCourtDto {
@@ -30,7 +36,10 @@ export class CreateCourtDto {
   @ApiProperty({
     description: 'Array de objetos da entidade Sports associados à quadra',
     type: [Object],
-    example: [{ id: 1, name: 'Futebol' }, { id: 2, name: 'Vôlei' }],
+    example: [
+      { id: 1, name: 'Futebol' },
+      { id: 2, name: 'Vôlei' },
+    ],
   })
   @IsArray()
   @ArrayNotEmpty()

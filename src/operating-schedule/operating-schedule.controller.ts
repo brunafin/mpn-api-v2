@@ -19,7 +19,7 @@ import { AuthGuard } from '@nestjs/passport';
 export class OperatingScheduleController {
   constructor(
     private readonly operatingScheduleService: OperatingScheduleService,
-  ) { }
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar um horário de funcionamento' })
