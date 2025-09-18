@@ -8,12 +8,18 @@ export class UrlQueryParamCourtScheduleDto {
   @Type(() => Number)
   courtId: number;
 
-  @ApiPropertyOptional({ description: 'Hora do horário no formato HH:mm', example: '14:30' })
+  @ApiPropertyOptional({
+    description: 'Hora do horário no formato HH:mm',
+    example: '14:30',
+  })
   @IsOptional()
   @IsString()
   hour?: string;
 
-  @ApiPropertyOptional({ description: 'Data do horário no formato ISO 8601', example: '2023-10-01' })
+  @ApiPropertyOptional({
+    description: 'Data do horário no formato ISO 8601',
+    example: '2023-10-01',
+  })
   @IsOptional()
   @IsDateString()
   date?: Date;

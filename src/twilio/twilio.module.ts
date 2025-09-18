@@ -7,4 +7,4 @@ import { WhatsAppController } from './twilio.controller';
   providers: [TwilioService],
   exports: [TwilioService],
 })
-export class TwilioModule { }
+export class TwilioModule {}

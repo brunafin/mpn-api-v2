@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
@@ -11,7 +21,7 @@ import { CounterQueryDto } from './dto/counter-query.dto';
 @ApiTags('notes')
 @Controller('notes')
 export class NotesController {
-  constructor(private readonly notesService: NotesService) { }
+  constructor(private readonly notesService: NotesService) {}
 
   @Post()
   create(@Body() createNoteDto: CreateNoteDto) {
@@ -27,8 +37,7 @@ export class NotesController {
   @Get('')
   @ApiQuery({ name: 'companyPublicId', type: String })
   @ApiQuery({ name: 'date', type: String })
-  findByDate(
-    @Query() query: CounterQueryDto) {
+  findByDate(@Query() query: CounterQueryDto) {
     return this.notesService.findByDate(query.companyPublicId, query.date);
   }
 

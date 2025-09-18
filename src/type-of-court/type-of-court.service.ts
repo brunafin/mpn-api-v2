@@ -10,7 +10,7 @@ export class TypeOfCourtService {
   constructor(
     @InjectRepository(TypeOfCourt)
     private readonly typeOfCourtRepository: Repository<TypeOfCourt>,
-  ) { }
+  ) {}
   create(createTypeOfCourtDto: CreateTypeOfCourtDto) {
     return this.typeOfCourtRepository.save(createTypeOfCourtDto);
   }

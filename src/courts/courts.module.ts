@@ -10,4 +10,4 @@ import { OperatingSchedule } from 'src/operating-schedule/entities/operating-sch
   controllers: [CourtsController],
   providers: [CourtsService],
 })
-export class CourtsModule { }
+export class CourtsModule {}

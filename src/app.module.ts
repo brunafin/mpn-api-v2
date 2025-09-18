@@ -62,7 +62,7 @@ import { PaymentCompany } from './payment_company/entities/payment_company.entit
         CompanyCustomer,
         Note,
         Plan,
-        PaymentCompany
+        PaymentCompany,
       ],
     }),
     PeopleModule,
@@ -82,9 +82,9 @@ import { PaymentCompany } from './payment_company/entities/payment_company.entit
     ZenviaModule,
     NotesModule,
     PlansModule,
-    PaymentCompanyModule
+    PaymentCompanyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

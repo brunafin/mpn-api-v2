@@ -11,7 +11,13 @@ import {
 import { DaysOfWeekService } from './days-of-week.service';
 import { CreateDaysOfWeekDto } from './dto/create-days-of-week.dto';
 import { UpdateDaysOfWeekDto } from './dto/update-days-of-week.dto';
-import { ApiBody, ApiOkResponse, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
@@ -19,7 +25,7 @@ import { AuthGuard } from '@nestjs/passport';
 @Controller('days-of-week')
 @ApiTags('days-of-week')
 export class DaysOfWeekController {
-  constructor(private readonly daysOfWeekService: DaysOfWeekService) { }
+  constructor(private readonly daysOfWeekService: DaysOfWeekService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar um dia da semana' })

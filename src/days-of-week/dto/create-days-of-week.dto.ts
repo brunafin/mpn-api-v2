@@ -8,7 +8,8 @@ export class CreateDaysOfWeekDto {
   description: string;
 
   @ApiProperty({
-    description: 'Referência do número do dia da semana (deve ser 0,1,2,3,4,5,6)',
+    description:
+      'Referência do número do dia da semana (deve ser 0,1,2,3,4,5,6)',
     type: 'integer',
     enum: [0, 1, 2, 3, 4, 5, 6],
   })

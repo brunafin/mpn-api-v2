@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -31,7 +28,7 @@ export class CompaniesService {
   constructor(
     @InjectRepository(Company)
     private readonly companiesRepository: Repository<Company>,
-  ) { }
+  ) {}
 
   create(createCompanyDto: CreateCompanyDto) {
     const company = this.companiesRepository.create(createCompanyDto);
@@ -69,13 +66,21 @@ export class CompaniesService {
     });
   }
 
-  async findSchedulesByDate(publicId: string, date: string): Promise<IReservationItemProps[]> {
+  async findSchedulesByDate(
+    publicId: string,
+    date: string,
+  ): Promise<IReservationItemProps[]> {
     const company = await this.companiesRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.courts', 'court')
-      .leftJoinAndSelect('court.court_schedule', 'schedule', 'schedule.date = :date', {
-        date: new Date(date).toISOString().split('T')[0],
-      })
+      .leftJoinAndSelect(
+        'court.court_schedule',
+        'schedule',
+        'schedule.date = :date',
+        {
+          date: new Date(date).toISOString().split('T')[0],
+        },
+      )
       .leftJoinAndSelect('schedule.reservation', 'reservation')
       .leftJoinAndSelect('reservation.sport', 'sport')
       .where('company.public_id = :publicId', { publicId })
@@ -103,41 +108,57 @@ export class CompaniesService {
         'reservation.observation',
         'reservation.is_barbecue_included',
         'reservation.is_event',
-        'sport.needsNet'
+        'sport.needsNet',
       ])
       .getOne();
 
-    const reservations: IReservationItemProps[] = company?.courts.flatMap((court) => {
-      const isHiddenInactiveHours = company.preferences_is_hidden_inactive_hours;
+    const reservations: IReservationItemProps[] =
+      company?.courts
+        .flatMap((court) => {
+          const isHiddenInactiveHours =
+            company.preferences_is_hidden_inactive_hours;
 
-      return court.court_schedule
-        .filter(schedule => {
-          const status = getStatusCourtSchedule(schedule);
-          return !(isHiddenInactiveHours && status === ReservationStatusEnum.INACTIVE);
+          return court.court_schedule
+            .filter((schedule) => {
+              const status = getStatusCourtSchedule(schedule);
+              return !(
+                isHiddenInactiveHours &&
+                status === ReservationStatusEnum.INACTIVE
+              );
+            })
+            .map((schedule) => ({
+              scheduleId: schedule.public_id,
+              status: getStatusCourtSchedule(schedule),
+              date: schedule.date,
+              court: court.name,
+              time: schedule.start_hour.slice(0, 5),
+              customerName: schedule.reservation?.contact_name ?? null,
+              isBarbecueIncluded:
+                schedule.reservation?.is_barbecue_included ?? false,
+              isEvent: schedule.reservation?.is_event ?? false,
+              isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
+            }));
         })
-        .map(schedule => ({
-          scheduleId: schedule.public_id,
-          status: getStatusCourtSchedule(schedule),
-          date: schedule.date,
-          court: court.name,
-          time: schedule.start_hour.slice(0, 5),
-          customerName: schedule.reservation?.contact_name ?? null,
-          isBarbecueIncluded: schedule.reservation?.is_barbecue_included ?? false,
-          isEvent: schedule.reservation?.is_event ?? false,
-          isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
-        }));
-    }).sort((a, b) => a.time.localeCompare(b.time)) ?? [];
+        .sort((a, b) => a.time.localeCompare(b.time)) ?? [];
 
     return reservations ?? [];
   }
 
-  async findAllSchedulesByDate(publicId: string, date: string): Promise<IReservationItemProps[]> {
+  async findAllSchedulesByDate(
+    publicId: string,
+    date: string,
+  ): Promise<IReservationItemProps[]> {
     const company = await this.companiesRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.courts', 'court')
-      .leftJoinAndSelect('court.court_schedule', 'schedule', 'schedule.date = :date', {
-        date: new Date(date).toISOString().split('T')[0],
-      })
+      .leftJoinAndSelect(
+        'court.court_schedule',
+        'schedule',
+        'schedule.date = :date',
+        {
+          date: new Date(date).toISOString().split('T')[0],
+        },
+      )
       .leftJoinAndSelect('schedule.reservation', 'reservation')
       .leftJoinAndSelect('reservation.sport', 'sport')
       .where('company.public_id = :publicId', { publicId })
@@ -165,32 +186,36 @@ export class CompaniesService {
         'reservation.observation',
         'reservation.is_barbecue_included',
         'reservation.is_event',
-        'sport.needsNet'
+        'sport.needsNet',
       ])
       .getOne();
 
-    const reservations: IReservationItemProps[] = company?.courts.flatMap((court) => {
-      return court.court_schedule
-        .map(schedule => ({
-          scheduleId: schedule.public_id,
-          status: getStatusCourtSchedule(schedule),
-          date: schedule.date,
-          court: court.name,
-          time: schedule.start_hour.slice(0, 5),
-          customerName: schedule.reservation?.contact_name ?? null,
-          isBarbecueIncluded: schedule.reservation?.is_barbecue_included ?? false,
-          isEvent: schedule.reservation?.is_event ?? false,
-          isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
-          isHiddenInactiveHours: company.preferences_is_hidden_inactive_hours,
-        }));
-    }).sort((a, b) => a.time.localeCompare(b.time)) ?? [];
-
+    const reservations: IReservationItemProps[] =
+      company?.courts
+        .flatMap((court) => {
+          return court.court_schedule.map((schedule) => ({
+            scheduleId: schedule.public_id,
+            status: getStatusCourtSchedule(schedule),
+            date: schedule.date,
+            court: court.name,
+            time: schedule.start_hour.slice(0, 5),
+            customerName: schedule.reservation?.contact_name ?? null,
+            isBarbecueIncluded:
+              schedule.reservation?.is_barbecue_included ?? false,
+            isEvent: schedule.reservation?.is_event ?? false,
+            isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
+            isHiddenInactiveHours: company.preferences_is_hidden_inactive_hours,
+          }));
+        })
+        .sort((a, b) => a.time.localeCompare(b.time)) ?? [];
 
     return reservations ?? [];
   }
 
   async updateByPublicId(publicId: string, updateCompanyDto: UpdateCompanyDto) {
-    const company = await this.companiesRepository.findOne({ where: { public_id: publicId } });
+    const company = await this.companiesRepository.findOne({
+      where: { public_id: publicId },
+    });
     if (!company) {
       throw new NotFoundException();
     }
@@ -202,8 +227,14 @@ export class CompaniesService {
     return this.companiesRepository.delete({ public_id: publicId });
   }
 
-  changePreferencesHiddenInactiveHoursByPublicId(publicId: string, isHiddenInactiveHours: boolean) {
-    return this.companiesRepository.update({ public_id: publicId }, { preferences_is_hidden_inactive_hours: isHiddenInactiveHours });
+  changePreferencesHiddenInactiveHoursByPublicId(
+    publicId: string,
+    isHiddenInactiveHours: boolean,
+  ) {
+    return this.companiesRepository.update(
+      { public_id: publicId },
+      { preferences_is_hidden_inactive_hours: isHiddenInactiveHours },
+    );
   }
 
   async findInfosByPublicId(uuid: string) {
@@ -226,16 +257,14 @@ export class CompaniesService {
       .orderBy('payments.dt_payment', 'DESC')
       .getOne();
 
-
     if (!company) {
       throw new NotFoundException();
     }
 
-
     const today = new Date();
     const fallbackDate = format(
       new Date(today.getFullYear(), today.getMonth(), company.day_due ?? 10),
-      'yyyy-MM-dd'
+      'yyyy-MM-dd',
     );
 
     const objToFront = {
@@ -248,14 +277,15 @@ export class CompaniesService {
         name: company.plan?.name || 'Gratuito (Teste)',
         price: company.plan?.price || 0,
         day_due: company?.day_due || null,
-        history: company.payments?.map(payment => ({
-          date: payment.dt_payment ?? fallbackDate,
-          value: payment.price,
-          form_of_payment: payment.form_of_payment,
-          paied: !!payment.dt_payment,
-        })) || [],
-      }
-    }
+        history:
+          company.payments?.map((payment) => ({
+            date: payment.dt_payment ?? fallbackDate,
+            value: payment.price,
+            form_of_payment: payment.form_of_payment,
+            paied: !!payment.dt_payment,
+          })) || [],
+      },
+    };
 
     return objToFront;
   }

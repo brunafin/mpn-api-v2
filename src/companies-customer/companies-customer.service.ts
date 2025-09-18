@@ -10,9 +10,11 @@ export class CompaniesCustomerService {
   constructor(
     @InjectRepository(CompanyCustomer)
     private readonly customerRepository: Repository<CompanyCustomer>,
-  ) { }
+  ) {}
 
-  async create(createCompaniesCustomerDto: CreateCompaniesCustomerDto): Promise<CompanyCustomer> {
+  async create(
+    createCompaniesCustomerDto: CreateCompaniesCustomerDto,
+  ): Promise<CompanyCustomer> {
     const existingCustomer = await this.customerRepository.findOne({
       where: {
         name: createCompaniesCustomerDto.name.trim(),
@@ -20,15 +22,15 @@ export class CompaniesCustomerService {
       },
     });
     if (existingCustomer) {
-      throw new NotFoundException(
-        "Usuário já existe",
-      );
+      throw new NotFoundException('Usuário já existe');
     }
     const customer = this.customerRepository.create(createCompaniesCustomerDto);
     return this.customerRepository.save(customer);
   }
 
-  async findAllByCompany(companyId: number): Promise<Pick<CompanyCustomer, 'id' | 'name' | 'phone' | 'email'>[]> {
+  async findAllByCompany(
+    companyId: number,
+  ): Promise<Pick<CompanyCustomer, 'id' | 'name' | 'phone' | 'email'>[]> {
     return this.customerRepository.find({
       select: ['id', 'name', 'phone', 'email'],
       where: { company_id: companyId },
@@ -43,9 +45,14 @@ export class CompaniesCustomerService {
     return customer;
   }
 
-  async update(id: number, updateCompaniesCustomerDto: UpdateCompaniesCustomerDto): Promise<CompanyCustomer> {
+  async update(
+    id: number,
+    updateCompaniesCustomerDto: UpdateCompaniesCustomerDto,
+  ): Promise<CompanyCustomer> {
     await this.customerRepository.update(id, updateCompaniesCustomerDto);
-    const updatedCustomer = await this.customerRepository.findOne({ where: { id } });
+    const updatedCustomer = await this.customerRepository.findOne({
+      where: { id },
+    });
     if (!updatedCustomer) {
       throw new NotFoundException('Cliente não encontrado');
     }

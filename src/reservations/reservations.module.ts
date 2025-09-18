@@ -12,9 +12,22 @@ import { CompanyCustomer } from 'src/companies-customer/entities/company-custome
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Reservation, CourtSchedule, CompanyCustomer, OperatingSchedule])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Reservation,
+      CourtSchedule,
+      CompanyCustomer,
+      OperatingSchedule,
+    ]),
+  ],
   controllers: [ReservationsController],
-  providers: [ReservationsService, JwtService, EmailService, TwilioService, ZenviaService],
+  providers: [
+    ReservationsService,
+    JwtService,
+    EmailService,
+    TwilioService,
+    ZenviaService,
+  ],
   exports: [ReservationsService],
 })
-export class ReservationsModule { }
+export class ReservationsModule {}

@@ -10,4 +10,4 @@ import { Sport } from './entities/sport.entity';
   controllers: [SportsController],
   providers: [SportsService],
 })
-export class SportsModule { }
+export class SportsModule {}

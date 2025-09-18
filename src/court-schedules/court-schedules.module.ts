@@ -11,8 +11,17 @@ import { PublicCourtSchedulesController } from './public-court-schedules.control
 import { Company } from 'src/companies/entities/company.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CourtSchedule, OperatingSchedule, Court, Reservation, Company]), JwtModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      CourtSchedule,
+      OperatingSchedule,
+      Court,
+      Reservation,
+      Company,
+    ]),
+    JwtModule,
+  ],
   controllers: [CourtSchedulesController, PublicCourtSchedulesController],
   providers: [CourtSchedulesService],
 })
-export class CourtSchedulesModule { }
+export class CourtSchedulesModule {}

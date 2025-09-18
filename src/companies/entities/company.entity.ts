@@ -93,12 +93,12 @@ export class Company {
   @Expose()
   day_due: number | null;
 
-  @Column()
+  @Column({ nullable: true })
   @Exclude()
   administrator_id: number;
 
   @Column({ type: 'int', nullable: true })
-  plan_id: number;
+  plan_id: number | null;
 
   @Column({ type: 'text', array: true, nullable: true })
   @Expose()

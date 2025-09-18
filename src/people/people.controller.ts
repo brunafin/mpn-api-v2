@@ -11,13 +11,19 @@ import {
 import { PeopleService } from './people.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @Controller('people')
 @ApiTags('people')
 export class PeopleController {
-  constructor(private readonly peopleService: PeopleService) { }
+  constructor(private readonly peopleService: PeopleService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar uma nova pessoa' })

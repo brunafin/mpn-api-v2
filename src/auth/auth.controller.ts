@@ -5,7 +5,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 @Controller('auth')
 @ApiTags('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -42,8 +42,11 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid password' })
   async changePassword(
-    @Body() body: { companyPublicId: string; newPassword: string }
+    @Body() body: { companyPublicId: string; newPassword: string },
   ) {
-    return this.authService.changePassword(body.companyPublicId, body.newPassword);
+    return this.authService.changePassword(
+      body.companyPublicId,
+      body.newPassword,
+    );
   }
 }

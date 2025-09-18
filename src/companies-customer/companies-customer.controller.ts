@@ -1,7 +1,21 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { CompaniesCustomerService } from './companies-customer.service';
 import { CreateCompaniesCustomerDto } from './dto/create-companies-customer.dto';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @ApiTags('companies-customer')
@@ -9,7 +23,9 @@ import { AuthGuard } from '@nestjs/passport';
 @ApiBearerAuth()
 @Controller('companies-customer')
 export class CompaniesCustomerController {
-  constructor(private readonly companiesCustomerService: CompaniesCustomerService) { }
+  constructor(
+    private readonly companiesCustomerService: CompaniesCustomerService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar um novo cliente de empresa' })
@@ -19,9 +35,14 @@ export class CompaniesCustomerController {
   }
 
   @Get('company/:companyId')
-  @ApiOperation({ summary: 'Listar todos os clientes de uma empresa específica' })
+  @ApiOperation({
+    summary: 'Listar todos os clientes de uma empresa específica',
+  })
   @ApiParam({ name: 'companyId', type: Number, description: 'ID da empresa' })
-  @ApiResponse({ status: 200, description: 'Lista de clientes da empresa retornada com sucesso.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de clientes da empresa retornada com sucesso.',
+  })
   findAllByCompany(@Param('companyId') companyId: string) {
     return this.companiesCustomerService.findAllByCompany(+companyId);
   }
