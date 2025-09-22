@@ -35,6 +35,10 @@ import { PlansModule } from './plans/plans.module';
 import { Plan } from './plans/entities/plan.entity';
 import { PaymentCompanyModule } from './payment_company/payment_company.module';
 import { PaymentCompany } from './payment_company/entities/payment_company.entity';
+import { GoogleCourtsModule } from './google_courts/google_courts.module';
+import { CitiesModule } from './cities/cities.module';
+import { City } from './cities/entities/city.entity';
+import { GoogleCourt } from './google_courts/entities/google_court.entity';
 
 @Module({
   imports: [
@@ -63,6 +67,8 @@ import { PaymentCompany } from './payment_company/entities/payment_company.entit
         Note,
         Plan,
         PaymentCompany,
+        City,
+        GoogleCourt,
       ],
     }),
     PeopleModule,
@@ -83,6 +89,8 @@ import { PaymentCompany } from './payment_company/entities/payment_company.entit
     NotesModule,
     PlansModule,
     PaymentCompanyModule,
+    GoogleCourtsModule,
+    CitiesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

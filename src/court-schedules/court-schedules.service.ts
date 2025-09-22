@@ -853,7 +853,7 @@ export class CourtSchedulesService {
     const sportMap = new Map<number, { label: string; value: number }>();
 
     courts.forEach((court) => {
-      court.court_sports.forEach((sport: any) => {
+      court.court_sports.forEach((sport: { id: number; name: string }) => {
         if (!sportMap.has(sport.id)) {
           sportMap.set(sport.id, { label: sport.name, value: sport.id });
         }
@@ -868,7 +868,6 @@ export class CourtSchedulesService {
 
   async findDetailsCourt({
     slug,
-    date,
   }: {
     slug?: string;
     date: Date;
