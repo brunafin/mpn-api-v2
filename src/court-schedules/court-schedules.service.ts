@@ -247,7 +247,7 @@ export class CourtSchedulesService {
     const courts = await this.courtRepository.find();
     const today = new Date();
     const endDate = new Date();
-    endDate.setDate(today.getDate() + 59);
+    endDate.setDate(today.getDate() + 89);
 
     console.log(
       `Iniciando verificação de horários faltantes para ${courts.length} quadras`,
