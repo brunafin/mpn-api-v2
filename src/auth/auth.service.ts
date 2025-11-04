@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PeopleService } from '../people/people.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { PlanEnum } from 'src/plans/enum/enum';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +27,14 @@ export class AuthService {
         'Acesso inválido. Por favor, verifique suas credenciais ou contate a nossa equipe.',
       );
     }
+
+    const isPendence = user.companies[0].plan_id === PlanEnum.PENDENCE;
+    if (isPendence) {
+      throw new UnauthorizedException(
+        'Sua conta está com pendência. Por favor, regularize sua situação para continuar utilizando nossos serviços. WhatsApp para contato (51)989589197',
+      );
+    }
+
     const defaultPassword = process.env.DEFAULT_PASSWORD;
     if (!defaultPassword) {
       throw new Error(
