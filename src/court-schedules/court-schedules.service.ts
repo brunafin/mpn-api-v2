@@ -25,6 +25,7 @@ import {
 } from './interfaces';
 import { Company } from 'src/companies/entities/company.entity';
 import { addHours, format, parse } from 'date-fns';
+import { PlanEnum } from 'src/plans/enum/enum';
 
 export enum ReservationStatusEnum {
   FIXED = 'fixed',
@@ -690,7 +691,11 @@ export class CourtSchedulesService {
         available: true,
         date,
         court: {
-          company: { city: ILike(`%${city}%`), is_active: true },
+          company: {
+            city: ILike(`%${city}%`),
+            is_active: true,
+            plan_id: Not(PlanEnum.PENDENCE),
+          },
         },
       },
       relations: {
@@ -735,10 +740,10 @@ export class CourtSchedulesService {
     });
 
     const companiesWithoutPlan = await this.companyRepository.find({
-      where: {
-        plan_id: IsNull(),
-        is_active: true,
-      },
+      where: [
+        { plan_id: IsNull(), is_active: true },
+        { plan_id: PlanEnum.PENDENCE, is_active: true },
+      ],
       select: {
         public_id: true,
         plan_id: true,
