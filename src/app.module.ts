@@ -28,7 +28,6 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesCustomerModule } from './companies-customer/companies-customer.module';
 import { CompanyCustomer } from './companies-customer/entities/company-customer.entity';
 import { TwilioModule } from './twilio/twilio.module';
-import { ZenviaModule } from './zenvia-sms/zenvia-sms.module';
 import { NotesModule } from './notes/notes.module';
 import { Note } from './notes/entities/note.entity';
 import { PlansModule } from './plans/plans.module';
@@ -85,7 +84,6 @@ import { GoogleCourt } from './google_courts/entities/google_court.entity';
     AuthModule,
     CompaniesCustomerModule,
     TwilioModule,
-    ZenviaModule,
     NotesModule,
     PlansModule,
     PaymentCompanyModule,
