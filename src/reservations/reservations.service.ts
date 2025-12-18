@@ -12,7 +12,6 @@ import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entit
 import { JwtService } from 'src/jwt/jwt.service';
 import { TwilioService } from 'src/twilio/twilio.service';
 import { plainToInstance } from 'class-transformer';
-import { ZenviaService } from 'src/zenvia-sms/zenvia-sms.service';
 import { checkIsCellphoneNumberBR } from 'src/utils/checkIsCellphoneNumberBR';
 import { normalizeText } from 'src/utils/normalizeText';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
@@ -32,7 +31,6 @@ export class ReservationsService {
 
     private readonly jwtService: JwtService,
     private readonly twilioService: TwilioService,
-    private readonly zenviaService: ZenviaService,
     private readonly dataSource: DataSource,
   ) {}
   async create(createReservationDto: CreateReservationDto) {
@@ -137,12 +135,10 @@ export class ReservationsService {
         checkIsCellphoneNumberBR(contactPhone)
       ) {
         if (process.env.TYPE_ENV === 'production') {
-          // await this.twilioService.sendSms(
-          //   contactPhone,
-          //   message,
-          // );
-
-          await this.zenviaService.sendSms(contactPhone, message);
+          await this.twilioService.sendSms(
+            contactPhone,
+            message,
+          );
         }
       }
 
