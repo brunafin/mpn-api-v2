@@ -130,17 +130,17 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      if (
-        createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 &&
-        checkIsCellphoneNumberBR(contactPhone)
-      ) {
-        if (process.env.TYPE_ENV === 'production') {
-          await this.twilioService.sendSms(
-            contactPhone,
-            message,
-          );
-        }
-      }
+      // if (
+      //   createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 &&
+      //   checkIsCellphoneNumberBR(contactPhone)
+      // ) {
+      //   if (process.env.TYPE_ENV === 'production') {
+      //     await this.twilioService.sendSms(
+      //       contactPhone,
+      //       message,
+      //     );
+      //   }
+      // }
 
       await queryRunner.commitTransaction();
       return plainToInstance(Reservation, reservation);
@@ -257,11 +257,11 @@ export class ReservationsService {
         message = message + '\nc/ churrasq.';
       }
 
-      if (checkIsCellphoneNumberBR(reservation.contact_phone)) {
-        if (process.env.TYPE_ENV === 'production') {
-          await this.twilioService.sendSms(reservation.contact_phone, message);
-        }
-      }
+      // if (checkIsCellphoneNumberBR(reservation.contact_phone)) {
+      //   if (process.env.TYPE_ENV === 'production') {
+      //     await this.twilioService.sendSms(reservation.contact_phone, message);
+      //   }
+      // }
 
       await queryRunner.commitTransaction();
       return 'Reserva cancelada com sucesso!';
