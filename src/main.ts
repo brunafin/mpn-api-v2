@@ -27,6 +27,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://sistemamarcapranos-stable.up.railway.app',
+      'https://mpn-court-v2-production.up.railway.app',
       'https://marcapranos.up.railway.app',
       'https://sistema.marcapranos.com.br',
       'https://marcapranos.com.br',
