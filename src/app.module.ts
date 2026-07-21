@@ -23,6 +23,7 @@ import { PlansModule } from './plans/plans.module';
 import { PaymentCompanyModule } from './payment_company/payment_company.module';
 import { GoogleCourtsModule } from './google_courts/google_courts.module';
 import { CitiesModule } from './cities/cities.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { CitiesModule } from './cities/cities.module';
     PaymentCompanyModule,
     GoogleCourtsModule,
     CitiesModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

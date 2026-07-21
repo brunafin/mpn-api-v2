@@ -23,5 +23,6 @@ import { Company } from 'src/companies/entities/company.entity';
   ],
   controllers: [CourtSchedulesController, PublicCourtSchedulesController],
   providers: [CourtSchedulesService],
+  exports: [CourtSchedulesService],
 })
 export class CourtSchedulesModule {}

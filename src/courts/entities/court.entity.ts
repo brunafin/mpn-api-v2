@@ -60,6 +60,10 @@ export class Court {
   @Expose()
   show: boolean;
 
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  @Expose()
+  floor: string | null;
+
   @OneToMany(() => CourtSchedule, (court_schedule) => court_schedule.court)
   court_schedule: CourtSchedule[];
 
