@@ -133,6 +133,43 @@ export class EmailService {
     }
   }
 
+  private generateVerificationCodeEmailHtml(code: string): string {
+    return `
+      <!DOCTYPE html>
+      <html lang="pt">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Confirmação de cadastro - Marca pra Nós</title>
+      </head>
+      <body style="font-family: sans-serif; text-align: center; color: #1a1a1a;">
+          <h1>Confirme seu cadastro</h1>
+          <p>Use o código abaixo para confirmar seu e-mail. Ele expira em 15 minutos.</p>
+          <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 24px 0;">
+            ${code}
+          </p>
+          <p style="color: #666;">Se você não solicitou este cadastro, ignore este e-mail.</p>
+          <p>Equipe Marca pra Nós</p>
+      </body>
+      </html>
+    `;
+  }
+
+  async sendVerificationCodeEmail(to: string, code: string): Promise<string> {
+    try {
+      await this.resend.emails.send({
+        from: `Marca pra Nós <${process.env.EMAIL_FROM}>`,
+        to,
+        subject: 'Seu código de confirmação - Marca pra Nós',
+        html: this.generateVerificationCodeEmailHtml(code),
+      });
+      return 'E-mail de verificação enviado com sucesso';
+    } catch (error) {
+      console.error('Erro ao enviar e-mail de verificação:', error);
+      throw new Error(`Falha ao enviar e-mail de verificação: ${error.message}`);
+    }
+  }
+
   async sendEmailNewReservation({
     courtEmail,
     courtName,

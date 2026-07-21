@@ -14,6 +14,7 @@ import { Plan } from '../plans/entities/plan.entity';
 import { PaymentCompany } from '../payment_company/entities/payment_company.entity';
 import { City } from '../cities/entities/city.entity';
 import { GoogleCourt } from '../google_courts/entities/google_court.entity';
+import { EmailVerification } from '../auth/entities/email-verification.entity';
 
 /**
  * Fonte única das entidades TypeORM. Reutilizada pelo AppModule (runtime) e
@@ -36,4 +37,5 @@ export const entities = [
   PaymentCompany,
   City,
   GoogleCourt,
+  EmailVerification,
 ];

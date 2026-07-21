@@ -64,7 +64,7 @@ describe('buildTypeOrmOptions', () => {
     const options = buildTypeOrmOptions();
 
     expect(options.entities).toBe(entities);
-    expect(options.entities).toHaveLength(16);
+    expect(options.entities).toHaveLength(entities.length);
     expect(Array.isArray(options.migrations)).toBe(true);
     expect((options.migrations as string[])[0]).toMatch(
       /database[\\/]migrations[\\/]\*\.\{ts,js\}$/,
