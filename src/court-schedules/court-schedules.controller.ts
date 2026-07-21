@@ -124,8 +124,8 @@ export class CourtSchedulesController {
     return this.courtSchedulesService.findOneByPublicId(publicId);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Atualizar um horário de quadra pelo ID' })
+  @Patch(':public_id')
+  @ApiOperation({ summary: 'Atualizar um horário de quadra pelo public_id' })
   @ApiBody({
     description: 'Dados para atualizar um horário de quadra',
     type: UpdateCourtScheduleDto,

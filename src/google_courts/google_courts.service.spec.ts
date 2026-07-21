@@ -7,7 +7,9 @@ describe('GoogleCourtsService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [GoogleCourtsService],
-    }).compile();
+    })
+      .useMocker(() => ({}))
+      .compile();
 
     service = module.get<GoogleCourtsService>(GoogleCourtsService);
   });

@@ -9,7 +9,9 @@ describe('OperatingScheduleController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OperatingScheduleController],
       providers: [OperatingScheduleService],
-    }).compile();
+    })
+      .useMocker(() => ({}))
+      .compile();
 
     controller = module.get<OperatingScheduleController>(
       OperatingScheduleController,

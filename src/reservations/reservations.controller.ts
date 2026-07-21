@@ -17,13 +17,13 @@ import { ApiBody, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 
-@UseGuards(AuthGuard('jwt'))
-@ApiBearerAuth()
 @Controller('reservation')
 @ApiTags('reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Criar uma nova reserva' })
   @ApiBody({
@@ -90,7 +90,7 @@ export class ReservationsController {
         <p>Data: <strong>${reservation.date}</strong></p>
         <p>Horário: <strong>${reservation.time}</strong></p>
         <p>Em nome de: <strong>${reservation.contactName} - ${reservation.contactPhone}</strong></p>
-        <form action="/reservations/cancel" method="POST">
+        <form action="/reservation/cancel" method="POST">
           <input type="hidden" name="token" value="${token}" />
           <button type="submit"
             style="background-color: #d9534f; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
@@ -118,20 +118,26 @@ export class ReservationsController {
     return this.reservationsService.cancel(token);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'Listar todas as reservas' })
   findAll() {
     return this.reservationsService.findAll();
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Get(':public_id')
   @ApiOperation({ summary: 'Buscar uma reserva pelo ID público' })
   findOne(@Param('public_id') public_id: string) {
     return this.reservationsService.findOneByPublicId(public_id);
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Atualizar uma reserva pelo ID' })
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @Patch(':public_id')
+  @ApiOperation({ summary: 'Atualizar uma reserva pelo public_id' })
   @ApiBody({
     description: 'Dados para atualizar uma reserva',
     type: UpdateReservationDto,
@@ -156,6 +162,8 @@ export class ReservationsController {
     );
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Patch(':public_id/extra')
   @ApiOperation({
     summary:
@@ -183,12 +191,16 @@ export class ReservationsController {
     return this.reservationsService.updateExtraFields(public_id, body);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Remover uma reserva pelo ID' })
   remove(@Param('id') id: string) {
     return this.reservationsService.remove(+id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Patch(':court_schedule_public_id/contact')
   @ApiOperation({ summary: 'Atualizar dados de contato da reserva' })
   @ApiBody({

@@ -1089,7 +1089,7 @@ export class CourtSchedulesService {
       end_hour,
       date: new Date(body.date),
       available: true,
-      price: body.price ?? 0,
+      price: body.price ?? operatingSchedule?.price ?? 0,
       is_fixed: false,
       court_id: body.court_id,
       day_of_week_id,

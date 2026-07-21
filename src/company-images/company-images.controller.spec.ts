@@ -9,7 +9,9 @@ describe('CompanyImagesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CompanyImagesController],
       providers: [CompanyImagesService],
-    }).compile();
+    })
+      .useMocker(() => ({}))
+      .compile();
 
     controller = module.get<CompanyImagesController>(CompanyImagesController);
   });

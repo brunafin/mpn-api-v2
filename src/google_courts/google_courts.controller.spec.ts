@@ -9,7 +9,9 @@ describe('GoogleCourtsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GoogleCourtsController],
       providers: [GoogleCourtsService],
-    }).compile();
+    })
+      .useMocker(() => ({}))
+      .compile();
 
     controller = module.get<GoogleCourtsController>(GoogleCourtsController);
   });

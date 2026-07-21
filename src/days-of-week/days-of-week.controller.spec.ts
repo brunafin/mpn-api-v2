@@ -9,7 +9,9 @@ describe('DaysOfWeekController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DaysOfWeekController],
       providers: [DaysOfWeekService],
-    }).compile();
+    })
+      .useMocker(() => ({}))
+      .compile();
 
     controller = module.get<DaysOfWeekController>(DaysOfWeekController);
   });
