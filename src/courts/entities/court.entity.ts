@@ -52,9 +52,9 @@ export class Court {
   @Exclude()
   company_id: number;
 
-  @Column()
+  @Column({ nullable: true })
   @Expose()
-  type_of_court_id: number;
+  type_of_court_id: number | null;
 
   @Column({ default: false })
   @Expose()

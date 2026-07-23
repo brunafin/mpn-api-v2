@@ -9,7 +9,6 @@ import { Court } from 'src/courts/entities/court.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { DaysOfWeek } from 'src/days-of-week/entities/days-of-week.entity';
 import { Sport } from 'src/sports/entities/sport.entity';
-import { TypeOfCourt } from 'src/type-of-court/entities/type-of-court.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { CourtSchedulesModule } from 'src/court-schedules/court-schedules.module';
 
@@ -21,7 +20,6 @@ import { CourtSchedulesModule } from 'src/court-schedules/court-schedules.module
       OperatingSchedule,
       DaysOfWeek,
       Sport,
-      TypeOfCourt,
       Person,
     ]),
     CourtSchedulesModule,

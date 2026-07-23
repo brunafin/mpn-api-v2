@@ -12,7 +12,10 @@ export interface IWhereToPlayCourtList {
   name: string;
   phone: string;
   city?: string;
+  uf?: string;
   address: string;
+  /** Slug público da arena (URL /encontre-onde-jogar/{slug}). */
+  slug: string;
   instagramUrl: string;
   courts: {
     courtName: string;
@@ -30,4 +33,6 @@ export interface ICourt {
 export interface IDetailsCourt extends IWhereToPlayCourtList {
   characteristics: string[];
   photoHighlightUrl: string;
+  /** Até 3 fotos do espaço (galeria pública). */
+  photoUrls: string[];
 }

@@ -11,19 +11,33 @@ export class PublicCourtSchedulesController {
   @ApiTags('Marca Pra Nós - Público')
   @ApiOperation({ summary: 'Encontre onde jogar' })
   @ApiQuery({ name: 'date', type: String, format: 'date', required: true })
-  @ApiQuery({ name: 'city', type: String, required: true })
-  findWhereToPlay(@Query('date') date: Date, @Query('city') city: string) {
+  @ApiQuery({ name: 'uf', type: String, required: false })
+  @ApiQuery({ name: 'city', type: String, required: false })
+  findWhereToPlay(
+    @Query('date') date: Date,
+    @Query('uf') uf?: string,
+    @Query('city') city?: string,
+  ) {
     return this.courtSchedulesService.findWhereToPlay({
+      uf,
       city,
       date,
     });
   }
 
+  @Get('/where-to-play/states')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({ summary: 'Estados (UF) com arenas ativas' })
+  findStatesToPlay() {
+    return this.courtSchedulesService.findStatesToPlay();
+  }
+
   @Get('/where-to-play/cities')
   @ApiTags('Marca Pra Nós - Público')
-  @ApiOperation({ summary: 'Cidades' })
-  findCitiesToPlay() {
-    return this.courtSchedulesService.findCitiesToPlay();
+  @ApiOperation({ summary: 'Cidades (opcionalmente filtradas por UF)' })
+  @ApiQuery({ name: 'uf', type: String, required: false })
+  findCitiesToPlay(@Query('uf') uf?: string) {
+    return this.courtSchedulesService.findCitiesToPlay(uf);
   }
 
   @Get('/where-to-play/sports')
@@ -65,5 +79,14 @@ export class PublicCourtSchedulesController {
   @ApiOperation({ summary: 'Slug das quadras para sitemap' })
   findAllCourts() {
     return this.courtSchedulesService.findAllCourts();
+  }
+
+  @Get('/partner-arenas')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({
+    summary: 'Arenas parceiras (planos ativos) para a landing',
+  })
+  findPartnerArenas() {
+    return this.courtSchedulesService.findPartnerArenas();
   }
 }

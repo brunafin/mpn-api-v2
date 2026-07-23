@@ -16,7 +16,6 @@ import { Court } from 'src/courts/entities/court.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
-import { JwtService } from 'src/jwt/jwt.service';
 import {
   IAvailableHours,
   ICourt,
@@ -26,6 +25,9 @@ import {
 import { Company } from 'src/companies/entities/company.entity';
 import { addHours, format, parse } from 'date-fns';
 import { PlanEnum } from 'src/plans/enum/enum';
+import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
+import { PublicListingCache } from 'src/cache/public-listing.cache';
+import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 
 export enum ReservationStatusEnum {
   FIXED = 'fixed',
@@ -46,7 +48,6 @@ interface IReservationDetailsItemProps {
     isPrepaid: boolean;
     contactName: string;
     contactPhone: string;
-    tokenToCancel: string;
     observation?: string;
     isBarbecueIncluded: boolean;
     isEvent: boolean;
@@ -74,9 +75,68 @@ export class CourtSchedulesService {
     private readonly courtRepository: Repository<Court>,
     @InjectRepository(Reservation)
     private readonly reservationRepository: Repository<Reservation>,
-    private readonly jwtService: JwtService,
+    private readonly publicListingCache: PublicListingCache,
   ) {}
-  create(createCourtScheduleDto: CreateCourtScheduleDto) {
+
+  /** Normaliza date de query (string | Date) para YYYY-MM-DD. */
+  private toDateKey(date?: Date | string): string {
+    if (!date) {
+      return new Date().toISOString().split('T')[0];
+    }
+    if (date instanceof Date) {
+      return date.toISOString().split('T')[0];
+    }
+    return String(date).slice(0, 10);
+  }
+
+  invalidatePublicListingCache(): void {
+    this.publicListingCache.clear();
+  }
+
+  private async assertCourtOwnedBy(
+    courtId: number,
+    ownerPublicId: string,
+  ): Promise<Court> {
+    const court = await this.courtRepository.findOne({
+      where: { id: courtId },
+      relations: { company: { administrator: true } },
+    });
+    if (!court) {
+      throw new NotFoundException('Quadra não encontrada.');
+    }
+    assertAdministratorOwns(
+      court.company?.administrator?.public_id,
+      ownerPublicId,
+    );
+    return court;
+  }
+
+  private async assertScheduleOwnedBy(
+    schedulePublicId: string,
+    ownerPublicId: string,
+  ): Promise<CourtSchedule> {
+    const courtSchedule = await this.courtSchedulesRepository.findOne({
+      where: { public_id: schedulePublicId },
+      relations: { court: { company: { administrator: true } } },
+    });
+    if (!courtSchedule) {
+      throw new NotFoundException('Horário de quadra não encontrado');
+    }
+    assertAdministratorOwns(
+      courtSchedule.court?.company?.administrator?.public_id,
+      ownerPublicId,
+    );
+    return courtSchedule;
+  }
+
+  async create(
+    createCourtScheduleDto: CreateCourtScheduleDto,
+    ownerPublicId: string,
+  ) {
+    await this.assertCourtOwnedBy(
+      createCourtScheduleDto.court_id,
+      ownerPublicId,
+    );
     const courtSchedule = this.courtSchedulesRepository.create(
       createCourtScheduleDto,
     );
@@ -87,7 +147,11 @@ export class CourtSchedulesService {
     court_id: number,
     start_date: string,
     end_date: string,
+    ownerPublicId?: string,
   ) {
+    if (ownerPublicId) {
+      await this.assertCourtOwnedBy(court_id, ownerPublicId);
+    }
     return await this.courtSchedulesRepository.manager.transaction(
       async (manager) => {
         const operating_schedule = await manager
@@ -218,7 +282,6 @@ export class CourtSchedulesService {
                 court_schedule: schedule,
                 contact_name: schedule.company_customer?.name,
                 contact_phone: schedule.company_customer?.phone,
-                token_to_cancel: this.jwtService.generateToken(schedule.id),
                 sport_id: schedule.sport_id,
               });
             }
@@ -245,13 +308,18 @@ export class CourtSchedulesService {
 
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
   async handleCron() {
-    const courts = await this.courtRepository.find();
+    // Quadra oculta (show=false) continua gerando; só pula company inativa.
+    // Onboarding / POST populate seguem livres para popular na mão.
+    const courts = await this.courtRepository.find({
+      where: { company: { is_active: true } },
+      relations: { company: true },
+    });
     const today = new Date();
     const endDate = new Date();
     endDate.setDate(today.getDate() + 89);
 
     console.log(
-      `Iniciando verificação de horários faltantes para ${courts.length} quadras`,
+      `Iniciando verificação de horários faltantes para ${courts.length} quadras (companies ativas)`,
     );
 
     for (const court of courts) {
@@ -380,12 +448,12 @@ export class CourtSchedulesService {
     return courtSchedule;
   }
 
-  async findOneByPublicId(publicId: string) {
+  async findOneByPublicId(publicId: string, ownerPublicId: string) {
     const courtSchedule = await this.courtSchedulesRepository.findOne({
       where: { public_id: publicId },
       relations: {
         day_of_week: true,
-        court: { court_sports: true, company: true },
+        court: { court_sports: true, company: { administrator: true } },
         reservation: { sport: true },
       },
       select: {
@@ -401,7 +469,6 @@ export class CourtSchedulesService {
           is_prepaid: true,
           contact_name: true,
           contact_phone: true,
-          token_to_cancel: true,
           created_at: true,
           observation: true,
           is_barbecue_included: true,
@@ -416,6 +483,9 @@ export class CourtSchedulesService {
           court_sports: true,
           company: {
             public_id: true,
+            administrator: {
+              public_id: true,
+            },
           },
         },
         price: true,
@@ -426,8 +496,13 @@ export class CourtSchedulesService {
     });
 
     if (!courtSchedule) {
-      throw new Error('Horário de quadra não encontrado');
+      throw new NotFoundException('Horário de quadra não encontrado');
     }
+
+    assertAdministratorOwns(
+      courtSchedule.court.company.administrator?.public_id,
+      ownerPublicId,
+    );
 
     const obj: IReservationDetailsItemProps = {
       scheduleId: courtSchedule.public_id,
@@ -441,7 +516,6 @@ export class CourtSchedulesService {
             isPrepaid: courtSchedule.reservation?.is_prepaid,
             contactName: courtSchedule.reservation?.contact_name,
             contactPhone: courtSchedule.reservation?.contact_phone,
-            tokenToCancel: courtSchedule.reservation?.token_to_cancel,
             observation: courtSchedule.reservation?.observation,
             isBarbecueIncluded: courtSchedule.reservation?.is_barbecue_included,
             isEvent: courtSchedule.reservation?.is_event,
@@ -467,30 +541,47 @@ export class CourtSchedulesService {
   async updateByPublicId(
     publicId: string,
     updateCourtScheduleDto: UpdateCourtScheduleDto,
+    ownerPublicId: string,
   ) {
+    await this.assertScheduleOwnedBy(publicId, ownerPublicId);
     const courtSchedule = await this.courtSchedulesRepository.findOne({
       where: { public_id: publicId },
     });
     if (!courtSchedule) {
-      throw new Error('Horário de quadra não encontrado');
+      throw new NotFoundException('Horário de quadra não encontrado');
     }
     this.courtSchedulesRepository.merge(courtSchedule, updateCourtScheduleDto);
     return this.courtSchedulesRepository.save(courtSchedule);
   }
 
-  removeByPublicId(publicId: string) {
+  async removeByPublicId(publicId: string, ownerPublicId: string) {
+    await this.assertScheduleOwnedBy(publicId, ownerPublicId);
     return this.courtSchedulesRepository.delete({ public_id: publicId });
   }
 
-  updateAvailability(publicId: string, available: boolean) {
-    return this.courtSchedulesRepository.update(
+  async updateAvailability(
+    publicId: string,
+    available: boolean,
+    ownerPublicId: string,
+  ) {
+    await this.assertScheduleOwnedBy(publicId, ownerPublicId);
+    const result = await this.courtSchedulesRepository.update(
       { public_id: publicId },
       { available },
     );
+    this.publicListingCache.clear();
+    return result;
   }
 
-  async fixSchedule(body: { court_schedule_public_id: string }) {
-    return await this.courtSchedulesRepository.manager.transaction(
+  async fixSchedule(
+    body: { court_schedule_public_id: string },
+    ownerPublicId: string,
+  ) {
+    await this.assertScheduleOwnedBy(
+      body.court_schedule_public_id,
+      ownerPublicId,
+    );
+    const result = await this.courtSchedulesRepository.manager.transaction(
       async (manager) => {
         const courtSchedule = await manager
           .getRepository(CourtSchedule)
@@ -609,19 +700,24 @@ export class CourtSchedulesService {
               sport_id: courtSchedule.reservation.sport_id,
             });
             await reservationRepo.save(reservation);
-            reservation.token_to_cancel = this.jwtService.generateToken(
-              reservation.id,
-            );
-            await reservationRepo.save(reservation);
           }
         }
         return { message: 'Horário fixado com sucesso' };
       },
     );
+    this.publicListingCache.clear();
+    return result;
   }
 
-  async unfixSchedule(body: { court_schedule_public_id: string }) {
-    return await this.courtSchedulesRepository.manager.transaction(
+  async unfixSchedule(
+    body: { court_schedule_public_id: string },
+    ownerPublicId: string,
+  ) {
+    await this.assertScheduleOwnedBy(
+      body.court_schedule_public_id,
+      ownerPublicId,
+    );
+    const result = await this.courtSchedulesRepository.manager.transaction(
       async (manager) => {
         const courtSchedule = await manager
           .getRepository(CourtSchedule)
@@ -682,19 +778,50 @@ export class CourtSchedulesService {
         return { message: 'Horário desafixado com sucesso' };
       },
     );
+    this.publicListingCache.clear();
+    return result;
   }
 
   // Marca Pra Nós público
-  async findWhereToPlay({ city, date }: { city?: string; date?: Date }) {
+  async findWhereToPlay({
+    city,
+    uf,
+    date,
+  }: {
+    city?: string;
+    uf?: string;
+    date?: Date;
+  }) {
+    const ufNorm = uf?.trim().toUpperCase() || '';
+    const cityNorm = city?.trim() || '';
+    const dateKey = this.toDateKey(date);
+    const cacheKey = `wtp:${dateKey}:${ufNorm}:${cityNorm.toLowerCase()}`;
+
+    return this.publicListingCache.getOrSet(cacheKey, () =>
+      this.loadWhereToPlay({ cityNorm, ufNorm, date }),
+    );
+  }
+
+  private async loadWhereToPlay({
+    cityNorm,
+    ufNorm,
+    date,
+  }: {
+    cityNorm: string;
+    ufNorm: string;
+    date?: Date;
+  }) {
     const courtSchedule = await this.courtSchedulesRepository.find({
       where: {
         available: true,
         date,
         court: {
+          show: true,
           company: {
-            city: ILike(`%${city}%`),
+            ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
+            ...(cityNorm ? { city: ILike(cityNorm) } : {}),
             is_active: true,
-            plan_id: Not(PlanEnum.PENDENCE),
+            // Público lista horários de qualquer empresa ativa (incl. onboarding/PENDENCE)
           },
         },
       },
@@ -710,8 +837,10 @@ export class CourtSchedulesService {
         start_hour: true,
         price: true,
         court: {
+          id: true,
           name: true,
           company: {
+            id: true,
             logo_url: true,
             instagram_url: true,
             name: true,
@@ -721,6 +850,8 @@ export class CourtSchedulesService {
             neighborhood: true,
             city: true,
             uf: true,
+            slug: true,
+            public_id: true,
           },
           court_sports: {
             id: true,
@@ -739,16 +870,32 @@ export class CourtSchedulesService {
       },
     });
 
+    // Público: não listar horários cujo início já passou
+    const openSchedules = courtSchedule.filter(
+      (item) => !isCourtScheduleInPast(item.date, item.start_hour),
+    );
+
     const companiesWithoutPlan = await this.companyRepository.find({
       where: [
-        { plan_id: IsNull(), is_active: true },
-        { plan_id: PlanEnum.PENDENCE, is_active: true },
+        {
+          plan_id: IsNull(),
+          is_active: true,
+          ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
+          ...(cityNorm ? { city: ILike(cityNorm) } : {}),
+        },
+        {
+          plan_id: PlanEnum.PENDENCE,
+          is_active: true,
+          ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
+          ...(cityNorm ? { city: ILike(cityNorm) } : {}),
+        },
       ],
       select: {
         public_id: true,
         plan_id: true,
         logo_url: true,
         instagram_url: true,
+        slug: true,
         name: true,
         phone: true,
         street: true,
@@ -759,7 +906,7 @@ export class CourtSchedulesService {
       },
     });
 
-    const groupedByCompany = courtSchedule.reduce(
+    const groupedByCompany = openSchedules.reduce(
       (acc, item) => {
         const companyId = item.court.company.id; // ou public_id
         const companyKey = `${item.court.company.name}-${item.court.company.phone}`;
@@ -769,8 +916,10 @@ export class CourtSchedulesService {
             logoUrl: item.court.company.logo_url,
             name: item.court.company.name,
             phone: item.court.company.phone,
+            slug: item.court.company.slug,
             instagramUrl: item.court.company.instagram_url ?? '',
             city: item.court.company.city,
+            uf: item.court.company.uf,
             address: `${item.court.company.street}, ${item.court.company.number} - ${item.court.company.neighborhood}, ${item.court.company.city} - ${item.court.company.uf}`,
             courts: [],
           };
@@ -813,32 +962,72 @@ export class CourtSchedulesService {
     );
 
     const result: IWhereToPlayCourtList[] = Object.values(groupedByCompany);
+    const companiesAlreadyListed = new Set(
+      result.map((item) => `${item.name}-${item.phone}`),
+    );
 
     const objToReturn = {
       courtsWithHours: result,
-      courtsWithoutHours: companiesWithoutPlan.map((company) => ({
-        logoUrl: company.logo_url,
-        name: company.name,
-        phone: company.phone,
-        instagramUrl: company.instagram_url ?? '',
-        city: company.city,
-        address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
-      })),
+      // Só arenas sem plano que ainda não entraram com horários no dia
+      courtsWithoutHours: companiesWithoutPlan
+        .filter(
+          (company) =>
+            !companiesAlreadyListed.has(`${company.name}-${company.phone}`),
+        )
+        .map((company) => ({
+          logoUrl: company.logo_url,
+          name: company.name,
+          phone: company.phone,
+          slug: company.slug,
+          instagramUrl: company.instagram_url ?? '',
+          city: company.city,
+          uf: company.uf,
+          address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
+        })),
     };
 
     return objToReturn;
   }
 
-  async findCitiesToPlay() {
+  async findStatesToPlay() {
     const companies = await this.companyRepository.find({
       where: { is_active: true },
-      select: ['city'],
+      select: ['uf'],
+      order: { uf: 'ASC' },
+    });
+
+    const unique = Array.from(
+      new Set(
+        companies
+          .map((item) => item.uf?.trim().toUpperCase())
+          .filter((uf): uf is string => Boolean(uf)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+
+    return unique.map((uf) => ({
+      label: uf,
+      value: uf,
+    }));
+  }
+
+  async findCitiesToPlay(uf?: string) {
+    const ufNorm = uf?.trim().toUpperCase() || '';
+    const companies = await this.companyRepository.find({
+      where: {
+        is_active: true,
+        ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
+      },
+      select: ['city', 'uf'],
       order: { city: 'ASC' },
     });
 
     const uniqueCities = Array.from(
-      new Set(companies.map((item) => item.city)),
-    );
+      new Set(
+        companies
+          .map((item) => item.city?.trim())
+          .filter((city): city is string => Boolean(city)),
+      ),
+    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     return uniqueCities.map((city) => ({
       label: city,
@@ -847,102 +1036,115 @@ export class CourtSchedulesService {
   }
 
   async findSportsToPlay() {
-    const courts = await this.courtRepository.find({
-      where: { company: { is_active: true } },
-      relations: {
-        court_sports: true,
-      },
-      select: ['court_sports'],
-    });
+    // QueryBuilder: o find()+select só em relation não carrega id das
+    // quadras e acaba omitindo esportes de parte das courts.
+    const rows = await this.courtRepository
+      .createQueryBuilder('court')
+      .innerJoin('court.company', 'company')
+      .innerJoin('court.court_sports', 'sport')
+      .where('court.show = :show', { show: true })
+      .andWhere('company.is_active = :active', { active: true })
+      .select('sport.id', 'id')
+      .addSelect('sport.name', 'name')
+      .distinct(true)
+      .orderBy('sport.name', 'ASC')
+      .getRawMany<{ id: number; name: string }>();
 
-    const sportMap = new Map<number, { label: string; value: number }>();
-
-    courts.forEach((court) => {
-      court.court_sports.forEach((sport: { id: number; name: string }) => {
-        if (!sportMap.has(sport.id)) {
-          sportMap.set(sport.id, { label: sport.name, value: sport.id });
-        }
-      });
-    });
-
-    const uniqueSportOptions = Array.from(sportMap.values()).sort((a, b) =>
-      a.label.localeCompare(b.label),
-    );
-    return uniqueSportOptions;
+    return rows.map((row) => ({
+      label: row.name,
+      value: Number(row.id),
+    }));
   }
 
   async findDetailsCourt({
     slug,
+    date,
   }: {
     slug?: string;
     date: Date;
   }): Promise<IDetailsCourt> {
-    const company = await this.companyRepository.findOne({
-      where: {
-        instagram_url: ILike(`%/${slug}`),
-        is_active: true,
-      },
-      relations: {
-        courts: {
-          court_sports: true,
-          court_schedule: true,
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        logo_url: true,
-        instagram_url: true,
-        street: true,
-        number: true,
-        neighborhood: true,
-        city: true,
-        uf: true,
-        photo_highlight_url: true,
-        characteristics: true,
-        courts: {
-          id: true,
-          name: true,
-          court_sports: {
-            id: true,
-            name: true,
-          },
-          court_schedule: true,
-        },
-      },
-    });
+    const dateStr = this.toDateKey(date);
+    const cacheKey = `details:${slug || ''}:${dateStr}`;
+
+    return this.publicListingCache.getOrSet(cacheKey, () =>
+      this.loadDetailsCourt(slug, dateStr),
+    );
+  }
+
+  private async loadDetailsCourt(
+    slug: string | undefined,
+    dateStr: string,
+  ): Promise<IDetailsCourt> {
+    // Join com filtro de date: evita carregar ~90 dias de court_schedule
+    const company = await this.companyRepository
+      .createQueryBuilder('company')
+      .leftJoinAndSelect('company.courts', 'court')
+      .leftJoinAndSelect('court.court_sports', 'court_sports')
+      .leftJoinAndSelect(
+        'court.court_schedule',
+        'schedule',
+        'schedule.date = :date',
+        { date: dateStr },
+      )
+      .leftJoinAndSelect('schedule.day_of_week', 'day_of_week')
+      .leftJoinAndSelect('company.images', 'images')
+      .where('company.slug = :slug', { slug })
+      .andWhere('company.is_active = :active', { active: true })
+      .getOne();
 
     if (!company) {
       throw new NotFoundException('Quadra não encontrada');
     }
 
+    const visibleCourts = (company.courts ?? []).filter((court) => court.show);
+
+    const photoUrls = (company.images ?? [])
+      .slice()
+      .sort((a, b) => a.id - b.id)
+      .slice(0, 3)
+      .map((image) => image.url)
+      .filter(Boolean);
+
+    const photoHighlightUrl =
+      photoUrls[0] ?? company.photo_highlight_url ?? '';
+
     const objToFront: IDetailsCourt = {
       logoUrl: company.logo_url,
       name: company.name,
       phone: company.phone,
+      slug: company.slug,
       instagramUrl: company.instagram_url ?? '',
+      city: company.city,
+      uf: company.uf,
       address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
-      courts: company.courts.map((court) => ({
+      courts: visibleCourts.map((court) => ({
         courtName: court.name,
-        courtSports: court.court_sports.map((sport) => ({
+        courtSports: (court.court_sports ?? []).map((sport) => ({
           label: sport.name,
           value: String(sport.id),
         })),
-        schedules: court.court_schedule.map((schedule) => ({
+        schedules: (court.court_schedule ?? []).map((schedule) => ({
           date: schedule.date,
           startHour: schedule.start_hour.slice(0, 5),
           price: schedule.price,
           courtName: court.name,
-          courtSports: court.court_sports.map((sport) => ({
+          courtSports: (court.court_sports ?? []).map((sport) => ({
             label: sport.name,
             value: String(sport.id),
           })),
-          dayOfWeekAbb: `(${schedule.day_of_week?.description.slice(0, 3).toLowerCase()})`,
+          dayOfWeekAbb: schedule.day_of_week?.description
+            ? `(${schedule.day_of_week.description.slice(0, 3).toLowerCase()})`
+            : '',
         })),
       })),
       characteristics: company.characteristics ?? [],
-      photoHighlightUrl: company.photo_highlight_url ?? '',
+      photoHighlightUrl,
+      photoUrls:
+        photoUrls.length > 0
+          ? photoUrls
+          : photoHighlightUrl
+            ? [photoHighlightUrl]
+            : [],
     };
 
     return objToFront;
@@ -955,13 +1157,26 @@ export class CourtSchedulesService {
     slug?: string;
     date: Date;
   }): Promise<ICourt[]> {
+    const dateKey = this.toDateKey(date);
+    const cacheKey = `hours:${slug || ''}:${dateKey}`;
+
+    return this.publicListingCache.getOrSet(cacheKey, () =>
+      this.loadAvailableHoursByCourt(slug, date),
+    );
+  }
+
+  private async loadAvailableHoursByCourt(
+    slug: string | undefined,
+    date: Date,
+  ): Promise<ICourt[]> {
     const courtSchedule = await this.courtSchedulesRepository.find({
       where: {
         available: true,
         date,
         court: {
+          show: true,
           company: {
-            instagram_url: ILike(`%/${slug}`),
+            slug,
             is_active: true,
           },
         },
@@ -977,8 +1192,10 @@ export class CourtSchedulesService {
         start_hour: true,
         price: true,
         court: {
+          id: true,
           name: true,
           court_sports: {
+            id: true,
             name: true,
           },
         },
@@ -991,13 +1208,17 @@ export class CourtSchedulesService {
       },
     });
 
-    if (courtSchedule.length === 0) {
+    const openSchedules = courtSchedule.filter(
+      (item) => !isCourtScheduleInPast(item.date, item.start_hour),
+    );
+
+    if (openSchedules.length === 0) {
       return [];
     }
 
     const groupedCourts: Record<string, ICourt> = {};
 
-    courtSchedule.forEach((item) => {
+    openSchedules.forEach((item) => {
       const courtKey = item.court.name; // ou `${item.court.name}-${item.court.company_id}` se quiser segurança
 
       if (!groupedCourts[courtKey]) {
@@ -1034,14 +1255,14 @@ export class CourtSchedulesService {
         is_active: true,
       },
       select: {
-        instagram_url: true,
+        slug: true,
         updated_at: true,
       },
     });
 
     const objToFront: { slug: string; updatedAt: Date }[] = companies.map(
       (item) => ({
-        slug: item.instagram_url?.split('/').filter(Boolean).pop() ?? '',
+        slug: item.slug,
         updatedAt: item.updated_at,
       }),
     );
@@ -1049,12 +1270,43 @@ export class CourtSchedulesService {
     return objToFront;
   }
 
-  async quickCreate(body: {
-    start_hour: string;
-    date: string;
-    court_id: number;
-    price?: number;
-  }) {
+  /** Arenas ativas com página pública — prova social na LP. */
+  async findPartnerArenas(): Promise<
+    { name: string; slug: string; logoUrl: string | null }[]
+  > {
+    const companies = await this.companyRepository.find({
+      where: {
+        is_active: true,
+      },
+      select: {
+        name: true,
+        slug: true,
+        logo_url: true,
+      },
+      order: {
+        name: 'ASC',
+      },
+    });
+
+    return companies
+      .filter((company) => Boolean(company.slug?.trim()))
+      .map((company) => ({
+        name: company.name,
+        slug: company.slug.trim(),
+        logoUrl: company.logo_url ?? null,
+      }));
+  }
+
+  async quickCreate(
+    body: {
+      start_hour: string;
+      date: string;
+      court_id: number;
+      price?: number;
+    },
+    ownerPublicId: string,
+  ) {
+    await this.assertCourtOwnedBy(body.court_id, ownerPublicId);
     const existingSchedule = await this.courtSchedulesRepository.findOne({
       where: {
         start_hour: body.start_hour,
@@ -1096,6 +1348,6 @@ export class CourtSchedulesService {
       sport_id: null,
     };
 
-    return this.create(schedule);
+    return this.create(schedule, ownerPublicId);
   }
 }

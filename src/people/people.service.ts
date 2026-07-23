@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { Person } from './entities/person.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -29,19 +28,6 @@ export class PeopleService {
       return { canCreate: false, message: 'O usuário já existe' };
     }
     return { canCreate: true };
-  }
-
-  async create(createPersonDto: CreatePersonDto) {
-    const person = this.peopleRepository.create(createPersonDto);
-    const usernameCheck = await this.canCreateUsername(person.username);
-    if (!usernameCheck.canCreate) {
-      throw new NotFoundException(usernameCheck.message);
-    }
-    const password = await this.hashPassword(
-      process.env.DEFAULT_PASSWORD ?? 'defaultPassword',
-    );
-
-    return this.peopleRepository.save({ ...person, password });
   }
 
   async findAll() {
@@ -92,8 +78,16 @@ export class PeopleService {
       password: person.password,
       public_id: person.public_id,
       status: person.status,
+      role: person.role,
       companies: person.companies,
     };
+  }
+
+  async touchLastLoginAt(personId: number): Promise<void> {
+    await this.peopleRepository.update(
+      { id: personId },
+      { last_login_at: new Date() },
+    );
   }
 
   findByEmail(email: string): Promise<Person | null> {
@@ -110,7 +104,9 @@ export class PeopleService {
 
     let candidate = base;
     let suffix = 0;
-    while (await this.peopleRepository.findOne({ where: { username: candidate } })) {
+    while (
+      await this.peopleRepository.findOne({ where: { username: candidate } })
+    ) {
       suffix += 1;
       const suf = String(suffix);
       candidate = base.slice(0, 20 - suf.length) + suf;
@@ -158,6 +154,21 @@ export class PeopleService {
     return {
       id: person.id,
       password: person.password,
+    };
+  }
+
+  async findOneByPublicIdForPasswordChange(personPublicId: string) {
+    const person = await this.peopleRepository.findOne({
+      where: { public_id: personPublicId },
+      select: { id: true, password: true, public_id: true },
+    });
+    if (!person) {
+      return null;
+    }
+    return {
+      id: person.id,
+      password: person.password,
+      public_id: person.public_id,
     };
   }
 

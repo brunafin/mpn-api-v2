@@ -7,18 +7,29 @@ import {
   Param,
   Delete,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import {
   ApiBody,
+  ApiConsumes,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+
+type AuthedRequest = {
+  user: { userId: string; email?: string };
+};
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
@@ -93,8 +104,8 @@ export class CompaniesController {
       },
     },
   })
-  findAll() {
-    return this.companiesService.findAll();
+  findAll(@Req() req: AuthedRequest) {
+    return this.companiesService.findAllForOwner(req.user.userId);
   }
 
   @Get(':public_id')
@@ -141,8 +152,11 @@ export class CompaniesController {
       },
     },
   })
-  findOne(@Param('public_id') public_id: string) {
-    return this.companiesService.findOneByPublicId(public_id);
+  findOne(
+    @Param('public_id') public_id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.companiesService.findOneByPublicId(public_id, req.user.userId);
   }
 
   @Get(':public_id/schedules/:date')
@@ -165,8 +179,13 @@ export class CompaniesController {
   findSchedules(
     @Param('public_id') public_id: string,
     @Param('date') date: string,
+    @Req() req: AuthedRequest,
   ) {
-    return this.companiesService.findSchedulesByDate(public_id, date);
+    return this.companiesService.findSchedulesByDate(
+      public_id,
+      date,
+      req.user.userId,
+    );
   }
 
   @Get(':public_id/all-schedules/:date')
@@ -189,8 +208,13 @@ export class CompaniesController {
   findAllSchedules(
     @Param('public_id') public_id: string,
     @Param('date') date: string,
+    @Req() req: AuthedRequest,
   ) {
-    return this.companiesService.findAllSchedulesByDate(public_id, date);
+    return this.companiesService.findAllSchedulesByDate(
+      public_id,
+      date,
+      req.user.userId,
+    );
   }
 
   @Patch(':public_id')
@@ -215,7 +239,6 @@ export class CompaniesController {
           city: 'Updated Company City',
           neighborhood: 'Updated Company Neighborhood',
           uf: 'UC',
-          administrator_id: 2,
           images: [
             {
               url: 'https://storage.googleapis.com/mpn-bucket_public/mpn/image1.jpg',
@@ -231,14 +254,19 @@ export class CompaniesController {
   update(
     @Param('public_id') public_id: string,
     @Body() updateCompanyDto: UpdateCompanyDto,
+    @Req() req: AuthedRequest,
   ) {
-    return this.companiesService.updateByPublicId(public_id, updateCompanyDto);
+    return this.companiesService.updateByPublicId(
+      public_id,
+      updateCompanyDto,
+      req.user.userId,
+    );
   }
 
   @Delete(':public_id')
   @ApiOperation({ summary: 'Remover uma empresa pelo public_id' })
-  remove(@Param('public_id') public_id: string) {
-    return this.companiesService.removeByPublicId(public_id);
+  remove(@Param('public_id') public_id: string, @Req() req: AuthedRequest) {
+    return this.companiesService.removeByPublicId(public_id, req.user.userId);
   }
 
   @Patch('/preferences-hidden-inactive-hours/:public_id')
@@ -259,10 +287,12 @@ export class CompaniesController {
   patch(
     @Param('public_id') public_id: string,
     @Body('isHiddenInactiveHours') isHiddenInactiveHours: boolean,
+    @Req() req: AuthedRequest,
   ) {
     return this.companiesService.changePreferencesHiddenInactiveHoursByPublicId(
       public_id,
       isHiddenInactiveHours,
+      req.user.userId,
     );
   }
 
@@ -271,7 +301,102 @@ export class CompaniesController {
   @ApiOkResponse({
     description: 'Informações da empresa retornados com sucesso',
   })
-  findInfosByPublicId(@Param('public_id') public_id: string) {
-    return this.companiesService.findInfosByPublicId(public_id);
+  findInfosByPublicId(
+    @Param('public_id') public_id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.companiesService.findInfosByPublicId(
+      public_id,
+      req.user.userId,
+    );
+  }
+
+  @Post('/:public_id/logo')
+  @ApiOperation({ summary: 'Enviar ou substituir o logo do estabelecimento' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Imagem JPG, PNG ou WebP (máx. 2 MB)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  uploadLogo(
+    @Param('public_id') publicId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthedRequest,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Envie um arquivo de imagem.');
+    }
+    return this.companiesService.uploadLogo(publicId, req.user.userId, file);
+  }
+
+  @Get('/:public_id/photos')
+  @ApiOperation({ summary: 'Listar fotos da arena (máx. 3)' })
+  listPhotos(
+    @Param('public_id') publicId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.companiesService.listPhotos(publicId, req.user.userId);
+  }
+
+  @Post('/:public_id/photos')
+  @ApiOperation({ summary: 'Enviar uma foto da arena (máx. 3)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Imagem JPG, PNG ou WebP (máx. 2 MB)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  uploadPhoto(
+    @Param('public_id') publicId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthedRequest,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Envie um arquivo de imagem.');
+    }
+    return this.companiesService.uploadPhoto(publicId, req.user.userId, file);
+  }
+
+  @Delete('/:public_id/photos/:imageId')
+  @ApiOperation({ summary: 'Remover uma foto da arena' })
+  deletePhoto(
+    @Param('public_id') publicId: string,
+    @Param('imageId') imageId: string,
+    @Req() req: AuthedRequest,
+  ) {
+    const id = Number.parseInt(imageId, 10);
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('ID da foto inválido.');
+    }
+    return this.companiesService.deletePhoto(publicId, req.user.userId, id);
   }
 }

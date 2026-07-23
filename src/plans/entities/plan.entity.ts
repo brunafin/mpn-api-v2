@@ -2,11 +2,11 @@ import { Exclude } from 'class-transformer';
 import {
   Column,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Company } from '../../companies/entities/company.entity';
-import { OneToMany } from 'typeorm';
 
 @Entity()
 export class Plan {
@@ -32,8 +32,13 @@ export class Plan {
   @Column({ length: 200 })
   description: string;
 
+  /** Valor fixo mensal da plataforma. */
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  price: number;
+  base_price: number;
+
+  /** Valor adicional por quadra cadastrada. */
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  price_per_court: number;
 
   @OneToMany(() => Company, (company) => company.plan)
   companies: Company[];

@@ -6,7 +6,7 @@ import { OperatingSchedule } from '../operating-schedule/entities/operating-sche
 import { Court } from '../courts/entities/court.entity';
 import { Reservation } from '../reservations/entities/reservation.entity';
 import { Company } from '../companies/entities/company.entity';
-import { JwtService } from '../jwt/jwt.service';
+import { PublicListingCache } from '../cache/public-listing.cache';
 
 type MockRepo = { [method: string]: jest.Mock };
 
@@ -29,12 +29,24 @@ describe('CourtSchedulesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CourtSchedulesService,
-        { provide: getRepositoryToken(CourtSchedule), useValue: courtSchedulesRepo },
+        {
+          provide: getRepositoryToken(CourtSchedule),
+          useValue: courtSchedulesRepo,
+        },
         { provide: getRepositoryToken(Company), useValue: makeRepo() },
-        { provide: getRepositoryToken(OperatingSchedule), useValue: operatingScheduleRepo },
+        {
+          provide: getRepositoryToken(OperatingSchedule),
+          useValue: operatingScheduleRepo,
+        },
         { provide: getRepositoryToken(Court), useValue: makeRepo() },
         { provide: getRepositoryToken(Reservation), useValue: makeRepo() },
-        { provide: JwtService, useValue: { generateToken: jest.fn(() => 'token') } },
+        {
+          provide: PublicListingCache,
+          useValue: {
+            getOrSet: jest.fn((_k, factory) => factory()),
+            clear: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -54,7 +66,11 @@ describe('CourtSchedulesService', () => {
 
       const created = await service.quickCreate(baseBody);
 
-      expect(created).toMatchObject({ price: 80, court_id: 2, start_hour: '10:00' });
+      expect(created).toMatchObject({
+        price: 80,
+        court_id: 2,
+        start_hour: '10:00',
+      });
       expect(courtSchedulesRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ price: 80 }),
       );

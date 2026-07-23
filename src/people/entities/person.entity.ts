@@ -1,5 +1,6 @@
 import { Exclude, Expose } from 'class-transformer';
 import { Company } from 'src/companies/entities/company.entity';
+import { PersonRole } from 'src/people/enums/person-role.enum';
 import {
   Column,
   Entity,
@@ -81,6 +82,14 @@ export class Person {
   @Column({ length: 20, unique: true })
   @Expose()
   username: string;
+
+  @Column({ type: 'varchar', length: 32, default: PersonRole.OWNER })
+  @Expose()
+  role: PersonRole;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose()
+  last_login_at: Date | null;
 
   @Column({ type: 'text' })
   @Exclude()

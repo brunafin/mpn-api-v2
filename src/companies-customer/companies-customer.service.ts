@@ -4,21 +4,46 @@ import { Repository } from 'typeorm';
 import { CompanyCustomer } from './entities/company-customer.entity';
 import { CreateCompaniesCustomerDto } from './dto/create-companies-customer.dto';
 import { UpdateCompaniesCustomerDto } from './dto/update-companies-customer.dto';
+import { Company } from 'src/companies/entities/company.entity';
+import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 
 @Injectable()
 export class CompaniesCustomerService {
   constructor(
     @InjectRepository(CompanyCustomer)
     private readonly customerRepository: Repository<CompanyCustomer>,
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
   ) {}
+
+  private async assertCompanyIdOwnedBy(
+    companyId: number,
+    ownerPublicId: string,
+  ): Promise<Company> {
+    const company = await this.companyRepository.findOne({
+      where: { id: companyId },
+      relations: ['administrator'],
+    });
+    if (!company) {
+      throw new NotFoundException('Estabelecimento não encontrado.');
+    }
+    assertAdministratorOwns(company.administrator?.public_id, ownerPublicId);
+    return company;
+  }
 
   async create(
     createCompaniesCustomerDto: CreateCompaniesCustomerDto,
+    ownerPublicId: string,
   ): Promise<CompanyCustomer> {
+    await this.assertCompanyIdOwnedBy(
+      createCompaniesCustomerDto.company_id,
+      ownerPublicId,
+    );
     const existingCustomer = await this.customerRepository.findOne({
       where: {
         name: createCompaniesCustomerDto.name.trim(),
         phone: createCompaniesCustomerDto.phone,
+        company_id: createCompaniesCustomerDto.company_id,
       },
     });
     if (existingCustomer) {
@@ -30,7 +55,9 @@ export class CompaniesCustomerService {
 
   async findAllByCompany(
     companyId: number,
+    ownerPublicId: string,
   ): Promise<Pick<CompanyCustomer, 'id' | 'name' | 'phone' | 'email'>[]> {
+    await this.assertCompanyIdOwnedBy(companyId, ownerPublicId);
     return this.customerRepository.find({
       select: ['id', 'name', 'phone', 'email'],
       where: { company_id: companyId },
@@ -59,10 +86,18 @@ export class CompaniesCustomerService {
     return updatedCustomer;
   }
 
-  async remove(id: number): Promise<void> {
-    const result = await this.customerRepository.delete(id);
-    if (result.affected === 0) {
+  async remove(id: number, ownerPublicId: string): Promise<void> {
+    const customer = await this.customerRepository.findOne({
+      where: { id },
+      relations: { company: { administrator: true } },
+    });
+    if (!customer) {
       throw new NotFoundException('Cliente não encontrado');
     }
+    assertAdministratorOwns(
+      customer.company?.administrator?.public_id,
+      ownerPublicId,
+    );
+    await this.customerRepository.delete(id);
   }
 }

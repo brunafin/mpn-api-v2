@@ -48,13 +48,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      errorDetails = exception.stack ?? null;
+      if (process.env.TYPE_ENV !== 'production') {
+        errorDetails = exception.stack ?? null;
+      }
     }
 
     response.status(status).json({
       statusCode: status,
       message,
-      error: errorDetails,
+      ...(errorDetails ? { error: errorDetails } : {}),
       timestamp: new Date().toISOString(),
     });
   }

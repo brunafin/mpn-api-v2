@@ -5,6 +5,7 @@ import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
+import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import {
   Column,
   Entity,
@@ -61,6 +62,10 @@ export class Company {
   @Expose()
   facebook_url: string;
 
+  @Column({ length: 80, unique: true })
+  @Expose()
+  slug: string;
+
   @Column({ length: 100, nullable: true })
   @Exclude()
   email: string;
@@ -107,6 +112,21 @@ export class Company {
   @Column({ type: 'boolean', default: false })
   @Expose()
   is_active: boolean;
+
+  /** Relação comercial com a MPN (não é publicação no portal). */
+  @Column({ type: 'varchar', length: 32, default: PartnerStatus.ACTIVE })
+  @Expose()
+  partner_status: PartnerStatus;
+
+  /** Fim do trial de 3 meses; null se não estiver em trial. */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose()
+  trial_ends_at: Date | null;
+
+  /** Primeiro acesso à agenda (quando o onboarding é concluído). */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose()
+  first_access_at: Date | null;
 
   @Column({ type: 'boolean', default: false })
   @Expose()

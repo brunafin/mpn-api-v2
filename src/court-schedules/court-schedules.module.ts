@@ -6,7 +6,6 @@ import { CourtSchedule } from './entities/court-schedule.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { Court } from 'src/courts/entities/court.entity';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
-import { JwtModule } from 'src/jwt/jwt.module';
 import { PublicCourtSchedulesController } from './public-court-schedules.controller';
 import { Company } from 'src/companies/entities/company.entity';
 
@@ -19,7 +18,6 @@ import { Company } from 'src/companies/entities/company.entity';
       Reservation,
       Company,
     ]),
-    JwtModule,
   ],
   controllers: [CourtSchedulesController, PublicCourtSchedulesController],
   providers: [CourtSchedulesService],

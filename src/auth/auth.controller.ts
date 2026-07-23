@@ -1,16 +1,45 @@
-import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { ResendCodeDto, SignupDto, VerifyEmailDto } from './dto/signup.dto';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
+import {
+  ResendCodeDto,
+  SignupDto,
+  VerifyEmailDto,
+  ChangePasswordDto,
+  SignInDto,
+} from './dto/signup.dto';
+
+type AuthedRequest = {
+  user: { userId: string; companyPublicId?: string | null };
+};
 
 @Controller('auth')
 @ApiTags('auth')
+@Throttle({ default: { limit: 20, ttl: 60_000 } })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @HttpCode(HttpStatus.CREATED)
   @Post('signup')
-  @ApiOperation({ summary: 'Cadastro do dono (cria conta inativa e envia código por e-mail)' })
+  @ApiOperation({
+    summary: 'Cadastro do dono (cria conta inativa e envia código por e-mail)',
+  })
   @ApiResponse({ status: 201, description: 'Cadastro criado, código enviado' })
   @ApiResponse({ status: 409, description: 'E-mail já cadastrado' })
   signup(@Body() body: SignupDto) {
@@ -29,7 +58,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('resend-code')
   @ApiOperation({ summary: 'Reenvia o código de confirmação por e-mail' })
-  @ApiResponse({ status: 200, description: 'Novo código enviado (se houver cadastro pendente)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Novo código enviado (se houver cadastro pendente)',
+  })
   resendCode(@Body() body: ResendCodeDto) {
     return this.authService.resendCode(body.email);
   }
@@ -37,43 +69,33 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   @ApiOperation({ summary: 'User login' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        username: { type: 'string', example: 'user1' },
-        password: { type: 'string', example: 'pass123' },
-      },
-      required: ['username', 'password'],
-    },
-  })
+  @ApiBody({ type: SignInDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  signIn(@Body() signInDto: Record<string, any>) {
+  signIn(@Body() signInDto: SignInDto) {
     return this.authService.signIn(signInDto.username, signInDto.password);
   }
 
   @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
   @Post('change-password')
-  @ApiOperation({ summary: 'Change user password' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        companyPublicId: { type: 'string', example: 'company-uuid' },
-        newPassword: { type: 'string', minLength: 6, example: 'newpass123' },
-      },
-      required: ['companyPublicId', 'newPassword'],
-    },
+  @ApiOperation({
+    summary:
+      'Altera a senha do usuário autenticado (senha atual obrigatória, exceto se ainda for a senha padrão)',
   })
+  @ApiBody({ type: ChangePasswordDto })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async changePassword(
-    @Body() body: { companyPublicId: string; newPassword: string },
+    @Req() req: AuthedRequest,
+    @Body() body: ChangePasswordDto,
   ) {
     return this.authService.changePassword(
-      body.companyPublicId,
+      req.user.userId,
       body.newPassword,
+      body.currentPassword,
     );
   }
 }

@@ -9,7 +9,6 @@ interface CreateEmailDto {
   time: string;
   date: string;
   amount: string;
-  tokenToCancel: string;
   subjectPrefix: string;
 }
 
@@ -49,20 +48,6 @@ export class EmailService {
           <p><strong>Que horas?</strong> ${createEmailDto.time}</p>
           <p><strong>Em nome de:</strong> ${createEmailDto.contactName} - ${createEmailDto.contactPhone}</p>
           <p><strong>Valor:</strong> ${createEmailDto.amount}</p>
-
-          <p style="margin-top: 20px;">
-              <a href="${process.env.LINK_TO_CANCEL}${createEmailDto.tokenToCancel}"
-                  style="
-                  color: #ffffff;
-                  background-color: #d9534f;
-                  padding: 12px 20px;
-                  border-radius: 8px;
-                  font-weight: bold;
-                  text-decoration: none;
-                  display: inline-block;">
-                  Cancelar Reserva
-              </a>
-          </p>
       </body>
       </html>
     `;
@@ -166,7 +151,64 @@ export class EmailService {
       return 'E-mail de verificação enviado com sucesso';
     } catch (error) {
       console.error('Erro ao enviar e-mail de verificação:', error);
-      throw new Error(`Falha ao enviar e-mail de verificação: ${error.message}`);
+      throw new Error(
+        `Falha ao enviar e-mail de verificação: ${error.message}`,
+      );
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async sendContactFormEmail(input: {
+    name: string;
+    email: string;
+    phone?: string;
+    preferWhatsapp?: boolean;
+    message: string;
+  }): Promise<string> {
+    const to =
+      process.env.CONTACT_TO_EMAIL?.trim() || 'contato@marcapranos.com.br';
+    const name = this.escapeHtml(input.name);
+    const email = this.escapeHtml(input.email);
+    const phone = input.phone ? this.escapeHtml(input.phone) : '';
+    const message = this.escapeHtml(input.message).replace(/\n/g, '<br>');
+    const preferWhatsapp = Boolean(input.preferWhatsapp);
+
+    try {
+      await this.resend.emails.send({
+        from: `Marca pra Nós <${process.env.EMAIL_FROM}>`,
+        to,
+        replyTo: input.email,
+        subject: `Contato pelo site — ${input.name}`,
+        html: `
+          <!DOCTYPE html>
+          <html lang="pt">
+          <head><meta charset="UTF-8" /></head>
+          <body style="font-family: sans-serif; color: #1a1a1a; line-height: 1.5;">
+            <h1 style="font-size: 18px;">Nova mensagem pelo site</h1>
+            <p><strong>Nome:</strong> ${name}</p>
+            <p><strong>E-mail:</strong> ${email}</p>
+            ${phone ? `<p><strong>Telefone:</strong> ${phone}</p>` : ''}
+            <p><strong>Retorno por WhatsApp:</strong> ${preferWhatsapp ? 'Sim' : 'Não'}</p>
+            <p><strong>Mensagem:</strong></p>
+            <p>${message}</p>
+          </body>
+          </html>
+        `,
+      });
+      return 'E-mail de contato enviado com sucesso';
+    } catch (error) {
+      console.error('Erro ao enviar e-mail de contato:', error);
+      throw new Error(
+        `Falha ao enviar e-mail de contato: ${error.message}`,
+      );
     }
   }
 
@@ -178,7 +220,6 @@ export class EmailService {
     date,
     time,
     amount,
-    tokenToCancel,
     subjectPrefix,
   }: CreateEmailDto) {
     const createEmailDto: CreateEmailDto = {
@@ -189,7 +230,6 @@ export class EmailService {
       time,
       date,
       amount,
-      tokenToCancel,
       subjectPrefix,
     };
 

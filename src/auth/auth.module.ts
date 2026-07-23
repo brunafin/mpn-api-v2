@@ -8,12 +8,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './jwt.strategy';
 import { EmailModule } from '../email/email.module';
 import { EmailVerification } from './entities/email-verification.entity';
+import { Company } from 'src/companies/entities/company.entity';
 
 @Module({
   imports: [
     PeopleModule,
     EmailModule,
-    TypeOrmModule.forFeature([EmailVerification]),
+    TypeOrmModule.forFeature([EmailVerification, Company]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

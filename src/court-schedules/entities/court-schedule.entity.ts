@@ -7,6 +7,7 @@ import { Sport } from 'src/sports/entities/sport.entity';
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToOne,
@@ -16,6 +17,8 @@ import {
 
 @Entity({ name: 'court_schedule' })
 @Unique(['start_hour', 'date', 'court_id'])
+@Index('IDX_court_schedule_date_available', ['date', 'available'])
+@Index('IDX_court_schedule_court_id_date', ['court_id', 'date'])
 export class CourtSchedule {
   @PrimaryGeneratedColumn()
   @Exclude()

@@ -7,10 +7,12 @@ import {
   Param,
   Delete,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { CourtsService } from './courts.service';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
+import { UpdateCourtVisibilityDto } from './dto/update-court-visibility.dto';
 import {
   ApiBody,
   ApiOkResponse,
@@ -19,6 +21,10 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+
+type AuthedRequest = {
+  user: { userId: string; email?: string };
+};
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
@@ -65,8 +71,11 @@ export class CourtsController {
       required: ['name', 'company_id', 'type_of_court_id', 'sports'],
     },
   })
-  create(@Body() createCourtDto: CreateCourtDto) {
-    return this.courtsService.create(createCourtDto);
+  create(
+    @Body() createCourtDto: CreateCourtDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.courtsService.create(createCourtDto, req.user.userId);
   }
 
   @Get('/company/:public_id')
@@ -94,8 +103,11 @@ export class CourtsController {
       },
     },
   })
-  findAllByCompanyId(@Param('public_id') public_id: string) {
-    return this.courtsService.findAllByCompanyId(public_id);
+  findAllByCompanyId(
+    @Param('public_id') public_id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.courtsService.findAllByCompanyId(public_id, req.user.userId);
   }
 
   @Get()
@@ -123,8 +135,8 @@ export class CourtsController {
       },
     },
   })
-  findAll() {
-    return this.courtsService.findAll();
+  findAll(@Req() req: AuthedRequest) {
+    return this.courtsService.findAllForOwner(req.user.userId);
   }
 
   @Get(':public_id')
@@ -149,8 +161,26 @@ export class CourtsController {
       },
     },
   })
-  findOne(@Param('public_id') public_id: string) {
-    return this.courtsService.findOneByPublicId(public_id);
+  findOne(
+    @Param('public_id') public_id: string,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.courtsService.findOneByPublicId(public_id, req.user.userId);
+  }
+
+  @Patch(':public_id/visibility')
+  @ApiOperation({ summary: 'Mostrar ou ocultar a quadra no site público' })
+  @ApiBody({ type: UpdateCourtVisibilityDto })
+  setVisibility(
+    @Param('public_id') public_id: string,
+    @Body() body: UpdateCourtVisibilityDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.courtsService.setVisibility(
+      public_id,
+      req.user.userId,
+      body.show,
+    );
   }
 
   @Patch(':public_id')
@@ -158,29 +188,22 @@ export class CourtsController {
   @ApiBody({
     description: 'Dados para atualizar uma quadra',
     type: UpdateCourtDto,
-    examples: {
-      exemplo1: {
-        summary: 'Quadra com todos os dados preenchidos',
-        value: {
-          name: 'Quadra Atualizada 1',
-          company_id: 1,
-          show: true,
-          is_covered: true,
-          is_can_have_net: false,
-        },
-      },
-    },
   })
   update(
     @Param('public_id') public_id: string,
     @Body() updateCourtDto: UpdateCourtDto,
+    @Req() req: AuthedRequest,
   ) {
-    return this.courtsService.updateByPublicId(public_id, updateCourtDto);
+    return this.courtsService.updateByPublicId(
+      public_id,
+      updateCourtDto,
+      req.user.userId,
+    );
   }
 
   @Delete(':public_id')
   @ApiOperation({ summary: 'Remover uma quadra pelo public_id' })
-  remove(@Param('public_id') public_id: string) {
-    return this.courtsService.removeByPublicId(public_id);
+  remove(@Param('public_id') public_id: string, @Req() req: AuthedRequest) {
+    return this.courtsService.removeByPublicId(public_id, req.user.userId);
   }
 }

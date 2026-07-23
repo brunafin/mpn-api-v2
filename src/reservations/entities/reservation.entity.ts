@@ -42,7 +42,7 @@ export class Reservation {
   contact_phone: string;
 
   @Column({ type: 'text', nullable: true })
-  @Expose()
+  @Exclude()
   token_to_cancel: string;
 
   @Column({ default: false })

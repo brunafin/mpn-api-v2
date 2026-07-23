@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,13 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Reservation } from './entities/reservation.entity';
 import { DataSource, MoreThanOrEqual, QueryRunner, Repository } from 'typeorm';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
-import { JwtService } from 'src/jwt/jwt.service';
-import { TwilioService } from 'src/twilio/twilio.service';
 import { plainToInstance } from 'class-transformer';
-import { checkIsCellphoneNumberBR } from 'src/utils/checkIsCellphoneNumberBR';
-import { normalizeText } from 'src/utils/normalizeText';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
+import { PublicListingCache } from 'src/cache/public-listing.cache';
+import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 
 @Injectable()
 export class ReservationsService {
@@ -29,40 +28,38 @@ export class ReservationsService {
     @InjectRepository(OperatingSchedule)
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
 
-    private readonly jwtService: JwtService,
-    private readonly twilioService: TwilioService,
     private readonly dataSource: DataSource,
+    private readonly publicListingCache: PublicListingCache,
   ) {}
-  async create(createReservationDto: CreateReservationDto) {
+  async create(
+    createReservationDto: CreateReservationDto,
+    ownerPublicId: string,
+  ) {
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const courtSchedule = await this.courtSchedulesRepository.findOne({
-        where: { public_id: createReservationDto.courtSchedulePublicId },
-        select: {
-          id: true,
-          public_id: true,
-          available: true,
-          court: {
-            id: true,
-            name: true,
-            company: {
-              email: true,
-              name: true,
-              phone: true,
-            },
-          },
-          start_hour: true,
-          date: true,
-          price: true,
-        },
-        relations: ['court', 'court.company'],
-      });
+      // Lock pessimista na mesma TX: evita double-book sob concorrência
+      const courtSchedule = await queryRunner.manager
+        .getRepository(CourtSchedule)
+        .createQueryBuilder('cs')
+        .innerJoinAndSelect('cs.court', 'court')
+        .innerJoinAndSelect('court.company', 'company')
+        .leftJoinAndSelect('company.administrator', 'administrator')
+        .setLock('pessimistic_write')
+        .where('cs.public_id = :publicId', {
+          publicId: createReservationDto.courtSchedulePublicId,
+        })
+        .getOne();
 
       if (!courtSchedule) {
         throw new NotFoundException('Horário não encontrado');
       }
+
+      assertAdministratorOwns(
+        courtSchedule.court.company.administrator?.public_id,
+        ownerPublicId,
+      );
 
       if (!courtSchedule.available) {
         throw new BadRequestException('Horário indisponível');
@@ -97,117 +94,44 @@ export class ReservationsService {
         is_event: createReservationDto.isEvent,
         sport_id: createReservationDto.sportId,
       });
-      reservation.token_to_cancel = this.jwtService.generateToken(
-        reservation.id,
-      );
 
       await queryRunner.manager.save(
         this.reservationsRepository.target,
         reservation,
       );
 
-      const formattedPrice = new Intl.NumberFormat('pt-BR', {
-        style: 'decimal',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(courtSchedule.price);
-
-      const startHourFormatted = courtSchedule.start_hour
-        ? courtSchedule.start_hour.slice(0, 5)
-        : '';
-
-      let message =
-        `Reserva confirmada!\n` +
-        `Quadra: ${normalizeText(courtSchedule?.court.company.name)} - Q.${courtSchedule.court.name}\n` +
-        `${
-          courtSchedule.date instanceof Date
-            ? courtSchedule.date.toLocaleDateString('pt-BR')
-            : new Date(courtSchedule.date).toLocaleDateString('pt-BR')
-        } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}`;
-
-      if (createReservationDto.isBarbecueIncluded) {
-        message = message + '\nc/ churrasq.';
-      }
-
-      // if (
-      //   createReservationDto.contactPhone.replace(/\s+/g, '').length > 0 &&
-      //   checkIsCellphoneNumberBR(contactPhone)
-      // ) {
-      //   if (process.env.TYPE_ENV === 'production') {
-      //     await this.twilioService.sendSms(
-      //       contactPhone,
-      //       message,
-      //     );
-      //   }
-      // }
-
       await queryRunner.commitTransaction();
+      this.publicListingCache.clear();
       return plainToInstance(Reservation, reservation);
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
       throw new BadRequestException('Erro ao criar reserva: ' + error.message);
     } finally {
       await queryRunner.release();
     }
   }
 
-  async findByToken(token: string) {
-    const reservation = await this.reservationsRepository.findOne({
-      where: { token_to_cancel: token },
-      select: {
-        id: true,
-        contact_name: true,
-        contact_phone: true,
-        token_to_cancel: true,
-        court_schedule: {
-          date: true,
-          start_hour: true,
-          court: {
-            name: true,
-          },
-        },
-      },
-      relations: ['court_schedule', 'court_schedule.court'],
-    });
-    if (!reservation) {
-      throw new NotFoundException('Reserva não encontrada.');
-    }
-    return {
-      reservationId: reservation.id,
-      date: reservation.court_schedule.date,
-      time: reservation.court_schedule.start_hour,
-      contactName: reservation.contact_name,
-      contactPhone: reservation.contact_phone,
-      courtName: reservation.court_schedule.court.name,
-      tokenToCancel: reservation.token_to_cancel,
-    };
-  }
+  async cancelByPublicId(publicId: string, ownerPublicId: string) {
+    const owned = await this.assertReservationOwnedBy(publicId, ownerPublicId);
 
-  async cancel(token: string) {
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       const reservation = await queryRunner.manager.findOne(Reservation, {
-        where: { token_to_cancel: token },
+        where: { id: owned.id },
         select: {
           id: true,
-          token_to_cancel: true,
           court_schedule_id: true,
-          contact_name: true,
-          contact_phone: true,
-          is_barbecue_included: true,
-          court_schedule: {
-            court: {
-              company: {
-                name: true,
-              },
-            },
-          },
         },
-        relations: { court_schedule: true },
       });
 
       if (!reservation) {
@@ -226,45 +150,9 @@ export class ReservationsService {
         },
       );
 
-      const courtSchedule = await this.courtSchedulesRepository.findOne({
-        where: { id: reservation.court_schedule_id },
-        relations: ['court', 'court.company'],
-      });
-
-      const formattedPrice = courtSchedule
-        ? new Intl.NumberFormat('pt-BR', {
-            style: 'decimal',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }).format(courtSchedule.price)
-        : '';
-
-      const startHourFormatted = courtSchedule?.start_hour
-        ? courtSchedule.start_hour.slice(0, 5)
-        : '';
-
-      let message =
-        `Reserva cancelada!\n` +
-        `Quadra: ${normalizeText(courtSchedule?.court.company.name!)} - Q.${courtSchedule?.court.name}\n` +
-        `${
-          courtSchedule?.date instanceof Date
-            ? courtSchedule.date.toLocaleDateString('pt-BR')
-            : new Date(courtSchedule?.date ?? '').toLocaleDateString('pt-BR')
-        } - ${startHourFormatted}\n` +
-        `Valor: ${formattedPrice}`;
-
-      if (reservation.is_barbecue_included) {
-        message = message + '\nc/ churrasq.';
-      }
-
-      // if (checkIsCellphoneNumberBR(reservation.contact_phone)) {
-      //   if (process.env.TYPE_ENV === 'production') {
-      //     await this.twilioService.sendSms(reservation.contact_phone, message);
-      //   }
-      // }
-
       await queryRunner.commitTransaction();
-      return 'Reserva cancelada com sucesso!';
+      this.publicListingCache.clear();
+      return { message: 'Reserva cancelada com sucesso!' };
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -281,10 +169,11 @@ export class ReservationsService {
     return `This action returns a #${id} reservation`;
   }
 
-  findOneByPublicId(public_id: string) {
-    const reservation = this.reservationsRepository.findOne({
-      where: { public_id },
-    });
+  async findOneByPublicId(public_id: string, ownerPublicId: string) {
+    const reservation = await this.assertReservationOwnedBy(
+      public_id,
+      ownerPublicId,
+    );
     return plainToInstance(Reservation, reservation);
   }
 
@@ -292,16 +181,39 @@ export class ReservationsService {
     return `This action updates a #${id} reservation`;
   }
 
+  private async assertReservationOwnedBy(
+    publicId: string,
+    ownerPublicId: string,
+  ): Promise<Reservation> {
+    const reservation = await this.reservationsRepository.findOne({
+      where: { public_id: publicId },
+      relations: {
+        court_schedule: { court: { company: { administrator: true } } },
+      },
+    });
+    if (!reservation) {
+      throw new NotFoundException('Reserva não encontrada.');
+    }
+    assertAdministratorOwns(
+      reservation.court_schedule?.court?.company?.administrator?.public_id,
+      ownerPublicId,
+    );
+    return reservation;
+  }
+
   updateByPublicId(
     public_id: string,
     updateReservationDto: UpdateReservationDto,
+    ownerPublicId: string,
   ) {
-    return this.reservationsRepository.update(
-      { public_id },
-      {
-        contact_name: updateReservationDto.contactName,
-        contact_phone: updateReservationDto.contactPhone,
-      },
+    return this.assertReservationOwnedBy(public_id, ownerPublicId).then(() =>
+      this.reservationsRepository.update(
+        { public_id },
+        {
+          contact_name: updateReservationDto.contactName,
+          contact_phone: updateReservationDto.contactPhone,
+        },
+      ),
     );
   }
 
@@ -312,7 +224,9 @@ export class ReservationsService {
       is_barbecue_included?: boolean;
       is_event?: boolean;
     },
+    ownerPublicId: string,
   ) {
+    await this.assertReservationOwnedBy(public_id, ownerPublicId);
     const updateData: any = {};
     if (fields.observation !== undefined)
       updateData.observation = fields.observation;
@@ -322,22 +236,41 @@ export class ReservationsService {
     return this.reservationsRepository.update({ public_id }, updateData);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} reservation`;
+  async remove(id: number, ownerPublicId: string) {
+    const reservation = await this.reservationsRepository.findOne({
+      where: { id },
+      relations: {
+        court_schedule: { court: { company: { administrator: true } } },
+      },
+    });
+    if (!reservation) {
+      throw new NotFoundException('Reserva não encontrada.');
+    }
+    assertAdministratorOwns(
+      reservation.court_schedule?.court?.company?.administrator?.public_id,
+      ownerPublicId,
+    );
+    await this.reservationsRepository.delete({ id });
+    return { message: 'Reserva removida' };
   }
 
   async updateContact(
     courtSchedulePublicId: string,
     contactName: string,
     contactPhone: string,
+    ownerPublicId: string,
   ) {
     const courtSchedule = await this.courtSchedulesRepository.findOne({
       where: { public_id: courtSchedulePublicId },
-      relations: { court: true },
+      relations: { court: { company: { administrator: true } } },
     });
     if (!courtSchedule) {
       throw new NotFoundException('Horário não encontrado.');
     }
+    assertAdministratorOwns(
+      courtSchedule.court?.company?.administrator?.public_id,
+      ownerPublicId,
+    );
 
     let contactPhoneSanitized = contactPhone?.replace(/\s+/g, '') || '';
 

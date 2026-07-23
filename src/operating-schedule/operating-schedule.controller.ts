@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { OperatingScheduleService } from './operating-schedule.service';
 import { CreateOperatingScheduleDto } from './dto/create-operating-schedule.dto';
 import {
@@ -11,6 +19,10 @@ import {
 } from '@nestjs/swagger';
 import { UrlQueryParamOperatingScheduleDto } from './dto/url-query-operating-schedule.dto';
 import { AuthGuard } from '@nestjs/passport';
+
+type AuthedRequest = {
+  user: { userId: string };
+};
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
@@ -38,8 +50,14 @@ export class OperatingScheduleController {
       },
     },
   })
-  create(@Body() createOperatingScheduleDto: CreateOperatingScheduleDto) {
-    return this.operatingScheduleService.create(createOperatingScheduleDto);
+  create(
+    @Body() createOperatingScheduleDto: CreateOperatingScheduleDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.operatingScheduleService.create(
+      createOperatingScheduleDto,
+      req.user.userId,
+    );
   }
 
   @Get()
@@ -63,7 +81,13 @@ export class OperatingScheduleController {
       },
     },
   })
-  findAllByCourtId(@Query() query: UrlQueryParamOperatingScheduleDto) {
-    return this.operatingScheduleService.findAllByCourtId(query);
+  findAllByCourtId(
+    @Query() query: UrlQueryParamOperatingScheduleDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.operatingScheduleService.findAllByCourtId(
+      query,
+      req.user.userId,
+    );
   }
 }
