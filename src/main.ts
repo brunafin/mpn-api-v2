@@ -42,6 +42,7 @@ async function bootstrap() {
     'https://sistemamarcapranos-stable.up.railway.app',
     'https://marcapranos.up.railway.app',
     'https://mpnadmin.up.railway.app',
+    'https://mpn-admin-v2.vercel.app',
     'https://sistema.marcapranos.com.br',
     'https://marcapranos.com.br',
   ];
@@ -53,13 +54,22 @@ async function bootstrap() {
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
   ];
+  const extraOrigins = (process.env.CORS_EXTRA_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  const allowedOrigins = [
+    ...(process.env.TYPE_ENV === 'production'
+      ? productionOrigins
+      : [...productionOrigins, ...localOrigins]),
+    ...extraOrigins,
+  ];
 
   app.enableCors({
-    origin:
-      process.env.TYPE_ENV === 'production'
-        ? productionOrigins
-        : [...productionOrigins, ...localOrigins],
+    origin: allowedOrigins,
     methods: 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
+    allowedHeaders: 'Content-Type,Authorization,Accept',
   });
 
   await app.listen(process.env.PORT ?? 3001);
