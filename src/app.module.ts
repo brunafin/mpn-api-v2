@@ -29,6 +29,7 @@ import { StorageModule } from './storage/storage.module';
 import { ContactModule } from './contact/contact.module';
 import { PublicListingCacheModule } from './cache/cache.module';
 import { PlatformModule } from './platform/platform.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { PlatformModule } from './platform/platform.module';
     OnboardingModule,
     ContactModule,
     PlatformModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [

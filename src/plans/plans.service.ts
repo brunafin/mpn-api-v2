@@ -14,7 +14,6 @@ import { PlanEnum } from './enum/enum';
 
 const SYSTEM_PLAN_IDS = new Set<number>([
   PlanEnum.FREE,
-  PlanEnum.BASIC,
   PlanEnum.PENDENCE,
 ]);
 
@@ -25,6 +24,8 @@ type PlanResponse = {
   basePrice: number;
   pricePerCourt: number;
   isSystem: boolean;
+  /** Plano FREE usado no trial de 3 meses. */
+  isTrialPlan: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -111,13 +112,15 @@ export class PlansService {
   }
 
   private mapPlan(plan: Plan): PlanResponse {
+    const id = Number(plan.id);
     return {
-      id: plan.id,
+      id,
       name: plan.name,
       description: plan.description,
       basePrice: Number(plan.base_price),
       pricePerCourt: Number(plan.price_per_court),
-      isSystem: SYSTEM_PLAN_IDS.has(plan.id),
+      isSystem: SYSTEM_PLAN_IDS.has(id),
+      isTrialPlan: id === PlanEnum.FREE,
       createdAt: plan.created_at,
       updatedAt: plan.updated_at,
     };

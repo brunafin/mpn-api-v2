@@ -75,6 +75,8 @@ type PlatformPaymentHistoryItem = {
   value: number;
   formOfPayment: string | null;
   paid: boolean;
+  status: 'open' | 'overdue' | 'awaiting_pix' | 'paid';
+  mpPaymentId: string | null;
 };
 
 type PlatformCourtDetail = {
@@ -399,7 +401,36 @@ export class PlatformService {
       value: Number(payment.price),
       formOfPayment: payment.form_of_payment ?? null,
       paid: !!payment.dt_payment,
+      status: this.resolvePaymentStatus(payment),
+      mpPaymentId: payment.mp_payment_id ?? null,
     };
+  }
+
+  private resolvePaymentStatus(
+    payment: PaymentCompany,
+  ): PlatformPaymentHistoryItem['status'] {
+    if (payment.dt_payment) return 'paid';
+    const awaiting =
+      Boolean(payment.mp_payment_id) &&
+      payment.pix_expires_at &&
+      new Date(payment.pix_expires_at).getTime() > Date.now();
+    if (awaiting) return 'awaiting_pix';
+    if (payment.dt_due) {
+      const due = new Date(payment.dt_due);
+      const now = new Date();
+      const startDue = new Date(
+        due.getFullYear(),
+        due.getMonth(),
+        due.getDate(),
+      );
+      const startToday = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      );
+      if (startDue < startToday) return 'overdue';
+    }
+    return 'open';
   }
 
   private sortItems(

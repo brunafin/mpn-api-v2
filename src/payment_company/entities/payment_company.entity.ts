@@ -39,4 +39,16 @@ export class PaymentCompany {
 
   @Column({ type: 'timestamp', nullable: true })
   dt_payment: Date | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  mp_payment_id: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  pix_copy_paste: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  pix_qr_base64: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  pix_expires_at: Date | null;
 }
