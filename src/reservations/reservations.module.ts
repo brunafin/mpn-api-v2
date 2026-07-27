@@ -7,6 +7,7 @@ import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entit
 import { EmailService } from 'src/email/email.service';
 import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
+import { CompanyAccessModule } from 'src/companies/company-access.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { OperatingSchedule } from 'src/operating-schedule/entities/operating-sch
       CompanyCustomer,
       OperatingSchedule,
     ]),
+    CompanyAccessModule,
   ],
   controllers: [ReservationsController],
   providers: [ReservationsService, EmailService],

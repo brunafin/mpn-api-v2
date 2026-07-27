@@ -18,6 +18,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 
 type AuthedRequest = {
   user: { userId: string };
@@ -33,6 +34,7 @@ export class CompaniesCustomerController {
   ) {}
 
   @Post()
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Criar um novo cliente de empresa' })
   @ApiResponse({ status: 201, description: 'Cliente criado com sucesso.' })
   create(
@@ -65,6 +67,7 @@ export class CompaniesCustomerController {
   }
 
   @Delete(':id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Excluir um cliente de empresa pelo ID' })
   @ApiParam({ name: 'id', type: Number, description: 'ID do cliente' })
   @ApiResponse({ status: 200, description: 'Cliente removido com sucesso.' })

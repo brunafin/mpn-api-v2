@@ -89,12 +89,13 @@ Quando for ligar:
 - [ ] Aplicação criada no MP Developers
 - [ ] Chave Pix cadastrada na conta
 - [ ] `MERCADOPAGO_ACCESS_TOKEN` no `.env` + API reiniciada
+- [ ] `MERCADOPAGO_WEBHOOK_SECRET` obrigatório em production (API não sobe sem ele)
 - [ ] Botão “Pagar com PIX” aparece no manager
-- [ ] (Depois) Webhook `payment` + `MERCADOPAGO_WEBHOOK_SECRET`
-- [ ] (Depois) Teste end-to-end: gerar PIX → pagar → parcela marcada paga
+- [ ] Webhook `payment` + secret válido (sem secret o webhook é rejeitado)
+- [ ] Teste end-to-end: gerar PIX → pagar → parcela marcada paga
 
 ## Fora deste guia
 
 - Tela **Planos** / “iniciar plano” pós-trial (produto em discussão)
-- Bloqueio de login por inadimplência
+- Restrição read-only por inadimplência (access_mode; independente do plano)
 - Migração de conta PF → PJ

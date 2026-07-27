@@ -16,6 +16,10 @@ import { ReservationsController } from '../reservations/reservations.controller'
 import { ContactController } from '../contact/contact.controller';
 import { PublicCourtSchedulesController } from '../court-schedules/public-court-schedules.controller';
 import { OperatingScheduleController } from '../operating-schedule/operating-schedule.controller';
+import { GoogleCourtsController } from '../google_courts/google_courts.controller';
+import { assertDeploySecurityGuards } from './assert-deploy-security';
+import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Contratos de segurança da remediação.
@@ -69,6 +73,54 @@ describe('Security remediation contracts', () => {
       expect(
         Reflect.getMetadata(GUARDS_METADATA, PeopleController)?.length,
       ).toBeGreaterThan(0);
+    });
+
+    it('GET /reservation (list stub) não existe mais', () => {
+      expect(
+        (ReservationsController.prototype as { findAll?: unknown }).findAll,
+      ).toBeUndefined();
+    });
+
+    it('google-courts exige PlatformAdminGuard além do JWT', () => {
+      expect(
+        Reflect.getMetadata(GUARDS_METADATA, GoogleCourtsController)?.length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('Deploy — MP secret e Twilio', () => {
+    const originalEnv = process.env.TYPE_ENV;
+    const originalSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+
+    afterEach(() => {
+      if (originalEnv === undefined) delete process.env.TYPE_ENV;
+      else process.env.TYPE_ENV = originalEnv;
+      if (originalSecret === undefined) {
+        delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+      } else {
+        process.env.MERCADOPAGO_WEBHOOK_SECRET = originalSecret;
+      }
+    });
+
+    it('production sem MERCADOPAGO_WEBHOOK_SECRET falha no boot guard', () => {
+      process.env.TYPE_ENV = 'production';
+      delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+      expect(() => assertDeploySecurityGuards()).toThrow(
+        /MERCADOPAGO_WEBHOOK_SECRET/,
+      );
+    });
+
+    it('webhook sem secret é rejeitado (não aceita cego)', () => {
+      const service = new MercadoPagoService({
+        get: () => undefined,
+      } as unknown as ConfigService);
+      expect(
+        service.validateWebhookSignature({
+          xSignature: 'ts=1,v1=abc',
+          xRequestId: 'req',
+          dataId: '123',
+        }),
+      ).toBe(false);
     });
   });
 

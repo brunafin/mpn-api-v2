@@ -39,14 +39,15 @@ export class ReservationsService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      // Lock pessimista na mesma TX: evita double-book sob concorrência
+      // Lock só em court_schedule: Postgres não permite FOR UPDATE no lado
+      // nullable de OUTER JOIN (ex.: leftJoin em administrator).
       const courtSchedule = await queryRunner.manager
         .getRepository(CourtSchedule)
         .createQueryBuilder('cs')
         .innerJoinAndSelect('cs.court', 'court')
         .innerJoinAndSelect('court.company', 'company')
         .leftJoinAndSelect('company.administrator', 'administrator')
-        .setLock('pessimistic_write')
+        .setLock('pessimistic_write', undefined, ['cs'])
         .where('cs.public_id = :publicId', {
           publicId: createReservationDto.courtSchedulePublicId,
         })
@@ -159,14 +160,6 @@ export class ReservationsService {
     } finally {
       await queryRunner.release();
     }
-  }
-
-  findAll() {
-    return `This action returns all reservations`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} reservation`;
   }
 
   async findOneByPublicId(public_id: string, ownerPublicId: string) {

@@ -21,6 +21,7 @@ import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
 import { isTrialActive } from 'src/companies/utils/trial-expiry';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
+import { buildCapabilities } from 'src/companies/utils/company-access';
 
 const LOGO_MIME_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -121,16 +122,40 @@ export class CompaniesService {
     publicId: string,
     date: string,
     ownerPublicId: string,
-  ): Promise<IReservationItemProps[]> {
+  ): Promise<{ schedules: IReservationItemProps[]; isDayClosed: boolean }> {
     await this.assertCompanyOwnedBy(publicId, ownerPublicId);
     const dateKey = new Date(date).toISOString().split('T')[0];
     const cacheKey = `agenda-all:${publicId}:${dateKey}`;
 
     return this.publicListingCache.getOrSet(
       cacheKey,
-      () => this.loadSchedulesByDate(publicId, dateKey, true),
+      () => this.loadAllSchedulesByDate(publicId, dateKey),
       this.publicListingCache.agendaTtlMs,
     );
+  }
+
+  private async loadAllSchedulesByDate(
+    publicId: string,
+    dateKey: string,
+  ): Promise<{ schedules: IReservationItemProps[]; isDayClosed: boolean }> {
+    const schedules = await this.loadSchedulesByDate(publicId, dateKey, true);
+    const company = await this.companiesRepository
+      .createQueryBuilder('company')
+      .innerJoin('company.courts', 'court')
+      .innerJoin(
+        'court.court_schedule',
+        'schedule',
+        'schedule.date = :date AND schedule.closed_by_day = true',
+        { date: dateKey },
+      )
+      .where('company.public_id = :publicId', { publicId })
+      .select('company.id')
+      .getOne();
+
+    return {
+      schedules,
+      isDayClosed: Boolean(company),
+    };
   }
 
   private async loadSchedulesByDate(
@@ -162,6 +187,7 @@ export class CompaniesService {
         'schedule.start_hour',
         'schedule.date',
         'schedule.available',
+        'schedule.closed_by_day',
         'schedule.price',
         'schedule.is_fixed',
         'reservation.id',
@@ -267,6 +293,10 @@ export class CompaniesService {
         'company.preferences_is_hidden_inactive_hours',
         'company.day_due',
         'company.trial_ends_at',
+        'company.partner_status',
+        'company.plan_id',
+        'company.access_mode',
+        'company.access_reason',
         'administrator.id',
         'administrator.public_id',
         'administrator.name',
@@ -338,6 +368,8 @@ export class CompaniesService {
         }
       : null;
 
+    const capabilities = buildCapabilities(company);
+
     const objToFront = {
       link: `https://marcapranos.com.br/encontre-onde-jogar/${company.slug}`,
       slug: company.slug,
@@ -354,6 +386,7 @@ export class CompaniesService {
         .map((image) => ({ id: image.id, url: image.url })),
       owner,
       courts,
+      capabilities,
       plan: {
         name:
           company.partner_status === PartnerStatus.EXPIRED

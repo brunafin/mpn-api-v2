@@ -5,6 +5,7 @@ import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
+import { AccessMode } from 'src/companies/enums/access-mode.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import {
   Column,
@@ -127,6 +128,23 @@ export class Company {
   @Column({ type: 'timestamptz', nullable: true })
   @Expose()
   first_access_at: Date | null;
+
+  /**
+   * Controle de escrita no manager (independente do plano e do portal).
+   * read_only = inadimplência / restrição admin: vê agenda, não muta.
+   */
+  @Column({ type: 'varchar', length: 32, default: AccessMode.FULL })
+  @Expose()
+  access_mode: AccessMode;
+
+  /** Motivo da restrição quando access_mode != full. */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  @Expose()
+  access_reason: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose()
+  access_restricted_at: Date | null;
 
   @Column({ type: 'boolean', default: false })
   @Expose()

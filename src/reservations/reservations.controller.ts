@@ -12,8 +12,9 @@ import {
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
-import { ApiBody, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 
 type AuthedRequest = {
   user: { userId: string };
@@ -24,7 +25,7 @@ type AuthedRequest = {
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), WriteAccessGuard)
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Criar uma nova reserva' })
@@ -36,14 +37,6 @@ export class ReservationsController {
       createReservationDto,
       req.user.userId,
     );
-  }
-
-  @UseGuards(AuthGuard('jwt'))
-  @ApiBearerAuth()
-  @Get()
-  @ApiOperation({ summary: 'Listar todas as reservas' })
-  findAll() {
-    return this.reservationsService.findAll();
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -60,7 +53,7 @@ export class ReservationsController {
     );
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), WriteAccessGuard)
   @ApiBearerAuth()
   @Patch(':public_id')
   @ApiOperation({ summary: 'Atualizar uma reserva pelo public_id' })
@@ -76,7 +69,7 @@ export class ReservationsController {
     );
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), WriteAccessGuard)
   @ApiBearerAuth()
   @Patch(':public_id/extra')
   @ApiOperation({
@@ -100,7 +93,7 @@ export class ReservationsController {
     );
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), WriteAccessGuard)
   @ApiBearerAuth()
   @Delete(':public_id')
   @ApiOperation({
@@ -116,7 +109,7 @@ export class ReservationsController {
     );
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), WriteAccessGuard)
   @ApiBearerAuth()
   @Patch(':court_schedule_public_id/contact')
   @ApiOperation({ summary: 'Atualizar dados de contato da reserva' })

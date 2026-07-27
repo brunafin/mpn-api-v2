@@ -23,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
@@ -41,6 +42,7 @@ export class CourtSchedulesController {
   constructor(private readonly courtSchedulesService: CourtSchedulesService) {}
 
   @Post()
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Criar um horário de quadra' })
   @ApiBody({
     description: 'Dados para criar um novo horário de quadra',
@@ -57,6 +59,7 @@ export class CourtSchedulesController {
   }
 
   @Post('/populate')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({
     summary: 'Popular horários de uma quadra com base em data inicial e final',
   })
@@ -69,6 +72,42 @@ export class CourtSchedulesController {
       court_id,
       start_date,
       end_date,
+      user.userId,
+    );
+  }
+
+  @Patch('day-availability')
+  @UseGuards(WriteAccessGuard)
+  @ApiOperation({
+    summary:
+      'Fechar ou reabrir todos os horários livres de um dia (sem alterar reservas/fixos)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['company_public_id', 'date', 'available'],
+      properties: {
+        company_public_id: { type: 'string', format: 'uuid' },
+        date: { type: 'string', format: 'date', example: '2026-07-26' },
+        available: {
+          type: 'boolean',
+          description:
+            'false = fechar o dia (inativar livres); true = reabrir inativos',
+        },
+      },
+    },
+  })
+  updateDayAvailability(
+    @Body()
+    body: {
+      company_public_id: string;
+      date: string;
+      available: boolean;
+    },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.courtSchedulesService.updateDayAvailability(
+      body,
       user.userId,
     );
   }
@@ -111,6 +150,7 @@ export class CourtSchedulesController {
   }
 
   @Patch(':public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Atualizar um horário de quadra pelo public_id' })
   @ApiBody({
     description: 'Dados para atualizar um horário de quadra',
@@ -129,6 +169,7 @@ export class CourtSchedulesController {
   }
 
   @Delete(':public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Remover um horário de quadra pelo public_id' })
   remove(
     @Param('public_id') publicId: string,
@@ -138,6 +179,7 @@ export class CourtSchedulesController {
   }
 
   @Patch(':public_id/availability')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({
     summary: 'Atualizar a disponibilidade de um horário de quadra',
   })
@@ -154,6 +196,7 @@ export class CourtSchedulesController {
   }
 
   @Post('fix')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Fixar horário para um cliente' })
   async fixSchedule(
     @Body() body: { court_schedule_public_id: string },
@@ -163,6 +206,7 @@ export class CourtSchedulesController {
   }
 
   @Post('unfix')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Desafixar horário de um cliente' })
   async unfixSchedule(
     @Body() body: { court_schedule_public_id: string },
@@ -172,6 +216,7 @@ export class CourtSchedulesController {
   }
 
   @Post('quick-create')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({
     summary: 'Criar horário de quadra rapidamente para o usuário logado',
   })

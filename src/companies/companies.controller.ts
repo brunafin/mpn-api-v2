@@ -26,6 +26,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 
 type AuthedRequest = {
   user: { userId: string; email?: string };
@@ -39,6 +40,7 @@ export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Criar uma nova empresa' })
   @ApiBody({
     description: 'Dados para criar uma nova empresa',
@@ -218,6 +220,7 @@ export class CompaniesController {
   }
 
   @Patch(':public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Atualizar uma empresa' })
   @ApiBody({
     description: 'Dados para atualizar uma empresa',
@@ -264,12 +267,14 @@ export class CompaniesController {
   }
 
   @Delete(':public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Remover uma empresa pelo public_id' })
   remove(@Param('public_id') public_id: string, @Req() req: AuthedRequest) {
     return this.companiesService.removeByPublicId(public_id, req.user.userId);
   }
 
   @Patch('/preferences-hidden-inactive-hours/:public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Alterar preferência ocultar horários inativos' })
   @ApiBody({
     description: 'Flag para ocultar horários inativos',
@@ -312,6 +317,7 @@ export class CompaniesController {
   }
 
   @Post('/:public_id/logo')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Enviar ou substituir o logo do estabelecimento' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -354,6 +360,7 @@ export class CompaniesController {
   }
 
   @Post('/:public_id/photos')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Enviar uma foto da arena (máx. 3)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -387,6 +394,7 @@ export class CompaniesController {
   }
 
   @Delete('/:public_id/photos/:imageId')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Remover uma foto da arena' })
   deletePhoto(
     @Param('public_id') publicId: string,

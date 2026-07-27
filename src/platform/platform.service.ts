@@ -7,8 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { format, getDaysInMonth } from 'date-fns';
 import { Company } from 'src/companies/entities/company.entity';
+import { AccessMode } from 'src/companies/enums/access-mode.enum';
+import { AccessReason } from 'src/companies/enums/access-reason.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
+import { buildCapabilities } from 'src/companies/utils/company-access';
 import { isTrialActive } from 'src/companies/utils/trial-expiry';
+import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { PersonRole } from 'src/people/enums/person-role.enum';
@@ -22,7 +26,9 @@ import {
   PlatformClientsSort,
 } from './dto/list-platform-clients-query.dto';
 import { MarkPlatformPaymentPaidDto } from './dto/mark-platform-payment-paid.dto';
+import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-access.dto';
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
+import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
 
 type PlatformClientListItem = {
   kind: 'company' | 'onboarding';
@@ -37,6 +43,9 @@ type PlatformClientListItem = {
   trialEndsAt: string | Date | null;
   firstAccessAt: string | Date | null;
   isTrial: boolean;
+  accessMode: AccessMode;
+  accessReason: string | null;
+  accessRestrictedAt: string | Date | null;
   createdAt: Date;
   dayDue: number | null;
   monthlyFee: number;
@@ -47,7 +56,6 @@ type PlatformClientListItem = {
     pricePerCourt: number;
     /** Alias da mensalidade calculada (compat). */
     price: number;
-    isPendence: boolean;
   } | null;
   owner: {
     publicId: string;
@@ -99,6 +107,8 @@ export class PlatformService {
     private readonly paymentsRepository: Repository<PaymentCompany>,
     @InjectRepository(Plan)
     private readonly plansRepository: Repository<Plan>,
+    @InjectRepository(Court)
+    private readonly courtsRepository: Repository<Court>,
   ) {}
 
   async listClients(query: ListPlatformClientsQueryDto) {
@@ -307,10 +317,9 @@ export class PlatformService {
       company.trial_ends_at = new Date(dto.trialEndsAt);
     }
 
-    // Contratar plano tira do estado expired / reativa o partner.
+    // Contratar plano promocional tira do estado expired / reativa o partner.
     if (
       plan.id !== PlanEnum.FREE &&
-      plan.id !== PlanEnum.PENDENCE &&
       (company.partner_status === PartnerStatus.EXPIRED ||
         company.partner_status === PartnerStatus.INACTIVE)
     ) {
@@ -320,6 +329,57 @@ export class PlatformService {
 
     await this.companiesRepository.save(company);
     return this.getClient(publicId);
+  }
+
+  async updateClientAccess(
+    publicId: string,
+    dto: UpdatePlatformClientAccessDto,
+  ) {
+    const company = await this.findCompanyByPublicId(publicId);
+
+    if (dto.accessMode === AccessMode.READ_ONLY) {
+      company.access_mode = AccessMode.READ_ONLY;
+      company.access_reason =
+        dto.reason ?? AccessReason.DELINQUENCY;
+      company.access_restricted_at = new Date();
+    } else {
+      company.access_mode = AccessMode.FULL;
+      company.access_reason = null;
+      company.access_restricted_at = null;
+    }
+
+    await this.companiesRepository.save(company);
+    return this.getClient(publicId);
+  }
+
+  async setCourtVisibility(
+    companyPublicId: string,
+    courtPublicId: string,
+    dto: UpdatePlatformCourtVisibilityDto,
+  ) {
+    const company = await this.findCompanyByPublicId(companyPublicId);
+    const court = await this.courtsRepository.findOne({
+      where: {
+        public_id: courtPublicId,
+        company_id: company.id,
+      },
+    });
+    if (!court) {
+      throw new NotFoundException('Quadra não encontrada.');
+    }
+
+    court.show = dto.show;
+    await this.courtsRepository.save(court);
+
+    const visibleCount = await this.courtsRepository.count({
+      where: { company_id: company.id, show: true },
+    });
+    await this.companiesRepository.update(
+      { id: company.id },
+      { is_active: visibleCount > 0 },
+    );
+
+    return this.getClient(companyPublicId);
   }
 
   private async expireDueTrials(): Promise<void> {
@@ -494,6 +554,9 @@ export class PlatformService {
       trialEndsAt: null,
       firstAccessAt: null,
       isTrial: false,
+      accessMode: AccessMode.FULL,
+      accessReason: null,
+      accessRestrictedAt: null,
       createdAt: person.created_at,
       dayDue: null,
       monthlyFee: 0,
@@ -544,8 +607,9 @@ export class PlatformService {
             basePrice,
             pricePerCourt,
             price: monthlyFee,
-            isPendence: planId === PlanEnum.PENDENCE,
           };
+
+    const caps = buildCapabilities(company);
 
     return {
       kind: 'company',
@@ -554,11 +618,14 @@ export class PlatformService {
       slug: company.slug,
       city: company.city || null,
       uf: company.uf || null,
-      onPortal: Boolean(company.is_active),
+      onPortal: Boolean(company.is_active) && caps.portalEligible,
       partnerStatus,
       trialEndsAt: company.trial_ends_at ?? null,
       firstAccessAt: company.first_access_at ?? null,
       isTrial,
+      accessMode: caps.accessMode,
+      accessReason: caps.accessReason,
+      accessRestrictedAt: company.access_restricted_at ?? null,
       createdAt: company.created_at,
       dayDue: company.day_due,
       monthlyFee: expired ? 0 : monthlyFee,

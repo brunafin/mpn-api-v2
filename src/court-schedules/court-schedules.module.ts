@@ -8,6 +8,7 @@ import { Court } from 'src/courts/entities/court.entity';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { PublicCourtSchedulesController } from './public-court-schedules.controller';
 import { Company } from 'src/companies/entities/company.entity';
+import { CompanyAccessModule } from 'src/companies/company-access.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { Company } from 'src/companies/entities/company.entity';
       Reservation,
       Company,
     ]),
+    CompanyAccessModule,
   ],
   controllers: [CourtSchedulesController, PublicCourtSchedulesController],
   providers: [CourtSchedulesService],

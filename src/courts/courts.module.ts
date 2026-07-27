@@ -5,9 +5,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Court } from './entities/court.entity';
 import { Company } from 'src/companies/entities/company.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
+import { CompanyAccessModule } from 'src/companies/company-access.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Court, Company, OperatingSchedule])],
+  imports: [
+    TypeOrmModule.forFeature([Court, Company, OperatingSchedule]),
+    CompanyAccessModule,
+  ],
   controllers: [CourtsController],
   providers: [CourtsService],
 })

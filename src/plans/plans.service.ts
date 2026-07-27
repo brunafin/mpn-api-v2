@@ -12,10 +12,7 @@ import { UpdatePlanDto } from './dto/update-plan.dto';
 import { Plan } from './entities/plan.entity';
 import { PlanEnum } from './enum/enum';
 
-const SYSTEM_PLAN_IDS = new Set<number>([
-  PlanEnum.FREE,
-  PlanEnum.PENDENCE,
-]);
+const SYSTEM_PLAN_IDS = new Set<number>([PlanEnum.FREE]);
 
 type PlanResponse = {
   id: number;

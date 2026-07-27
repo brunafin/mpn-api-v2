@@ -19,9 +19,7 @@ export const getStatusCourtSchedule = (
   if (courtSchedule.is_fixed) {
     return ReservationStatusEnum.FIXED;
   }
-  if (courtSchedule.reservation && courtSchedule.reservation.is_prepaid) {
-    return ReservationStatusEnum.PREPAID;
-  }
+  // Prepago foi removido do produto (D3): qualquer reserva pontual = reserved.
   if (courtSchedule.reservation) {
     return ReservationStatusEnum.RESERVED;
   }

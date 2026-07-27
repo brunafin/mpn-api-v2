@@ -10,10 +10,7 @@ export function isEligibleForAutoParcel(company: {
 }): boolean {
   if (company.partner_status !== PartnerStatus.ACTIVE) return false;
   if (!company.plan_id) return false;
-  if (
-    company.plan_id === PlanEnum.FREE ||
-    company.plan_id === PlanEnum.PENDENCE
-  ) {
+  if (company.plan_id === PlanEnum.FREE) {
     return false;
   }
   if (isTrialActive(company.trial_ends_at)) return false;

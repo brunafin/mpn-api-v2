@@ -13,12 +13,9 @@ describe('isEligibleForAutoParcel', () => {
     expect(isEligibleForAutoParcel(base)).toBe(true);
   });
 
-  it('rejeita FREE, PENDENCE, trial e não-active', () => {
+  it('rejeita FREE, trial e não-active', () => {
     expect(
       isEligibleForAutoParcel({ ...base, plan_id: PlanEnum.FREE }),
-    ).toBe(false);
-    expect(
-      isEligibleForAutoParcel({ ...base, plan_id: PlanEnum.PENDENCE }),
     ).toBe(false);
     expect(
       isEligibleForAutoParcel({

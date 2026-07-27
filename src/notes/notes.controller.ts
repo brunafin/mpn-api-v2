@@ -13,6 +13,7 @@ import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 import { CounterQueryDto } from './dto/counter-query.dto';
 import { NotesByDateQueryDto } from './dto/notes-by-date-query.dto';
 
@@ -28,6 +29,7 @@ export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 
   @Post()
+  @UseGuards(WriteAccessGuard)
   create(
     @Body() createNoteDto: CreateNoteDto,
     @Req() req: AuthedRequest,
@@ -53,6 +55,7 @@ export class NotesController {
   }
 
   @Patch(':id')
+  @UseGuards(WriteAccessGuard)
   update(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.notesService.update(+id, req.user.userId);
   }

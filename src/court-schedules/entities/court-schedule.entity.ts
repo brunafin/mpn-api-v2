@@ -44,6 +44,11 @@ export class CourtSchedule {
   @Expose()
   available: boolean;
 
+  /** true = inativado pelo "Fechar o dia" (não por ação avulsa). */
+  @Column({ type: 'boolean', default: false })
+  @Expose()
+  closed_by_day: boolean;
+
   @Column({ type: 'numeric', precision: 10, scale: 2 })
   @Expose()
   price: number;

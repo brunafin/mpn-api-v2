@@ -15,7 +15,9 @@ import { PlatformAdminGuard } from 'src/common/guards/platform-admin.guard';
 import { CreatePlatformPaymentDto } from './dto/create-platform-payment.dto';
 import { ListPlatformClientsQueryDto } from './dto/list-platform-clients-query.dto';
 import { MarkPlatformPaymentPaidDto } from './dto/mark-platform-payment-paid.dto';
+import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-access.dto';
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
+import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
 import { PlatformService } from './platform.service';
 
 @Controller('platform')
@@ -44,6 +46,31 @@ export class PlatformController {
     @Body() dto: UpdatePlatformClientPlanDto,
   ) {
     return this.platformService.updateClientPlan(companyPublicId, dto);
+  }
+
+  @Patch('clients/:companyPublicId/access')
+  @ApiOperation({
+    summary: 'Restringir ou liberar escrita no manager (inadimplência)',
+  })
+  updateClientAccess(
+    @Param('companyPublicId') companyPublicId: string,
+    @Body() dto: UpdatePlatformClientAccessDto,
+  ) {
+    return this.platformService.updateClientAccess(companyPublicId, dto);
+  }
+
+  @Patch('clients/:companyPublicId/courts/:courtPublicId/visibility')
+  @ApiOperation({ summary: 'Mostrar ou ocultar quadra no portal público' })
+  setCourtVisibility(
+    @Param('companyPublicId') companyPublicId: string,
+    @Param('courtPublicId') courtPublicId: string,
+    @Body() dto: UpdatePlatformCourtVisibilityDto,
+  ) {
+    return this.platformService.setCourtVisibility(
+      companyPublicId,
+      courtPublicId,
+      dto,
+    );
   }
 
   @Post('clients/:companyPublicId/payments')

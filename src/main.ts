@@ -5,8 +5,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import createDatabaseIfNotExists from './database-init';
 import helmet from 'helmet';
+import { assertDeploySecurityGuards } from './security/assert-deploy-security';
 
 async function bootstrap() {
+  assertDeploySecurityGuards();
   await createDatabaseIfNotExists();
 
   const app = await NestFactory.create(AppModule);

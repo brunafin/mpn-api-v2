@@ -128,7 +128,7 @@ export class MercadoPagoService {
 
   /**
    * Valida x-signature do webhook Mercado Pago.
-   * Se o secret não estiver configurado, aceita (dev) mas loga aviso.
+   * Sem secret configurado → rejeita (nunca aceitar webhook sem HMAC).
    */
   validateWebhookSignature(params: {
     xSignature: string | undefined;
@@ -136,10 +136,10 @@ export class MercadoPagoService {
     dataId: string | undefined;
   }): boolean {
     if (!this.webhookSecret) {
-      this.logger.warn(
-        'MERCADOPAGO_WEBHOOK_SECRET ausente — webhook aceito sem validação.',
+      this.logger.error(
+        'MERCADOPAGO_WEBHOOK_SECRET ausente — webhook rejeitado.',
       );
-      return true;
+      return false;
     }
     if (!params.xSignature || !params.dataId) {
       return false;

@@ -15,7 +15,6 @@ import { JwtService } from '@nestjs/jwt';
 import { Company } from 'src/companies/entities/company.entity';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { shouldExpireTrialCompany } from 'src/companies/utils/trial-expiry';
-import { PlanEnum } from 'src/plans/enum/enum';
 import { PersonRole } from 'src/people/enums/person-role.enum';
 import { EmailService } from 'src/email/email.service';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
@@ -74,23 +73,8 @@ export class AuthService {
       await this.expireTrialIfNeeded(company);
     }
 
-    const isExpired =
-      role !== PersonRole.PLATFORM_ADMIN &&
-      company?.partner_status === PartnerStatus.EXPIRED;
-    if (isExpired) {
-      throw new UnauthorizedException(
-        'Seu período de teste expirou. Entre em contato para contratar um plano. WhatsApp (51)989589197',
-      );
-    }
-
-    const isPendence =
-      role !== PersonRole.PLATFORM_ADMIN &&
-      company?.plan_id === PlanEnum.PENDENCE;
-    if (isPendence) {
-      throw new UnauthorizedException(
-        'Sua conta está com pendência. Por favor, regularize sua situação para continuar utilizando nossos serviços. WhatsApp para contato (51)989589197',
-      );
-    }
+    // Trial expirado e restrição read_only não bloqueiam login:
+    // o manager decide via capabilities (CTA / somente leitura).
 
     const defaultPassword = process.env.DEFAULT_PASSWORD;
     if (!defaultPassword) {

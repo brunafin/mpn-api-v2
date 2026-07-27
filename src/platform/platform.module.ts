@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Company } from 'src/companies/entities/company.entity';
+import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
@@ -9,7 +10,7 @@ import { PlatformService } from './platform.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Company, Person, PaymentCompany, Plan]),
+    TypeOrmModule.forFeature([Company, Person, PaymentCompany, Plan, Court]),
   ],
   controllers: [PlatformController],
   providers: [PlatformService],

@@ -14,8 +14,9 @@ import { CreateBatchGoogleCourtDto } from './dto/createBatch-google_court.dto';
 // import { UpdateGoogleCourtDto } from './dto/update-google_court.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { PlatformAdminGuard } from 'src/common/guards/platform-admin.guard';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), PlatformAdminGuard)
 @ApiBearerAuth()
 @Controller('google-courts')
 export class GoogleCourtsController {

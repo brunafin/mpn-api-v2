@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { UrlQueryParamOperatingScheduleDto } from './dto/url-query-operating-schedule.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 
 type AuthedRequest = {
   user: { userId: string };
@@ -34,6 +35,7 @@ export class OperatingScheduleController {
   ) {}
 
   @Post()
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Criar um horário de funcionamento' })
   @ApiBody({
     description: 'Dados para criar um novo horário de funcionamento',

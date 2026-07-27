@@ -21,6 +21,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
 
 type AuthedRequest = {
   user: { userId: string; email?: string };
@@ -34,6 +35,7 @@ export class CourtsController {
   constructor(private readonly courtsService: CourtsService) {}
 
   @Post()
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Criar uma quadra' })
   @ApiBody({
     description: 'Dados para criar uma nova quadra',
@@ -169,6 +171,7 @@ export class CourtsController {
   }
 
   @Patch(':public_id/visibility')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Mostrar ou ocultar a quadra no site público' })
   @ApiBody({ type: UpdateCourtVisibilityDto })
   setVisibility(
@@ -184,6 +187,7 @@ export class CourtsController {
   }
 
   @Patch(':public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Atualizar uma quadra pelo public_id' })
   @ApiBody({
     description: 'Dados para atualizar uma quadra',
@@ -202,6 +206,7 @@ export class CourtsController {
   }
 
   @Delete(':public_id')
+  @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Remover uma quadra pelo public_id' })
   remove(@Param('public_id') public_id: string, @Req() req: AuthedRequest) {
     return this.courtsService.removeByPublicId(public_id, req.user.userId);
