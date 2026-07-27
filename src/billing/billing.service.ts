@@ -25,6 +25,7 @@ import {
   BillingPixPayload,
   BillingSummary,
 } from './billing.types';
+import { normalizeCpf } from 'src/utils/normalize-cpf';
 
 const BRAZIL_TZ = 'America/Sao_Paulo';
 
@@ -215,7 +216,7 @@ export class BillingService {
       );
     }
 
-    let cpf = this.normalizeCpf(owner.cpf) ?? this.normalizeCpf(cpfFromBody);
+    let cpf = normalizeCpf(owner.cpf) ?? normalizeCpf(cpfFromBody);
     if (!cpf) {
       throw new UnprocessableEntityException({
         code: 'CPF_REQUIRED',
@@ -223,7 +224,7 @@ export class BillingService {
       });
     }
 
-    if (!owner.cpf || this.normalizeCpf(owner.cpf) !== cpf) {
+    if (!owner.cpf || normalizeCpf(owner.cpf) !== cpf) {
       owner.cpf = cpf;
       await this.peopleRepository.save(owner);
     }
@@ -439,12 +440,5 @@ export class BillingService {
         : null,
       mpPaymentId: payment.mp_payment_id ?? null,
     };
-  }
-
-  private normalizeCpf(value: string | null | undefined): string | null {
-    if (!value) return null;
-    const digits = value.replace(/\D/g, '');
-    if (digits.length !== 11) return null;
-    return digits;
   }
 }

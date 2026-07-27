@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsOptional,
@@ -27,6 +28,19 @@ export class SignupDto {
     message: 'Telefone deve ter 10 ou 11 dígitos.',
   })
   phone?: string;
+
+  @ApiProperty({
+    example: '52998224725',
+    description: 'CPF do responsável (11 dígitos). Usado no PIX das mensalidades.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\D/g, '') : value,
+  )
+  @IsString()
+  @Matches(/^\d{11}$/, {
+    message: 'CPF deve ter 11 dígitos.',
+  })
+  cpf: string;
 
   @ApiProperty({ example: 'Senha@123' })
   @IsString()

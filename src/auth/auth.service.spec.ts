@@ -73,6 +73,7 @@ describe('AuthService', () => {
         name: 'João',
         email: 'JOAO@Email.com',
         phone: '(51) 99999-9999',
+        cpf: '529.982.247-25',
         password: STRONG_PASSWORD,
       });
 
@@ -80,6 +81,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           email: 'joao@email.com',
           phone: '51999999999',
+          cpf: '52998224725',
         }),
       );
       expect(verificationRepo.save).toHaveBeenCalledWith(
@@ -94,7 +96,24 @@ describe('AuthService', () => {
 
     it('rejeita senha fraca', async () => {
       await expect(
-        service.signup({ name: 'João', email: 'a@b.com', password: '123' }),
+        service.signup({
+          name: 'João',
+          email: 'a@b.com',
+          cpf: '52998224725',
+          password: '123',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
+    });
+
+    it('rejeita CPF inválido', async () => {
+      await expect(
+        service.signup({
+          name: 'João',
+          email: 'a@b.com',
+          cpf: '123',
+          password: STRONG_PASSWORD,
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
     });
@@ -108,6 +127,7 @@ describe('AuthService', () => {
         service.signup({
           name: 'João',
           email: 'a@b.com',
+          cpf: '52998224725',
           password: STRONG_PASSWORD,
         }),
       ).rejects.toBeInstanceOf(ConflictException);
@@ -122,6 +142,7 @@ describe('AuthService', () => {
       const result = await service.signup({
         name: 'João',
         email: 'a@b.com',
+        cpf: '52998224725',
         password: STRONG_PASSWORD,
       });
 

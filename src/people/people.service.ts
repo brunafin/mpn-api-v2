@@ -122,6 +122,7 @@ export class PeopleService {
     name: string;
     email: string;
     phone?: string;
+    cpf?: string;
     passwordHash: string;
   }): Promise<Person> {
     const username = await this.generateUniqueUsername(input.email);
@@ -129,6 +130,7 @@ export class PeopleService {
       name: input.name,
       email: input.email,
       phone: input.phone,
+      cpf: input.cpf,
       username,
       password: input.passwordHash,
       status: false,

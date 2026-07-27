@@ -18,6 +18,7 @@ import { shouldExpireTrialCompany } from 'src/companies/utils/trial-expiry';
 import { PersonRole } from 'src/people/enums/person-role.enum';
 import { EmailService } from 'src/email/email.service';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
+import { normalizeCpf } from 'src/utils/normalize-cpf';
 import { EmailVerification } from './entities/email-verification.entity';
 import { SignupDto } from './dto/signup.dto';
 
@@ -200,11 +201,17 @@ export class AuthService {
       };
     }
 
+    const cpf = normalizeCpf(dto.cpf);
+    if (!cpf) {
+      throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
+    }
+
     const passwordHash = await this.peopleService.hashPassword(dto.password);
     const person = await this.peopleService.createInactiveOwner({
       name,
       email,
       phone: dto.phone?.replace(/\D/g, '') || undefined,
+      cpf,
       passwordHash,
     });
 

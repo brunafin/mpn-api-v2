@@ -14,15 +14,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = 'Ocorreu um erro inesperado';
+    let message: string | Record<string, unknown> = 'Ocorreu um erro inesperado';
     let errorDetails: string | null = null;
+    let code: string | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const responseObject = exceptionResponse as any;
+        const responseObject = exceptionResponse as Record<string, unknown>;
 
         // ✅ Tratamento especial para 401
         if (status === HttpStatus.UNAUTHORIZED) {
@@ -35,14 +36,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
             message = 'Acesso expirado';
           } else {
             // se for outro Unauthorized, mantém a mensagem que você definiu
-            message = responseObject.message ?? message;
+            message =
+              (responseObject.message as string | Record<string, unknown>) ??
+              message;
           }
         } else {
           // outros erros normais
-          message = responseObject.message ?? message;
+          message =
+            (responseObject.message as string | Record<string, unknown>) ??
+            message;
         }
 
-        errorDetails = responseObject.error ?? null;
+        if (typeof responseObject.code === 'string') {
+          code = responseObject.code;
+        }
+        errorDetails =
+          typeof responseObject.error === 'string'
+            ? responseObject.error
+            : null;
       } else if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       }
@@ -56,6 +67,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       statusCode: status,
       message,
+      ...(code ? { code } : {}),
       ...(errorDetails ? { error: errorDetails } : {}),
       timestamp: new Date().toISOString(),
     });
