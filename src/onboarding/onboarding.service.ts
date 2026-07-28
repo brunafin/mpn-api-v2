@@ -15,11 +15,11 @@ import { Person } from 'src/people/entities/person.entity';
 import { CourtSchedulesService } from 'src/court-schedules/court-schedules.service';
 import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 import { JwtService } from '@nestjs/jwt';
-import { format } from 'date-fns';
 import { slugify } from 'src/utils/slugify';
 import { EntityManager } from 'typeorm';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { PlanEnum } from 'src/plans/enum/enum';
+import { addDaysToDateKey, todayDateKey } from 'src/utils/calendarDate';
 
 const POPULATE_DAYS_AHEAD = 89;
 
@@ -140,13 +140,24 @@ export class OnboardingService {
           );
           courts.push(court);
 
+          const priceBySlot = new Map<string, number>();
+          for (const slot of courtDto.priceSlots ?? []) {
+            if (!(Number(slot.price) > 0)) continue;
+            priceBySlot.set(
+              `${slot.day_of_week_ref}|${slot.hour}`,
+              Number(slot.price),
+            );
+          }
+
           const operatingRows = dto.weekTemplate.flatMap((day) =>
             day.hours.map((hour) =>
               manager.getRepository(OperatingSchedule).create({
                 court_id: court.id,
                 day_of_week_id: dayIdByRef.get(day.day_of_week_ref)!,
                 hour,
-                price: courtDto.price,
+                price:
+                  priceBySlot.get(`${day.day_of_week_ref}|${hour}`) ??
+                  courtDto.price,
                 is_active: true,
                 is_fixed: false,
               }),
@@ -271,11 +282,8 @@ export class OnboardingService {
   }
 
   private async populateSchedulesBackground(courts: Court[]) {
-    const today = new Date();
-    const endDate = new Date();
-    endDate.setDate(today.getDate() + POPULATE_DAYS_AHEAD);
-    const start = format(today, 'yyyy-MM-dd');
-    const end = format(endDate, 'yyyy-MM-dd');
+    const start = todayDateKey();
+    const end = addDaysToDateKey(start, POPULATE_DAYS_AHEAD);
 
     for (const court of courts) {
       try {

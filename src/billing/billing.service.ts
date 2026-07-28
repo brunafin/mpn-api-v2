@@ -81,7 +81,10 @@ export class BillingService {
     const month = today.getMonth() + 1;
 
     const companies = await this.companiesRepository.find({
-      where: { partner_status: PartnerStatus.ACTIVE },
+      where: {
+        partner_status: PartnerStatus.ACTIVE,
+        is_trial: false,
+      },
       relations: { plan: true, courts: true },
     });
 
@@ -169,7 +172,10 @@ export class BillingService {
     });
 
     const history = payments.map((p) => this.mapPaymentItem(p, hasCpf));
-    const openPayment = history.find((p) => !p.paid) ?? null;
+    // Em trial, parcela de contratação não aparece como "mensalidade em aberto".
+    const openPayment = isTrial
+      ? null
+      : (history.find((p) => !p.paid) ?? null);
 
     return {
       openPayment,

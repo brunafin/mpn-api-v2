@@ -416,6 +416,10 @@ export class CompaniesService {
           });
         })(),
         day_due: company?.day_due || null,
+        isTrial: Boolean(company.is_trial),
+        trialEndsAt: company.trial_ends_at
+          ? new Date(company.trial_ends_at).toISOString()
+          : null,
         history:
           company.payments?.map((payment) => ({
             date: payment.dt_payment ?? fallbackDate,

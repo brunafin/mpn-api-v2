@@ -84,10 +84,11 @@ describe('OnboardingService', () => {
     const reposByEntity = new Map<
       unknown,
       {
-        create: jest.Mock;
-        save: jest.Mock;
+        create?: jest.Mock;
+        save?: jest.Mock;
         findOne?: jest.Mock;
         exist?: jest.Mock;
+        update?: jest.Mock;
       }
     >([
       [
@@ -101,6 +102,7 @@ describe('OnboardingService', () => {
       ],
       [Court, { create: jest.fn((x) => x), save: courtSave }],
       [OperatingSchedule, { create: jest.fn((x) => x), save: operatingSave }],
+      [Person, { update: jest.fn().mockResolvedValue(undefined) }],
     ]);
     const manager = {
       getRepository: (entity: unknown) => reposByEntity.get(entity),
@@ -285,6 +287,39 @@ describe('OnboardingService', () => {
       expect.objectContaining({ companyPublicId: 'company-uuid' }),
     );
     expect(result.access_token).toBe('new-jwt-token');
+  });
+
+  it('aplica priceSlots personalizados por dia/hora na grade', async () => {
+    mockValidLookups();
+    operatingSave.mockClear();
+    courtSave.mockClear();
+
+    await service.complete(OWNER_PUBLIC_ID, {
+      ...baseDto,
+      courts: [
+        {
+          name: 'Q1',
+          sports: ['Futsal'],
+          floor: 'madeira',
+          price: 100,
+          priceSlots: [
+            { day_of_week_ref: 1, hour: '08:00', price: 100 },
+            { day_of_week_ref: 1, hour: '09:00', price: 150 },
+            { day_of_week_ref: 2, hour: '08:00', price: 120 },
+          ],
+        },
+      ],
+    });
+
+    const rows = operatingSave.mock.calls[0][0] as OperatingSchedule[];
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ hour: '08:00', price: 100 }),
+        expect.objectContaining({ hour: '09:00', price: 150 }),
+        expect.objectContaining({ hour: '08:00', price: 120 }),
+      ]),
+    );
+    expect(rows.find((r) => r.hour === '09:00')?.price).toBe(150);
   });
 
   it('retorna schedulesPopulated=false quando o populate falha', async () => {

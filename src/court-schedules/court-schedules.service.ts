@@ -29,6 +29,14 @@ import { addHours, format, parse } from 'date-fns';
 import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
+import {
+  addDaysToDateKey,
+  dateKeyToUtcDate,
+  eachDateKeyInclusive,
+  toDateKey,
+  todayDateKey,
+  weekdayRefFromDateKey,
+} from 'src/utils/calendarDate';
 
 export enum ReservationStatusEnum {
   FIXED = 'fixed',
@@ -81,13 +89,7 @@ export class CourtSchedulesService {
 
   /** Normaliza date de query (string | Date) para YYYY-MM-DD. */
   private toDateKey(date?: Date | string): string {
-    if (!date) {
-      return new Date().toISOString().split('T')[0];
-    }
-    if (date instanceof Date) {
-      return date.toISOString().split('T')[0];
-    }
-    return String(date).slice(0, 10);
+    return toDateKey(date);
   }
 
   invalidatePublicListingCache(): void {
@@ -171,15 +173,15 @@ export class CourtSchedulesService {
           throw new Error('Não existe horário de funcionamento para a quadra');
         }
 
-        const startDate = new Date(start_date);
-        const endDate = new Date(end_date);
+        const startKey = toDateKey(start_date);
+        const endKey = toDateKey(end_date);
+        const startDate = dateKeyToUtcDate(startKey);
+        const endDate = dateKeyToUtcDate(endKey);
         const newsCourtSchedule: CreateCourtScheduleDto[] = [];
         const reservationsToCreate: Partial<Reservation>[] = [];
 
-        const currentDate = new Date(startDate);
-
-        while (currentDate <= endDate) {
-          const weekdayRef = currentDate.getDay();
+        for (const dateKey of eachDateKeyInclusive(startKey, endKey)) {
+          const weekdayRef = weekdayRefFromDateKey(dateKey);
 
           const operatingScheduleOfDay = operating_schedule
             .map((item) => ({
@@ -206,7 +208,7 @@ export class CourtSchedulesService {
               .padStart(2, '0')}`;
 
             const newCourtSchedule: CreateCourtScheduleDto = {
-              date: new Date(currentDate.toISOString().split('T')[0]),
+              date: dateKeyToUtcDate(dateKey),
               start_hour: startHour,
               end_hour: endHour,
               day_of_week_id: operatingSchedule.weekday_id,
@@ -222,8 +224,6 @@ export class CourtSchedulesService {
             };
             newsCourtSchedule.push(newCourtSchedule);
           }
-
-          currentDate.setDate(currentDate.getDate() + 1);
         }
 
         let createdSchedules;
@@ -239,15 +239,14 @@ export class CourtSchedulesService {
 
           const existingKeys = new Set(
             existingSchedules.map((s) => {
-              const dateObj = new Date(s.date);
               const [hour, minute] = s.start_hour.split(':');
               const startHour = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
-              return `${dateObj.toISOString().split('T')[0]}-${startHour}`;
+              return `${toDateKey(s.date)}-${startHour}`;
             }),
           );
 
           const filteredSchedules = newsCourtSchedule.filter((s) => {
-            const dateStr = s.date.toISOString().split('T')[0];
+            const dateStr = toDateKey(s.date);
             const [hour, minute] = s.start_hour.split(':');
             const startHour = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
             const key = `${dateStr}-${startHour}`;
@@ -323,9 +322,8 @@ export class CourtSchedulesService {
       },
       relations: { company: true },
     });
-    const today = new Date();
-    const endDate = new Date();
-    endDate.setDate(today.getDate() + 89);
+    const todayKey = todayDateKey();
+    const endKey = addDaysToDateKey(todayKey, 89);
 
     console.log(
       `Iniciando verificação de horários faltantes para ${courts.length} quadras (companies ativas)`,
@@ -337,8 +335,8 @@ export class CourtSchedulesService {
         relations: { day_of_week: true },
       });
 
-      for (let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)) {
-        const weekdayRef = d.getDay();
+      for (const dateKey of eachDateKeyInclusive(todayKey, endKey)) {
+        const weekdayRef = weekdayRefFromDateKey(dateKey);
 
         const expectedSlots = operatingSchedule.filter(
           (os) => os.day_of_week.ref === weekdayRef,
@@ -352,20 +350,19 @@ export class CourtSchedulesService {
           await this.courtSchedulesRepository.count({
             where: {
               court_id: court.id,
-              date: new Date(d.toISOString().split('T')[0]),
+              date: dateKeyToUtcDate(dateKey),
             },
           });
 
         if (existingSchedulesCount < expectedSlots.length) {
-          const dateStr = d.toISOString().split('T')[0];
           try {
-            await this.populateCourtSchedule(court.id, dateStr, dateStr);
+            await this.populateCourtSchedule(court.id, dateKey, dateKey);
             console.log(
-              `Criados horários faltantes para quadra ${court.id} no dia ${dateStr}`,
+              `Criados horários faltantes para quadra ${court.id} no dia ${dateKey}`,
             );
           } catch (error) {
             console.error(
-              `Erro ao popular quadra ${court.id} no dia ${dateStr}:`,
+              `Erro ao popular quadra ${court.id} no dia ${dateKey}:`,
               error.message,
             );
           }
@@ -1460,8 +1457,7 @@ export class CourtSchedulesService {
     const end_hour = format(endTime, 'HH:mm');
 
     // Parse local (Y, M-1, D) — evita UTC midnight virar D-1 em America/Sao_Paulo.
-    const [y, m, d] = dateKey.split('-').map(Number);
-    const day_of_week_id = new Date(y, m - 1, d).getDay() + 1;
+    const day_of_week_id = weekdayRefFromDateKey(dateKey) + 1;
 
     const schedule: CreateCourtScheduleDto = {
       start_hour: body.start_hour,

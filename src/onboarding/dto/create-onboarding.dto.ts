@@ -32,6 +32,26 @@ export class OnboardingDayDto {
   hours: string[];
 }
 
+export class OnboardingPriceSlotDto {
+  @ApiProperty({
+    description: 'Dia da semana (0=Domingo ... 6=Sábado)',
+    example: 1,
+  })
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  day_of_week_ref: number;
+
+  @ApiProperty({ example: '18:00' })
+  @IsString()
+  hour: string;
+
+  @ApiProperty({ description: 'Preço deste slot', example: 150 })
+  @IsNumber()
+  @Min(0)
+  price: number;
+}
+
 export class OnboardingCourtDto {
   @ApiProperty({ example: 'Q1' })
   @IsString()
@@ -63,6 +83,18 @@ export class OnboardingCourtDto {
   @IsNumber()
   @Min(0)
   price: number;
+
+  @ApiProperty({
+    type: [OnboardingPriceSlotDto],
+    required: false,
+    description:
+      'Preços personalizados por dia/hora. Ausente = usa price em todos os slots.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OnboardingPriceSlotDto)
+  priceSlots?: OnboardingPriceSlotDto[];
 }
 
 export class CreateOnboardingDto {

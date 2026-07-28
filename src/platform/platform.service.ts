@@ -243,6 +243,11 @@ export class PlatformService {
     if (!company.plan_id) {
       throw new BadRequestException('Cliente sem plano associado.');
     }
+    if (isCompanyOnTrial(company) || company.plan_id === PlanEnum.FREE) {
+      throw new BadRequestException(
+        'Cliente em período de teste não recebe mensalidade. Encerre o trial ou use a contratação.',
+      );
+    }
 
     const dueDate = this.buildDueDate(
       dto.year,

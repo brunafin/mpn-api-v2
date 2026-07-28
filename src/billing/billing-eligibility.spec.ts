@@ -21,7 +21,24 @@ describe('isEligibleForAutoParcel', () => {
     expect(
       isEligibleForAutoParcel({
         ...base,
+        plan_id: PlanEnum.FREE,
+        is_trial: true,
+      }),
+    ).toBe(false);
+    expect(
+      isEligibleForAutoParcel({
+        ...base,
         partner_status: PartnerStatus.EXPIRED,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejeita is_trial mesmo com plano comercial', () => {
+    expect(
+      isEligibleForAutoParcel({
+        ...base,
+        plan_id: 99,
+        is_trial: true,
       }),
     ).toBe(false);
   });
