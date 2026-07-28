@@ -4,11 +4,16 @@ import { PersonRole } from 'src/people/enums/person-role.enum';
 import {
   Column,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
+@Index('UQ_person_cpf', ['cpf'], {
+  unique: true,
+  where: '"cpf" IS NOT NULL',
+})
 @Entity()
 export class Person {
   @PrimaryGeneratedColumn()

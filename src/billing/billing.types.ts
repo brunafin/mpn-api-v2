@@ -22,6 +22,8 @@ export type BillingSummary = {
   monthlyFee: number;
   dayDue: number | null;
   isTrial: boolean;
+  /** ISO da data de fim do teste. */
+  trialEndsAt: string;
   pixEnabled: boolean;
 };
 

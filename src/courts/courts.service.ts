@@ -87,9 +87,17 @@ export class CourtsService {
 
   async findAllByCompanyId(companyPublicId: string, ownerPublicId: string) {
     await this.assertCompanyPublicIdOwnedBy(companyPublicId, ownerPublicId);
-    return this.courtRepository.find({
+    const courts = await this.courtRepository.find({
       where: { company: { public_id: companyPublicId } },
+      select: { id: true, name: true, public_id: true },
     });
+    // Retorna plain object com `id` (excluído na entity via @Exclude) para o
+    // manager usar no select de horário / quick-create.
+    return courts.map((court) => ({
+      id: court.id,
+      name: court.name,
+      public_id: court.public_id,
+    }));
   }
 
   findAllForOwner(ownerPublicId: string) {

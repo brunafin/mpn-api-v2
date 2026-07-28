@@ -16,6 +16,7 @@ describe('company-access', () => {
     const company = {
       partner_status: PartnerStatus.ACTIVE,
       plan_id: PlanEnum.FREE,
+      is_trial: true,
       trial_ends_at: future,
       access_mode: AccessMode.FULL,
     };
@@ -28,6 +29,7 @@ describe('company-access', () => {
     const company = {
       partner_status: PartnerStatus.EXPIRED,
       plan_id: null,
+      is_trial: false,
       trial_ends_at: past,
       access_mode: AccessMode.FULL,
     };
@@ -36,11 +38,23 @@ describe('company-access', () => {
     expect(buildCapabilities(company).canViewAgenda).toBe(false);
   });
 
-  it('pagante read_only vê agenda mas não muta e pode pagar', () => {
+  it('pago com data de trial no passado não é trial', () => {
     const company = {
       partner_status: PartnerStatus.ACTIVE,
       plan_id: 10,
-      trial_ends_at: null,
+      is_trial: false,
+      trial_ends_at: past,
+      access_mode: AccessMode.FULL,
+    };
+    expect(resolveEntitlement(company)).toBe('paid');
+  });
+
+  it('pagante read_only vê agenda mas não muta, não aparece no portal e pode pagar', () => {
+    const company = {
+      partner_status: PartnerStatus.ACTIVE,
+      plan_id: 10,
+      is_trial: false,
+      trial_ends_at: past,
       access_mode: AccessMode.READ_ONLY,
       access_reason: 'delinquency',
     };
@@ -49,6 +63,17 @@ describe('company-access', () => {
     expect(caps.canViewAgenda).toBe(true);
     expect(caps.canMutate).toBe(false);
     expect(caps.canPayBilling).toBe(true);
-    expect(caps.portalEligible).toBe(true);
+    expect(caps.portalEligible).toBe(false);
+  });
+
+  it('pagante full permanece elegível ao portal', () => {
+    const company = {
+      partner_status: PartnerStatus.ACTIVE,
+      plan_id: 10,
+      is_trial: false,
+      trial_ends_at: past,
+      access_mode: AccessMode.FULL,
+    };
+    expect(buildCapabilities(company).portalEligible).toBe(true);
   });
 });

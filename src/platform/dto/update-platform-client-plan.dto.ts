@@ -21,13 +21,13 @@ export class UpdatePlatformClientPlanDto {
   @Max(28)
   dayDue?: number;
 
-  /** Se true, encerra o trial imediatamente. */
+  /** Se true, encerra o trial imediatamente (mantém trial_ends_at como histórico). */
   @IsOptional()
   @IsBoolean()
   endTrial?: boolean;
 
-  /** Atualiza ou redefine trial (ISO date). Null limpa. */
+  /** Atualiza a data de fim do trial (ISO). Nunca limpa — use endTrial para encerrar. */
   @IsOptional()
   @IsDateString()
-  trialEndsAt?: string | null;
+  trialEndsAt?: string;
 }

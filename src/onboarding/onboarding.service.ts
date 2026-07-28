@@ -112,6 +112,7 @@ export class OnboardingService {
             // Trial de 3 meses começa na conclusão do onboarding (não no cadastro).
             first_access_at: firstAccessAt,
             trial_ends_at: trialEndsAt,
+            is_trial: true,
             plan_id: PlanEnum.FREE,
           }),
         );

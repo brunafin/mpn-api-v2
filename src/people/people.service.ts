@@ -94,6 +94,10 @@ export class PeopleService {
     return this.peopleRepository.findOne({ where: { email } });
   }
 
+  findByCpf(cpf: string): Promise<Person | null> {
+    return this.peopleRepository.findOne({ where: { cpf } });
+  }
+
   private async generateUniqueUsername(email: string): Promise<string> {
     const base =
       email

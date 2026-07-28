@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { PeopleService } from '../people/people.service';
 import { EmailService } from '../email/email.service';
 import { EmailVerification } from './entities/email-verification.entity';
+import { Company } from '../companies/entities/company.entity';
 
 jest.mock('bcrypt');
 
@@ -28,6 +29,7 @@ describe('AuthService', () => {
 
     peopleService = {
       findByEmail: jest.fn(),
+      findByCpf: jest.fn().mockResolvedValue(null),
       hashPassword: jest.fn().mockResolvedValue('hashed'),
       createInactiveOwner: jest.fn(),
       activate: jest.fn(),
@@ -45,6 +47,10 @@ describe('AuthService', () => {
       create: jest.fn((v) => v),
       findOne: jest.fn(),
     };
+    const companyRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,6 +61,10 @@ describe('AuthService', () => {
         {
           provide: getRepositoryToken(EmailVerification),
           useValue: verificationRepo,
+        },
+        {
+          provide: getRepositoryToken(Company),
+          useValue: companyRepo,
         },
       ],
     }).compile();
@@ -131,6 +141,20 @@ describe('AuthService', () => {
           password: STRONG_PASSWORD,
         }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejeita CPF já cadastrado', async () => {
+      peopleService.findByEmail.mockResolvedValue(null);
+      peopleService.findByCpf.mockResolvedValue({ id: 2 } as never);
+      await expect(
+        service.signup({
+          name: 'João',
+          email: 'a@b.com',
+          cpf: '52998224725',
+          password: STRONG_PASSWORD,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
     });
 
     it('retoma cadastro pendente reenviando o código', async () => {

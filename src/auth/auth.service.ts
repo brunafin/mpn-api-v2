@@ -107,10 +107,15 @@ export class AuthService {
     if (!shouldExpireTrialCompany(company)) return;
     await this.companyRepository.update(
       { id: company.id },
-      { partner_status: PartnerStatus.EXPIRED, plan_id: null },
+      {
+        partner_status: PartnerStatus.EXPIRED,
+        plan_id: null,
+        is_trial: false,
+      },
     );
     company.partner_status = PartnerStatus.EXPIRED;
     company.plan_id = null;
+    company.is_trial = false;
   }
 
   private generateCode(): string {
@@ -204,6 +209,11 @@ export class AuthService {
     const cpf = normalizeCpf(dto.cpf);
     if (!cpf) {
       throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
+    }
+
+    const existingCpf = await this.peopleService.findByCpf(cpf);
+    if (existingCpf) {
+      throw new ConflictException('Já existe uma conta com este CPF.');
     }
 
     const passwordHash = await this.peopleService.hashPassword(dto.password);

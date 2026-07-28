@@ -6,12 +6,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { format, getDaysInMonth } from 'date-fns';
+import { BillingService } from 'src/billing/billing.service';
+import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { Company } from 'src/companies/entities/company.entity';
 import { AccessMode } from 'src/companies/enums/access-mode.enum';
 import { AccessReason } from 'src/companies/enums/access-reason.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { buildCapabilities } from 'src/companies/utils/company-access';
-import { isTrialActive } from 'src/companies/utils/trial-expiry';
+import {
+  endCompanyTrial,
+  isCompanyOnTrial,
+} from 'src/companies/utils/trial-expiry';
 import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
@@ -109,6 +114,8 @@ export class PlatformService {
     private readonly plansRepository: Repository<Plan>,
     @InjectRepository(Court)
     private readonly courtsRepository: Repository<Court>,
+    private readonly billingService: BillingService,
+    private readonly publicListingCache: PublicListingCache,
   ) {}
 
   async listClients(query: ListPlatformClientsQueryDto) {
@@ -289,6 +296,7 @@ export class PlatformService {
       payment.form_of_payment = 'PIX';
     }
     const saved = await this.paymentsRepository.save(payment);
+    await this.billingService.onPaymentApproved(saved.id);
     return this.mapPaymentHistoryItem(saved, company.day_due ?? 10);
   }
 
@@ -311,23 +319,33 @@ export class PlatformService {
       company.day_due = dto.dayDue;
     }
 
-    if (dto.endTrial) {
-      company.trial_ends_at = null;
-    } else if (dto.trialEndsAt) {
+    if (dto.trialEndsAt) {
       company.trial_ends_at = new Date(dto.trialEndsAt);
     }
 
-    // Contratar plano promocional tira do estado expired / reativa o partner.
-    if (
-      plan.id !== PlanEnum.FREE &&
-      (company.partner_status === PartnerStatus.EXPIRED ||
-        company.partner_status === PartnerStatus.INACTIVE)
-    ) {
-      company.partner_status = PartnerStatus.ACTIVE;
-      company.trial_ends_at = null;
+    if (plan.id === PlanEnum.FREE) {
+      if (dto.endTrial) {
+        endCompanyTrial(company);
+      } else {
+        company.is_trial = true;
+      }
+    } else {
+      // Plano comercial: sai do trial, mantém histórico da data.
+      if (isCompanyOnTrial(company) || dto.endTrial) {
+        endCompanyTrial(company);
+      } else {
+        company.is_trial = false;
+      }
+      if (
+        company.partner_status === PartnerStatus.EXPIRED ||
+        company.partner_status === PartnerStatus.INACTIVE
+      ) {
+        company.partner_status = PartnerStatus.ACTIVE;
+      }
     }
 
     await this.companiesRepository.save(company);
+    this.publicListingCache.clear();
     return this.getClient(publicId);
   }
 
@@ -349,6 +367,7 @@ export class PlatformService {
     }
 
     await this.companiesRepository.save(company);
+    this.publicListingCache.clear();
     return this.getClient(publicId);
   }
 
@@ -378,6 +397,7 @@ export class PlatformService {
       { id: company.id },
       { is_active: visibleCount > 0 },
     );
+    this.publicListingCache.clear();
 
     return this.getClient(companyPublicId);
   }
@@ -389,8 +409,9 @@ export class PlatformService {
       .set({
         partner_status: PartnerStatus.EXPIRED,
         plan_id: null,
+        is_trial: false,
       })
-      .where('trial_ends_at IS NOT NULL')
+      .where('is_trial = true')
       .andWhere('trial_ends_at <= NOW()')
       .andWhere('partner_status = :active', {
         active: PartnerStatus.ACTIVE,
@@ -589,7 +610,7 @@ export class PlatformService {
     const partnerStatus =
       company.partner_status ?? PartnerStatus.ACTIVE;
     const expired = partnerStatus === PartnerStatus.EXPIRED;
-    const isTrial = isTrialActive(company.trial_ends_at) && !expired;
+    const isTrial = isCompanyOnTrial(company) && !expired;
     const basePrice = Number(company.plan?.base_price ?? 0);
     const pricePerCourt = Number(company.plan?.price_per_court ?? 0);
     const monthlyFee = computeMonthlyFee({
@@ -620,7 +641,7 @@ export class PlatformService {
       uf: company.uf || null,
       onPortal: Boolean(company.is_active) && caps.portalEligible,
       partnerStatus,
-      trialEndsAt: company.trial_ends_at ?? null,
+      trialEndsAt: company.trial_ends_at,
       firstAccessAt: company.first_access_at ?? null,
       isTrial,
       accessMode: caps.accessMode,

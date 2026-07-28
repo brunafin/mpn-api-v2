@@ -18,8 +18,7 @@ import { StorageService } from 'src/storage/storage.service';
 import { CompanyImage } from 'src/company-images/entities/company-image.entity';
 import { randomUUID } from 'crypto';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
-import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
-import { isTrialActive } from 'src/companies/utils/trial-expiry';
+import { computeMonthlyFee, quotePlanPrices } from 'src/plans/utils/compute-monthly-fee';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { buildCapabilities } from 'src/companies/utils/company-access';
 
@@ -34,7 +33,7 @@ const PHOTO_MAX_COUNT = 3;
 export interface IReservationItemProps {
   scheduleId: string;
   status: ReservationStatusEnum;
-  date: Date;
+  date: string;
   court: string;
   time: string;
   customerName: string | null;
@@ -108,7 +107,10 @@ export class CompaniesService {
     ownerPublicId: string,
   ): Promise<IReservationItemProps[]> {
     await this.assertCompanyOwnedBy(publicId, ownerPublicId);
-    const dateKey = new Date(date).toISOString().split('T')[0];
+    const dateKey =
+      typeof date === 'string'
+        ? date.slice(0, 10)
+        : new Date(date).toISOString().split('T')[0];
     const cacheKey = `agenda:${publicId}:${dateKey}`;
 
     return this.publicListingCache.getOrSet(
@@ -124,7 +126,10 @@ export class CompaniesService {
     ownerPublicId: string,
   ): Promise<{ schedules: IReservationItemProps[]; isDayClosed: boolean }> {
     await this.assertCompanyOwnedBy(publicId, ownerPublicId);
-    const dateKey = new Date(date).toISOString().split('T')[0];
+    const dateKey =
+      typeof date === 'string'
+        ? date.slice(0, 10)
+        : new Date(date).toISOString().split('T')[0];
     const cacheKey = `agenda-all:${publicId}:${dateKey}`;
 
     return this.publicListingCache.getOrSet(
@@ -221,7 +226,16 @@ export class CompaniesService {
             .map((schedule) => ({
               scheduleId: schedule.public_id,
               status: getStatusCourtSchedule(schedule),
-              date: schedule.date,
+              date:
+                typeof schedule.date === 'string'
+                  ? String(schedule.date).slice(0, 10)
+                  : format(
+                      new Date(
+                        schedule.date.getTime() +
+                          schedule.date.getTimezoneOffset() * 60_000,
+                      ),
+                      'yyyy-MM-dd',
+                    ),
               court: court.name,
               time: schedule.start_hour.slice(0, 5),
               customerName: schedule.reservation?.contact_name ?? null,
@@ -293,6 +307,7 @@ export class CompaniesService {
         'company.preferences_is_hidden_inactive_hours',
         'company.day_due',
         'company.trial_ends_at',
+        'company.is_trial',
         'company.partner_status',
         'company.plan_id',
         'company.access_mode',
@@ -392,14 +407,14 @@ export class CompaniesService {
           company.partner_status === PartnerStatus.EXPIRED
             ? 'Expirado'
             : company.plan?.name || 'Gratuito (Teste)',
-        price: computeMonthlyFee({
-          basePrice: company.plan?.base_price,
-          pricePerCourt: company.plan?.price_per_court,
-          courtsCount: courts.length,
-          isTrial:
-            company.partner_status !== PartnerStatus.EXPIRED &&
-            isTrialActive(company.trial_ends_at),
-        }),
+        price: (() => {
+          const { basePrice, pricePerCourt } = quotePlanPrices(company.plan);
+          return computeMonthlyFee({
+            basePrice,
+            pricePerCourt,
+            courtsCount: courts.length,
+          });
+        })(),
         day_due: company?.day_due || null,
         history:
           company.payments?.map((payment) => ({

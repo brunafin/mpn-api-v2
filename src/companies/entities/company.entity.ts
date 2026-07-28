@@ -119,10 +119,18 @@ export class Company {
   @Expose()
   partner_status: PartnerStatus;
 
-  /** Fim do trial de 3 meses; null se não estiver em trial. */
-  @Column({ type: 'timestamptz', nullable: true })
+  /**
+   * Fonte da verdade: está em período de teste agora.
+   * Independe de trial_ends_at (que fica como histórico).
+   */
+  @Column({ type: 'boolean', default: false })
   @Expose()
-  trial_ends_at: Date | null;
+  is_trial: boolean;
+
+  /** Fim do trial (quando acaba ou quando acabou). Sempre preenchido após onboarding. */
+  @Column({ type: 'timestamptz' })
+  @Expose()
+  trial_ends_at: Date;
 
   /** Primeiro acesso à agenda (quando o onboarding é concluído). */
   @Column({ type: 'timestamptz', nullable: true })
@@ -130,8 +138,9 @@ export class Company {
   first_access_at: Date | null;
 
   /**
-   * Controle de escrita no manager (independente do plano e do portal).
-   * read_only = inadimplência / restrição admin: vê agenda, não muta.
+   * Controle de escrita no manager.
+   * read_only = inadimplência / restrição admin: vê agenda, não muta;
+   * também sai do portal público (sem alterar court.show).
    */
   @Column({ type: 'varchar', length: 32, default: AccessMode.FULL })
   @Expose()

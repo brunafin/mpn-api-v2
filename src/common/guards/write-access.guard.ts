@@ -53,6 +53,7 @@ export class WriteAccessGuard implements CanActivate {
         'public_id',
         'partner_status',
         'plan_id',
+        'is_trial',
         'trial_ends_at',
         'access_mode',
       ],
@@ -68,6 +69,7 @@ export class WriteAccessGuard implements CanActivate {
     if (shouldExpireTrialCompany(company)) {
       company.partner_status = PartnerStatus.EXPIRED;
       company.plan_id = null;
+      company.is_trial = false;
       await this.companyRepository.save(company);
     }
 

@@ -23,6 +23,7 @@ import {
   IWhereToPlayCourtList,
 } from './interfaces';
 import { Company } from 'src/companies/entities/company.entity';
+import { AccessMode } from 'src/companies/enums/access-mode.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { addHours, format, parse } from 'date-fns';
 import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
@@ -140,7 +141,9 @@ export class CourtSchedulesService {
     const courtSchedule = this.courtSchedulesRepository.create(
       createCourtScheduleDto,
     );
-    return this.courtSchedulesRepository.save(courtSchedule);
+    const saved = await this.courtSchedulesRepository.save(courtSchedule);
+    this.publicListingCache.clear();
+    return saved;
   }
 
   async populateCourtSchedule(
@@ -951,6 +954,7 @@ export class CourtSchedulesService {
             is_active: true,
             partner_status: PartnerStatus.ACTIVE,
             plan_id: Not(IsNull()),
+            access_mode: AccessMode.FULL,
           },
         },
       },
@@ -1085,6 +1089,7 @@ export class CourtSchedulesService {
         is_active: true,
         partner_status: PartnerStatus.ACTIVE,
         plan_id: Not(IsNull()),
+        access_mode: AccessMode.FULL,
       },
       select: ['uf'],
       order: { uf: 'ASC' },
@@ -1111,6 +1116,7 @@ export class CourtSchedulesService {
         is_active: true,
         partner_status: PartnerStatus.ACTIVE,
         plan_id: Not(IsNull()),
+        access_mode: AccessMode.FULL,
         ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
       },
       select: ['city', 'uf'],
@@ -1144,6 +1150,9 @@ export class CourtSchedulesService {
         partnerStatus: PartnerStatus.ACTIVE,
       })
       .andWhere('company.plan_id IS NOT NULL')
+      .andWhere('company.access_mode = :accessMode', {
+        accessMode: AccessMode.FULL,
+      })
       .select('sport.id', 'id')
       .addSelect('sport.name', 'name')
       .distinct(true)
@@ -1194,6 +1203,9 @@ export class CourtSchedulesService {
         partnerStatus: PartnerStatus.ACTIVE,
       })
       .andWhere('company.plan_id IS NOT NULL')
+      .andWhere('company.access_mode = :accessMode', {
+        accessMode: AccessMode.FULL,
+      })
       .getOne();
 
     if (!company) {
@@ -1284,6 +1296,7 @@ export class CourtSchedulesService {
             is_active: true,
             partner_status: PartnerStatus.ACTIVE,
             plan_id: Not(IsNull()),
+            access_mode: AccessMode.FULL,
           },
         },
       },
@@ -1361,6 +1374,7 @@ export class CourtSchedulesService {
         is_active: true,
         partner_status: PartnerStatus.ACTIVE,
         plan_id: Not(IsNull()),
+        access_mode: AccessMode.FULL,
       },
       select: {
         slug: true,
@@ -1387,6 +1401,7 @@ export class CourtSchedulesService {
         is_active: true,
         partner_status: PartnerStatus.ACTIVE,
         plan_id: Not(IsNull()),
+        access_mode: AccessMode.FULL,
       },
       select: {
         name: true,
@@ -1417,10 +1432,11 @@ export class CourtSchedulesService {
     ownerPublicId: string,
   ) {
     await this.assertCourtOwnedBy(body.court_id, ownerPublicId);
+    const dateKey = this.toDateKey(body.date);
     const existingSchedule = await this.courtSchedulesRepository.findOne({
       where: {
         start_hour: body.start_hour,
-        date: new Date(body.date),
+        date: dateKey as unknown as Date,
         court_id: body.court_id,
       },
     });
@@ -1443,13 +1459,14 @@ export class CourtSchedulesService {
     const endTime = addHours(startTime, 1);
     const end_hour = format(endTime, 'HH:mm');
 
-    const dateObj = new Date(body.date);
-    const day_of_week_id = dateObj.getDay() + 1;
+    // Parse local (Y, M-1, D) — evita UTC midnight virar D-1 em America/Sao_Paulo.
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const day_of_week_id = new Date(y, m - 1, d).getDay() + 1;
 
     const schedule: CreateCourtScheduleDto = {
       start_hour: body.start_hour,
       end_hour,
-      date: new Date(body.date),
+      date: dateKey as unknown as Date,
       available: true,
       price: body.price ?? operatingSchedule?.price ?? 0,
       is_fixed: false,

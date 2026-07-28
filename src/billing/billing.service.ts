@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,14 +11,25 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { format, getDaysInMonth } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { Company } from 'src/companies/entities/company.entity';
+import { AccessMode } from 'src/companies/enums/access-mode.enum';
+import { AccessReason } from 'src/companies/enums/access-reason.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
-import { isTrialActive } from 'src/companies/utils/trial-expiry';
+import {
+  endCompanyTrial,
+  isCompanyOnTrial,
+} from 'src/companies/utils/trial-expiry';
+import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
-import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
-import { Repository } from 'typeorm';
+import { Plan } from 'src/plans/entities/plan.entity';
+import { PlanEnum } from 'src/plans/enum/enum';
+import {
+  computeMonthlyFee,
+  quotePlanPrices,
+} from 'src/plans/utils/compute-monthly-fee';
+import { ILike, IsNull, Repository } from 'typeorm';
 import { isEligibleForAutoParcel } from './billing-eligibility';
 import {
   BillingPaymentItem,
@@ -28,6 +40,7 @@ import {
 import { normalizeCpf } from 'src/utils/normalize-cpf';
 
 const BRAZIL_TZ = 'America/Sao_Paulo';
+const PROMOTIONAL_PLAN_NAME = 'Promocional';
 
 @Injectable()
 export class BillingService {
@@ -40,7 +53,10 @@ export class BillingService {
     private readonly paymentsRepository: Repository<PaymentCompany>,
     @InjectRepository(Person)
     private readonly peopleRepository: Repository<Person>,
+    @InjectRepository(Plan)
+    private readonly plansRepository: Repository<Plan>,
     private readonly mercadoPago: MercadoPagoService,
+    private readonly publicListingCache: PublicListingCache,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_5AM)
@@ -131,14 +147,17 @@ export class BillingService {
     ownerPublicId: string,
   ): Promise<BillingSummary> {
     const company = await this.findOwnedCompany(companyPublicId, ownerPublicId);
-    const isTrial =
-      company.partner_status !== PartnerStatus.EXPIRED &&
-      isTrialActive(company.trial_ends_at);
+    const isTrial = isCompanyOnTrial(company);
+    const quotePlan = this.needsPlanActivation(company)
+      ? await this.findPromotionalPlanOptional()
+      : company.plan;
+    const { basePrice, pricePerCourt } = quotePlanPrices(
+      quotePlan ?? company.plan,
+    );
     const monthlyFee = computeMonthlyFee({
-      basePrice: company.plan?.base_price,
-      pricePerCourt: company.plan?.price_per_court,
+      basePrice,
+      pricePerCourt,
       courtsCount: company.courts?.length ?? 0,
-      isTrial,
     });
 
     const hasCpf = Boolean(company.administrator?.cpf?.replace(/\D/g, ''));
@@ -150,9 +169,7 @@ export class BillingService {
     });
 
     const history = payments.map((p) => this.mapPaymentItem(p, hasCpf));
-    const openPayment =
-      history.find((p) => !p.paid) ??
-      null;
+    const openPayment = history.find((p) => !p.paid) ?? null;
 
     return {
       openPayment,
@@ -160,8 +177,84 @@ export class BillingService {
       monthlyFee,
       dayDue: company.day_due,
       isTrial,
+      trialEndsAt: new Date(company.trial_ends_at).toISOString(),
       pixEnabled: this.mercadoPago.isConfigured(),
     };
+  }
+
+  /**
+   * Contratação: cria (ou reusa) parcela do Promocional e gera PIX.
+   * Após o pagamento, onPaymentApproved vincula o plano e libera o produto.
+   */
+  async startContract(
+    companyPublicId: string,
+    ownerPublicId: string,
+    cpfFromBody?: string,
+  ): Promise<BillingPixPayload> {
+    if (!this.mercadoPago.isConfigured()) {
+      throw new UnprocessableEntityException({
+        code: 'PIX_UNAVAILABLE',
+        message:
+          'Pagamento PIX ainda não está disponível. Fale conosco no WhatsApp.',
+      });
+    }
+
+    const company = await this.findOwnedCompany(companyPublicId, ownerPublicId);
+    if (!this.needsPlanActivation(company)) {
+      throw new BadRequestException(
+        'Este estabelecimento já possui plano ativo. Use Mensalidades para pagar.',
+      );
+    }
+
+    const promotional = await this.findPromotionalPlan();
+    const { basePrice, pricePerCourt } = quotePlanPrices(promotional);
+    const price = computeMonthlyFee({
+      basePrice,
+      pricePerCourt,
+      courtsCount: company.courts?.length ?? 0,
+    });
+    if (price <= 0) {
+      throw new UnprocessableEntityException(
+        'Não foi possível calcular o valor do plano. Contate o suporte.',
+      );
+    }
+
+    let payment = await this.paymentsRepository.findOne({
+      where: {
+        company_id: company.id,
+        dt_payment: IsNull(),
+      },
+      order: { id: 'DESC' },
+    });
+
+    const today = toZonedTime(new Date(), BRAZIL_TZ);
+    if (!payment) {
+      payment = await this.paymentsRepository.save(
+        this.paymentsRepository.create({
+          company_id: company.id,
+          plan_id: promotional.id,
+          dt_due: this.buildDueDate(
+            today.getFullYear(),
+            today.getMonth() + 1,
+            Math.min(Math.max(today.getDate(), 1), 28),
+          ),
+          price,
+          form_of_payment: 'PIX',
+          dt_payment: null,
+        }),
+      );
+    } else {
+      payment.plan_id = promotional.id;
+      payment.price = price;
+      await this.paymentsRepository.save(payment);
+    }
+
+    return this.generatePix(
+      companyPublicId,
+      ownerPublicId,
+      payment.id,
+      cpfFromBody,
+    );
   }
 
   async getPaymentStatus(
@@ -177,7 +270,6 @@ export class BillingService {
       throw new NotFoundException('Parcela não encontrada.');
     }
 
-    // Se ainda há PIX pendente, consulta MP (polling do manager).
     if (!payment.dt_payment && payment.mp_payment_id) {
       await this.syncPaymentFromMercadoPago(payment);
     }
@@ -193,9 +285,11 @@ export class BillingService {
     cpfFromBody?: string,
   ): Promise<BillingPixPayload> {
     if (!this.mercadoPago.isConfigured()) {
-      throw new UnprocessableEntityException(
-        'Pagamento PIX ainda não está disponível. Contate o suporte.',
-      );
+      throw new UnprocessableEntityException({
+        code: 'PIX_UNAVAILABLE',
+        message:
+          'Pagamento PIX ainda não está disponível. Fale conosco no WhatsApp.',
+      });
     }
 
     const company = await this.findOwnedCompany(companyPublicId, ownerPublicId);
@@ -225,6 +319,12 @@ export class BillingService {
     }
 
     if (!owner.cpf || normalizeCpf(owner.cpf) !== cpf) {
+      const existingCpf = await this.peopleRepository.findOne({
+        where: { cpf },
+      });
+      if (existingCpf && existingCpf.id !== owner.id) {
+        throw new ConflictException('Já existe uma conta com este CPF.');
+      }
       owner.cpf = cpf;
       await this.peopleRepository.save(owner);
     }
@@ -295,6 +395,7 @@ export class BillingService {
       return false;
     }
     if (payment.dt_payment) {
+      await this.onPaymentApproved(payment.id);
       return true;
     }
 
@@ -305,6 +406,7 @@ export class BillingService {
     payment.form_of_payment = payment.form_of_payment || 'PIX';
     await this.paymentsRepository.save(payment);
     this.logger.log(`Parcela ${payment.id} marcada como paga via MP webhook.`);
+    await this.onPaymentApproved(payment.id);
     return true;
   }
 
@@ -316,6 +418,31 @@ export class BillingService {
       externalReference: remote.externalReference,
       status: remote.status,
     });
+  }
+
+  /**
+   * Efeitos após pagamento aprovado:
+   * - 1ª contratação (trial/expirado/sem plano pago) → vincula Promocional + libera
+   * - Demais → só desbloqueia inadimplência (read_only/delinquency)
+   */
+  async onPaymentApproved(paymentId: number): Promise<void> {
+    const payment = await this.paymentsRepository.findOne({
+      where: { id: paymentId },
+    });
+    if (!payment?.dt_payment) return;
+
+    const company = await this.companiesRepository.findOne({
+      where: { id: payment.company_id },
+      relations: { plan: true },
+    });
+    if (!company) return;
+
+    if (this.needsPlanActivation(company)) {
+      await this.activatePromotionalPlan(company, payment.dt_payment);
+      return;
+    }
+
+    await this.unlockDelinquencyIfNeeded(company);
   }
 
   private async syncPaymentFromMercadoPago(
@@ -330,7 +457,80 @@ export class BillingService {
       payment.dt_payment = new Date();
       payment.form_of_payment = payment.form_of_payment || 'PIX';
       await this.paymentsRepository.save(payment);
+      await this.onPaymentApproved(payment.id);
     }
+  }
+
+  /** Precisa da 1ª vinculação comercial (não é cliente pago ainda). */
+  private needsPlanActivation(company: Company): boolean {
+    if (isCompanyOnTrial(company)) return true;
+    if (company.partner_status === PartnerStatus.EXPIRED) return true;
+    if (company.partner_status === PartnerStatus.INACTIVE) return true;
+    if (company.plan_id == null) return true;
+    if (company.plan_id === PlanEnum.FREE) return true;
+    return false;
+  }
+
+  private async activatePromotionalPlan(
+    company: Company,
+    paidAt: Date,
+  ): Promise<void> {
+    const promotional = await this.findPromotionalPlan();
+    endCompanyTrial(company);
+    company.is_trial = false;
+    company.plan_id = promotional.id;
+    company.plan = promotional;
+    company.partner_status = PartnerStatus.ACTIVE;
+
+    const localPaid = toZonedTime(paidAt, BRAZIL_TZ);
+    company.day_due = Math.min(Math.max(localPaid.getDate(), 1), 28);
+
+    company.access_mode = AccessMode.FULL;
+    company.access_reason = null;
+    company.access_restricted_at = null;
+
+    await this.companiesRepository.save(company);
+    this.publicListingCache.clear();
+    this.logger.log(
+      `Company ${company.public_id} ativada no plano Promocional (day_due=${company.day_due}).`,
+    );
+  }
+
+  private async unlockDelinquencyIfNeeded(company: Company): Promise<void> {
+    if (company.access_mode !== AccessMode.READ_ONLY) return;
+    if (
+      company.access_reason &&
+      company.access_reason !== AccessReason.DELINQUENCY
+    ) {
+      return;
+    }
+
+    company.access_mode = AccessMode.FULL;
+    company.access_reason = null;
+    company.access_restricted_at = null;
+    await this.companiesRepository.save(company);
+    this.publicListingCache.clear();
+    this.logger.log(
+      `Company ${company.public_id} liberada de somente leitura (inadimplência).`,
+    );
+  }
+
+  private async findPromotionalPlan(): Promise<Plan> {
+    const plan = await this.plansRepository.findOne({
+      where: { name: ILike(PROMOTIONAL_PLAN_NAME) },
+    });
+    if (!plan) {
+      throw new NotFoundException(
+        'Plano Promocional não encontrado. Contate o suporte.',
+      );
+    }
+    return plan;
+  }
+
+  private async findPromotionalPlanOptional(): Promise<Plan | null> {
+    return this.plansRepository.findOne({
+      where: { name: ILike(PROMOTIONAL_PLAN_NAME) },
+    });
   }
 
   private async findOwnedCompany(

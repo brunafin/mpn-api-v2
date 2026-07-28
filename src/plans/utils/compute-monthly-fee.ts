@@ -1,10 +1,13 @@
 /**
  * Mensalidade = base + (quadras extras × preço por quadra).
  * A 1ª quadra entra na base; a partir da 2ª cobra price_per_court.
- * Em trial ativo, retorna 0.
+ * Em trial ativo, retorna 0 quando `isTrial` é true.
  *
  * Ex.: base 100, +10/quadra → 1 quadra = 100; 2 = 110; 3 = 120.
  */
+export const DEFAULT_QUOTE_BASE_PRICE = 100;
+export const DEFAULT_QUOTE_PRICE_PER_COURT = 10;
+
 export function computeMonthlyFee(params: {
   basePrice: number | string | null | undefined;
   pricePerCourt: number | string | null | undefined;
@@ -17,4 +20,23 @@ export function computeMonthlyFee(params: {
   const courts = Math.max(0, Number(params.courtsCount ?? 0));
   const extraCourts = Math.max(0, courts - 1);
   return Number((base + perCourt * extraCourts).toFixed(2));
+}
+
+/** Preços para cotação na UI quando a company não tem plano vinculado. */
+export function quotePlanPrices(plan?: {
+  base_price?: number | string | null;
+  price_per_court?: number | string | null;
+} | null): { basePrice: number; pricePerCourt: number } {
+  if (plan == null) {
+    return {
+      basePrice: DEFAULT_QUOTE_BASE_PRICE,
+      pricePerCourt: DEFAULT_QUOTE_PRICE_PER_COURT,
+    };
+  }
+  return {
+    basePrice: Number(plan.base_price ?? DEFAULT_QUOTE_BASE_PRICE),
+    pricePerCourt: Number(
+      plan.price_per_court ?? DEFAULT_QUOTE_PRICE_PER_COURT,
+    ),
+  };
 }

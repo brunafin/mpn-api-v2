@@ -39,19 +39,13 @@ export class NotesService {
       createNoteDto.companyPublicId,
       ownerPublicId,
     );
-    await this.notesRepository.save({
-      ...createNoteDto,
+    const dateKey = createNoteDto.date.slice(0, 10);
+    const noteFields = {
+      date: dateKey,
+      message: createNoteDto.message,
       company_id: company.id,
-    });
-    if (createNoteDto.is24HoursBefore) {
-      await this.notesRepository.save({
-        ...createNoteDto,
-        company_id: company.id,
-        date: new Date(
-          new Date(createNoteDto.date).getTime() - 24 * 60 * 60 * 1000,
-        ),
-      });
-    }
+    };
+    await this.notesRepository.save(noteFields);
     return { message: 'Lembrete criado com sucesso' };
   }
 
@@ -67,7 +61,7 @@ export class NotesService {
     const count = await this.notesRepository.count({
       where: {
         company_id: company.id,
-        date: new Date(formatted),
+        date: formatted as unknown as Date,
         is_read: false,
       },
     });
@@ -77,15 +71,19 @@ export class NotesService {
 
   async findByDate(
     companyPublicId: string,
-    date: Date,
+    date: string | Date,
     ownerPublicId: string,
   ) {
     const company = await this.getOwnedCompany(companyPublicId, ownerPublicId);
+    const dateKey =
+      typeof date === 'string'
+        ? date.slice(0, 10)
+        : date.toISOString().slice(0, 10);
     const notes = await this.notesRepository.find({
       select: ['id', 'sender', 'message', 'title'],
       where: {
         company_id: company.id,
-        date,
+        date: dateKey as unknown as Date,
         is_read: false,
       },
       order: {

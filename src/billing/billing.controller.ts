@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
 import { GenerateBillingPixDto } from './dto/generate-billing-pix.dto';
+import { StartBillingContractDto } from './dto/start-billing-contract.dto';
 
 type AuthedRequest = {
   user: { userId: string };
@@ -37,6 +38,23 @@ export class BillingController {
     return this.billingService.getBillingSummary(
       companyPublicId,
       req.user.userId,
+    );
+  }
+
+  @Post('contract')
+  @ApiOperation({
+    summary:
+      'Inicia contratação do plano Promocional (cria parcela + gera PIX)',
+  })
+  startContract(
+    @Param('companyPublicId') companyPublicId: string,
+    @Body() dto: StartBillingContractDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.billingService.startContract(
+      companyPublicId,
+      req.user.userId,
+      dto.cpf,
     );
   }
 
