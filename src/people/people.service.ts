@@ -128,6 +128,7 @@ export class PeopleService {
     phone?: string;
     cpf?: string;
     passwordHash: string;
+    termsAcceptedAt?: Date;
   }): Promise<Person> {
     const username = await this.generateUniqueUsername(input.email);
     const person = this.peopleRepository.create({
@@ -138,6 +139,7 @@ export class PeopleService {
       username,
       password: input.passwordHash,
       status: false,
+      terms_accepted_at: input.termsAcceptedAt ?? null,
     });
     return this.peopleRepository.save(person);
   }

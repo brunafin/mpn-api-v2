@@ -39,7 +39,10 @@ describe('AuthService', () => {
       updatePassword: jest.fn(),
       touchLastLoginAt: jest.fn().mockResolvedValue(undefined),
     };
-    emailService = { sendVerificationCodeEmail: jest.fn() };
+    emailService = {
+      sendVerificationCodeEmail: jest.fn(),
+      sendPasswordResetCodeEmail: jest.fn(),
+    };
     jwtService = { sign: jest.fn().mockReturnValue('jwt-token') };
     verificationRepo = {
       update: jest.fn(),
@@ -85,6 +88,7 @@ describe('AuthService', () => {
         phone: '(51) 99999-9999',
         cpf: '529.982.247-25',
         password: STRONG_PASSWORD,
+        acceptedTerms: true,
       });
 
       expect(peopleService.createInactiveOwner).toHaveBeenCalledWith(
@@ -92,10 +96,15 @@ describe('AuthService', () => {
           email: 'joao@email.com',
           phone: '51999999999',
           cpf: '52998224725',
+          termsAcceptedAt: expect.any(Date),
         }),
       );
       expect(verificationRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ person_id: 7, email: 'joao@email.com' }),
+        expect.objectContaining({
+          person_id: 7,
+          email: 'joao@email.com',
+          purpose: 'email_verification',
+        }),
       );
       expect(emailService.sendVerificationCodeEmail).toHaveBeenCalledWith(
         'joao@email.com',
@@ -111,6 +120,7 @@ describe('AuthService', () => {
           email: 'a@b.com',
           cpf: '52998224725',
           password: '123',
+          acceptedTerms: true,
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
@@ -123,6 +133,7 @@ describe('AuthService', () => {
           email: 'a@b.com',
           cpf: '123',
           password: STRONG_PASSWORD,
+          acceptedTerms: true,
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
@@ -139,6 +150,7 @@ describe('AuthService', () => {
           email: 'a@b.com',
           cpf: '52998224725',
           password: STRONG_PASSWORD,
+          acceptedTerms: true,
         }),
       ).rejects.toBeInstanceOf(ConflictException);
     });
@@ -152,6 +164,7 @@ describe('AuthService', () => {
           email: 'a@b.com',
           cpf: '52998224725',
           password: STRONG_PASSWORD,
+          acceptedTerms: true,
         }),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
@@ -168,6 +181,7 @@ describe('AuthService', () => {
         email: 'a@b.com',
         cpf: '52998224725',
         password: STRONG_PASSWORD,
+        acceptedTerms: true,
       });
 
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
@@ -430,6 +444,105 @@ describe('AuthService', () => {
 
       await expect(
         service.changePassword('person-1', STRONG_PASSWORD),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('não revela inexistência e não envia quando e-mail não existe', async () => {
+      peopleService.findByEmail.mockResolvedValue(null);
+      const result = await service.forgotPassword('a@b.com');
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+      expect(result.message).toMatch(/se houver uma conta ativa/i);
+    });
+
+    it('não envia quando a conta ainda não confirmou o e-mail', async () => {
+      peopleService.findByEmail.mockResolvedValue({
+        id: 7,
+        status: false,
+      } as never);
+      const result = await service.forgotPassword('a@b.com');
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+      expect(result.message).toMatch(/se houver uma conta ativa/i);
+    });
+
+    it('envia código de recuperação para conta ativa', async () => {
+      peopleService.findByEmail.mockResolvedValue({
+        id: 7,
+        status: true,
+      } as never);
+      await service.forgotPassword('A@B.com');
+      expect(verificationRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          person_id: 7,
+          email: 'a@b.com',
+          purpose: 'password_reset',
+        }),
+      );
+      expect(emailService.sendPasswordResetCodeEmail).toHaveBeenCalledWith(
+        'a@b.com',
+        expect.any(String),
+      );
+    });
+
+    it('aplica rate-limit quando o último código de reset é recente', async () => {
+      peopleService.findByEmail.mockResolvedValue({
+        id: 7,
+        status: true,
+      } as never);
+      verificationRepo.findOne.mockResolvedValue({
+        created_at: new Date(),
+      });
+      await expect(service.forgotPassword('a@b.com')).rejects.toThrow(/Aguarde/i);
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('redefine a senha com código válido', async () => {
+      verificationRepo.findOne.mockResolvedValue({
+        person_id: 7,
+        code: '123456',
+        expires_at: new Date(Date.now() + 60_000),
+        attempts: 0,
+        consumed_at: null,
+      });
+      peopleService.findByEmail.mockResolvedValue({
+        id: 7,
+        status: true,
+        password: 'old-hash',
+      } as never);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      peopleService.updatePassword.mockResolvedValue({ message: 'ok' });
+
+      const result = await service.resetPassword(
+        'a@b.com',
+        '123456',
+        STRONG_PASSWORD,
+      );
+
+      expect(peopleService.updatePassword).toHaveBeenCalledWith(7, 'new-hash');
+      expect(result.message).toMatch(/redefinida/i);
+    });
+
+    it('rejeita código inválido', async () => {
+      verificationRepo.findOne.mockResolvedValue({
+        person_id: 7,
+        code: '123456',
+        expires_at: new Date(Date.now() + 60_000),
+        attempts: 0,
+        consumed_at: null,
+      });
+      await expect(
+        service.resetPassword('a@b.com', '000000', STRONG_PASSWORD),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(peopleService.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('rejeita senha fraca', async () => {
+      await expect(
+        service.resetPassword('a@b.com', '123456', '123'),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

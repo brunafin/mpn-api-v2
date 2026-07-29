@@ -8,11 +8,11 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { EmailVerificationPurpose } from '../enums/email-verification-purpose.enum';
 
 /**
- * Código de verificação de e-mail enviado no cadastro do dono.
- * Uma linha por tentativa de verificação (o reenvio invalida a anterior
- * ao consumir/expirar e criar uma nova).
+ * Código de verificação enviado por e-mail (cadastro ou recuperação de senha).
+ * Uma linha por tentativa; o reenvio invalida a anterior ao consumir e criar nova.
  */
 @Entity({ name: 'email_verification' })
 export class EmailVerification {
@@ -25,6 +25,14 @@ export class EmailVerification {
 
   @Column({ type: 'char', length: 6 })
   code: string;
+
+  @Index()
+  @Column({
+    type: 'varchar',
+    length: 32,
+    default: EmailVerificationPurpose.EMAIL_VERIFICATION,
+  })
+  purpose: EmailVerificationPurpose;
 
   @Column({ type: 'timestamp' })
   expires_at: Date;

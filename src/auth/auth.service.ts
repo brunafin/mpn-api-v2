@@ -20,11 +20,15 @@ import { EmailService } from 'src/email/email.service';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
 import { normalizeCpf } from 'src/utils/normalize-cpf';
 import { EmailVerification } from './entities/email-verification.entity';
+import { EmailVerificationPurpose } from './enums/email-verification-purpose.enum';
 import { SignupDto } from './dto/signup.dto';
 
 const CODE_TTL_MINUTES = 15;
 const MAX_VERIFICATION_ATTEMPTS = 5;
 const RESEND_COOLDOWN_SECONDS = 30;
+
+const FORGOT_PASSWORD_GENERIC_MESSAGE =
+  'Se houver uma conta ativa com este e-mail, enviamos um código para redefinir a senha.';
 
 @Injectable()
 export class AuthService {
@@ -128,12 +132,14 @@ export class AuthService {
 
   /**
    * Rate-limit no servidor: impede reenviar um novo código antes de esgotar o
-   * cooldown, medido a partir do último código emitido para o dono. Evita spam
-   * de e-mails mesmo que o cooldown do cliente seja burlado.
+   * cooldown, medido a partir do último código emitido para o dono + finalidade.
    */
-  private async assertResendAllowed(personId: number): Promise<void> {
+  private async assertResendAllowed(
+    personId: number,
+    purpose: EmailVerificationPurpose,
+  ): Promise<void> {
     const last = await this.emailVerificationRepository.findOne({
-      where: { person_id: personId },
+      where: { person_id: personId, purpose },
       order: { created_at: 'DESC' },
     });
     if (!last) return;
@@ -148,13 +154,13 @@ export class AuthService {
     }
   }
 
-  private async issueVerificationCode(
+  private async issueCode(
     personId: number,
     email: string,
+    purpose: EmailVerificationPurpose,
   ): Promise<string> {
-    // Invalida códigos anteriores ainda não consumidos deste dono.
     await this.emailVerificationRepository.update(
-      { person_id: personId, consumed_at: IsNull() },
+      { person_id: personId, purpose, consumed_at: IsNull() },
       { consumed_at: new Date() },
     );
 
@@ -165,13 +171,59 @@ export class AuthService {
         person_id: personId,
         email,
         code,
+        purpose,
         expires_at,
         attempts: 0,
       }),
     );
 
-    await this.emailService.sendVerificationCodeEmail(email, code);
+    if (purpose === EmailVerificationPurpose.PASSWORD_RESET) {
+      await this.emailService.sendPasswordResetCodeEmail(email, code);
+    } else {
+      await this.emailService.sendVerificationCodeEmail(email, code);
+    }
     return code;
+  }
+
+  private async findPendingCode(
+    email: string,
+    purpose: EmailVerificationPurpose,
+  ): Promise<EmailVerification | null> {
+    return this.emailVerificationRepository.findOne({
+      where: { email, purpose, consumed_at: IsNull() },
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  private async assertValidPendingCode(
+    verification: EmailVerification | null,
+    code: string,
+  ): Promise<EmailVerification> {
+    if (!verification) {
+      throw new BadRequestException(
+        'Nenhum código pendente para este e-mail. Solicite um novo código.',
+      );
+    }
+
+    if (new Date() > verification.expires_at) {
+      throw new BadRequestException(
+        'Código expirado. Solicite um novo código.',
+      );
+    }
+
+    if (verification.attempts >= MAX_VERIFICATION_ATTEMPTS) {
+      throw new BadRequestException(
+        'Número máximo de tentativas excedido. Solicite um novo código.',
+      );
+    }
+
+    if (verification.code !== code?.trim()) {
+      verification.attempts += 1;
+      await this.emailVerificationRepository.save(verification);
+      throw new BadRequestException('Código inválido. Tente novamente.');
+    }
+
+    return verification;
   }
 
   async signup(dto: SignupDto): Promise<{ message: string; email: string }> {
@@ -197,8 +249,15 @@ export class AuthService {
 
       // Conta pendente (não verificada): retoma o cadastro reenviando o código
       // em vez de travar o usuário num 409 sem saída.
-      await this.assertResendAllowed(existing.id);
-      await this.issueVerificationCode(existing.id, email);
+      await this.assertResendAllowed(
+        existing.id,
+        EmailVerificationPurpose.EMAIL_VERIFICATION,
+      );
+      await this.issueCode(
+        existing.id,
+        email,
+        EmailVerificationPurpose.EMAIL_VERIFICATION,
+      );
       return {
         message:
           'Já havia um cadastro pendente para este e-mail. Enviamos um novo código de confirmação.',
@@ -223,9 +282,14 @@ export class AuthService {
       phone: dto.phone?.replace(/\D/g, '') || undefined,
       cpf,
       passwordHash,
+      termsAcceptedAt: new Date(),
     });
 
-    await this.issueVerificationCode(person.id, email);
+    await this.issueCode(
+      person.id,
+      email,
+      EmailVerificationPurpose.EMAIL_VERIFICATION,
+    );
 
     return {
       message:
@@ -239,38 +303,15 @@ export class AuthService {
     code: string,
   ): Promise<{ message: string }> {
     const email = this.normalizeEmail(rawEmail ?? '');
-    const verification = await this.emailVerificationRepository.findOne({
-      where: { email, consumed_at: IsNull() },
-      order: { created_at: 'DESC' },
-    });
+    const verification = await this.findPendingCode(
+      email,
+      EmailVerificationPurpose.EMAIL_VERIFICATION,
+    );
+    const valid = await this.assertValidPendingCode(verification, code);
 
-    if (!verification) {
-      throw new BadRequestException(
-        'Nenhum código pendente para este e-mail. Solicite um novo código.',
-      );
-    }
-
-    if (new Date() > verification.expires_at) {
-      throw new BadRequestException(
-        'Código expirado. Solicite um novo código.',
-      );
-    }
-
-    if (verification.attempts >= MAX_VERIFICATION_ATTEMPTS) {
-      throw new BadRequestException(
-        'Número máximo de tentativas excedido. Solicite um novo código.',
-      );
-    }
-
-    if (verification.code !== code?.trim()) {
-      verification.attempts += 1;
-      await this.emailVerificationRepository.save(verification);
-      throw new BadRequestException('Código inválido. Tente novamente.');
-    }
-
-    verification.consumed_at = new Date();
-    await this.emailVerificationRepository.save(verification);
-    await this.peopleService.activate(verification.person_id);
+    valid.consumed_at = new Date();
+    await this.emailVerificationRepository.save(valid);
+    await this.peopleService.activate(valid.person_id);
 
     return { message: 'E-mail confirmado com sucesso.' };
   }
@@ -287,12 +328,83 @@ export class AuthService {
       };
     }
 
-    await this.assertResendAllowed(person.id);
-    await this.issueVerificationCode(person.id, email);
+    await this.assertResendAllowed(
+      person.id,
+      EmailVerificationPurpose.EMAIL_VERIFICATION,
+    );
+    await this.issueCode(
+      person.id,
+      email,
+      EmailVerificationPurpose.EMAIL_VERIFICATION,
+    );
     return {
       message:
         'Se houver um cadastro pendente para este e-mail, enviamos um novo código.',
     };
+  }
+
+  async forgotPassword(rawEmail: string): Promise<{ message: string }> {
+    const email = this.normalizeEmail(rawEmail ?? '');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Informe um e-mail válido.');
+    }
+
+    const person = await this.peopleService.findByEmail(email);
+
+    // Resposta genérica: não revela se o e-mail existe ou se a conta está ativa.
+    if (!person || !person.status) {
+      return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+    }
+
+    await this.assertResendAllowed(
+      person.id,
+      EmailVerificationPurpose.PASSWORD_RESET,
+    );
+    await this.issueCode(
+      person.id,
+      email,
+      EmailVerificationPurpose.PASSWORD_RESET,
+    );
+    return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
+  }
+
+  async resetPassword(
+    rawEmail: string,
+    code: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    if (!isValidPassword(newPassword)) {
+      throw new BadRequestException(PASSWORD_HINT);
+    }
+
+    const email = this.normalizeEmail(rawEmail ?? '');
+    const verification = await this.findPendingCode(
+      email,
+      EmailVerificationPurpose.PASSWORD_RESET,
+    );
+    const valid = await this.assertValidPendingCode(verification, code);
+
+    const person = await this.peopleService.findByEmail(email);
+    if (!person || !person.status || person.id !== valid.person_id) {
+      throw new BadRequestException(
+        'Não foi possível redefinir a senha. Solicite um novo código.',
+      );
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, person.password);
+    if (isSamePassword) {
+      throw new BadRequestException(
+        'A nova senha não pode ser igual à senha atual.',
+      );
+    }
+
+    valid.consumed_at = new Date();
+    await this.emailVerificationRepository.save(valid);
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await this.peopleService.updatePassword(person.id, hashed);
+
+    return { message: 'Senha redefinida com sucesso. Faça login com a nova senha.' };
   }
 
   async changePassword(

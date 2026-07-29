@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  Equals,
   IsEmail,
   IsOptional,
   IsString,
@@ -47,6 +48,16 @@ export class SignupDto {
   @MinLength(8)
   @MaxLength(72)
   password: string;
+
+  @ApiProperty({
+    example: true,
+    description: 'Aceite dos Termos de Uso e da Política de Privacidade.',
+  })
+  @Transform(({ value }) => value === true || value === 'true')
+  @Equals(true, {
+    message: 'É necessário aceitar os Termos de Uso e a Política de Privacidade.',
+  })
+  acceptedTerms: boolean;
 }
 
 export class VerifyEmailDto {
@@ -83,6 +94,31 @@ export class ChangePasswordDto {
   @MinLength(1)
   @MaxLength(72)
   currentPassword?: string;
+}
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'joao@email.com' })
+  @IsEmail()
+  @MaxLength(100)
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: 'joao@email.com' })
+  @IsEmail()
+  @MaxLength(100)
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'Código deve ter 6 dígitos.' })
+  code: string;
+
+  @ApiProperty({ example: 'Senha@123' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  newPassword: string;
 }
 
 export class SignInDto {

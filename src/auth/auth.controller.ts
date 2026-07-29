@@ -23,6 +23,8 @@ import {
   VerifyEmailDto,
   ChangePasswordDto,
   SignInDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
 } from './dto/signup.dto';
 
 type AuthedRequest = {
@@ -64,6 +66,37 @@ export class AuthController {
   })
   resendCode(@Body() body: ResendCodeDto) {
     return this.authService.resendCode(body.email);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  @ApiOperation({
+    summary:
+      'Solicita código por e-mail para redefinir a senha (resposta genérica)',
+  })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Mensagem genérica (código enviado se a conta existir e estiver ativa)',
+  })
+  forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  @ApiOperation({
+    summary: 'Redefine a senha com o código recebido por e-mail',
+  })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: 200, description: 'Senha redefinida' })
+  @ApiResponse({ status: 400, description: 'Código inválido/expirado ou senha fraca' })
+  resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(
+      body.email,
+      body.code,
+      body.newPassword,
+    );
   }
 
   @HttpCode(HttpStatus.OK)

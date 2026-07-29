@@ -202,11 +202,13 @@ describe('Security remediation contracts', () => {
   });
 
   describe('Superfície pública intencional (não remover)', () => {
-    it('auth signup/login/verify/resend permanecem públicos', () => {
+    it('auth signup/login/verify/resend/forgot/reset permanecem públicos', () => {
       for (const method of [
         'signup',
         'verifyEmail',
         'resendCode',
+        'forgotPassword',
+        'resetPassword',
         'signIn',
       ] as const) {
         const guards = Reflect.getMetadata(

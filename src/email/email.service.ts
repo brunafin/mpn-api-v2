@@ -157,6 +157,45 @@ export class EmailService {
     }
   }
 
+  private generatePasswordResetCodeEmailHtml(code: string): string {
+    return `
+      <!DOCTYPE html>
+      <html lang="pt">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Recuperação de senha - Marca pra Nós</title>
+      </head>
+      <body style="font-family: sans-serif; text-align: center; color: #1a1a1a;">
+          <h1>Recuperação de senha</h1>
+          <p>Use o código abaixo para criar uma nova senha. Ele expira em 15 minutos.</p>
+          <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 24px 0;">
+            ${code}
+          </p>
+          <p style="color: #666;">Se você não pediu para redefinir a senha, ignore este e-mail.</p>
+          <p>Equipe Marca pra Nós</p>
+      </body>
+      </html>
+    `;
+  }
+
+  async sendPasswordResetCodeEmail(to: string, code: string): Promise<string> {
+    try {
+      await this.resend.emails.send({
+        from: `Marca pra Nós <${process.env.EMAIL_FROM}>`,
+        to,
+        subject: 'Código para redefinir sua senha - Marca pra Nós',
+        html: this.generatePasswordResetCodeEmailHtml(code),
+      });
+      return 'E-mail de recuperação de senha enviado com sucesso';
+    } catch (error) {
+      console.error('Erro ao enviar e-mail de recuperação de senha:', error);
+      throw new Error(
+        `Falha ao enviar e-mail de recuperação de senha: ${error.message}`,
+      );
+    }
+  }
+
   private escapeHtml(value: string): string {
     return value
       .replace(/&/g, '&amp;')

@@ -96,6 +96,11 @@ export class Person {
   @Expose()
   last_login_at: Date | null;
 
+  /** Aceite dos Termos de Uso e da Política de Privacidade no cadastro. */
+  @Column({ type: 'timestamptz', nullable: true })
+  @Expose()
+  terms_accepted_at: Date | null;
+
   @Column({ type: 'text' })
   @Exclude()
   password: string;
