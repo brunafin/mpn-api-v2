@@ -21,7 +21,7 @@ type PlanResponse = {
   basePrice: number;
   pricePerCourt: number;
   isSystem: boolean;
-  /** Plano FREE usado no trial de 3 meses. */
+  /** Plano FREE usado no trial de 2 meses. */
   isTrialPlan: boolean;
   createdAt: Date;
   updatedAt: Date;

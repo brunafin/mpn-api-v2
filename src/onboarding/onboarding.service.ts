@@ -93,7 +93,7 @@ export class OnboardingService {
 
         const firstAccessAt = new Date();
         const trialEndsAt = new Date(firstAccessAt);
-        trialEndsAt.setMonth(trialEndsAt.getMonth() + 3);
+        trialEndsAt.setMonth(trialEndsAt.getMonth() + 2);
 
         const company = await manager.getRepository(Company).save(
           manager.getRepository(Company).create({
@@ -109,7 +109,7 @@ export class OnboardingService {
             administrator_id: person.id,
             is_active: false,
             partner_status: PartnerStatus.ACTIVE,
-            // Trial de 3 meses começa na conclusão do onboarding (não no cadastro).
+            // Trial de 2 meses começa na conclusão do onboarding (não no cadastro).
             first_access_at: firstAccessAt,
             trial_ends_at: trialEndsAt,
             is_trial: true,
