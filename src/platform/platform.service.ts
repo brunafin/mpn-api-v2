@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,12 +20,13 @@ import {
 } from 'src/companies/utils/trial-expiry';
 import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
+import { cleanupPersonById } from 'src/people/cleanup-person';
 import { Person } from 'src/people/entities/person.entity';
 import { PersonRole } from 'src/people/enums/person-role.enum';
 import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CreatePlatformPaymentDto } from './dto/create-platform-payment.dto';
 import {
   ListPlatformClientsQueryDto,
@@ -114,6 +116,7 @@ export class PlatformService {
     private readonly plansRepository: Repository<Plan>,
     @InjectRepository(Court)
     private readonly courtsRepository: Repository<Court>,
+    private readonly dataSource: DataSource,
     private readonly billingService: BillingService,
     private readonly publicListingCache: PublicListingCache,
   ) {}
@@ -405,6 +408,62 @@ export class PlatformService {
     this.publicListingCache.clear();
 
     return this.getClient(companyPublicId);
+  }
+
+  /**
+   * Exclui o cliente por completo (person + companies + courts + agendas + reservas),
+   * no mesmo espírito do script `cleanup:person`.
+   *
+   * `publicId` pode ser o da company (cliente ativo) ou da person (onboarding).
+   */
+  async deleteClient(publicId: string) {
+    const company = await this.companiesRepository
+      .createQueryBuilder('company')
+      .leftJoinAndSelect('company.administrator', 'administrator')
+      .where('company.public_id = :uuid', { uuid: publicId })
+      .getOne();
+
+    let person: Person | null = null;
+
+    if (company) {
+      person = company.administrator ?? null;
+      if (!person) {
+        throw new BadRequestException(
+          'Cliente sem administrador associado; não é possível excluir.',
+        );
+      }
+    } else {
+      person = await this.peopleRepository.findOne({
+        where: { public_id: publicId, role: PersonRole.OWNER },
+        relations: ['companies'],
+      });
+      if (!person || (person.companies?.length ?? 0) > 0) {
+        throw new NotFoundException('Cliente não encontrado.');
+      }
+    }
+
+    if (person.role === PersonRole.PLATFORM_ADMIN) {
+      throw new ForbiddenException(
+        'Não é permitido excluir um administrador da plataforma.',
+      );
+    }
+
+    const result = await cleanupPersonById(this.dataSource, person.id);
+    this.publicListingCache.clear();
+
+    return {
+      ok: true as const,
+      person: {
+        publicId: result.person.public_id,
+        name: result.person.name,
+        email: result.person.email,
+      },
+      companies: result.companies.map((c) => ({
+        publicId: c.public_id,
+        name: c.name,
+      })),
+      deleted: result.deleted,
+    };
   }
 
   private async expireDueTrials(): Promise<void> {

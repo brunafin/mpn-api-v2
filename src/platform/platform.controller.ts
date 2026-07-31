@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Patch,
@@ -37,6 +39,16 @@ export class PlatformController {
   @ApiOperation({ summary: 'Detalhe de um cliente da plataforma' })
   getClient(@Param('companyPublicId') companyPublicId: string) {
     return this.platformService.getClient(companyPublicId);
+  }
+
+  @Delete('clients/:companyPublicId')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Excluir cliente por completo (dono, estabelecimento, quadras, agendas e reservas)',
+  })
+  deleteClient(@Param('companyPublicId') companyPublicId: string) {
+    return this.platformService.deleteClient(companyPublicId);
   }
 
   @Patch('clients/:companyPublicId/plan')
