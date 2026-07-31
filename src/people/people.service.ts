@@ -79,6 +79,8 @@ export class PeopleService {
       public_id: person.public_id,
       status: person.status,
       role: person.role,
+      cpf: person.cpf,
+      terms_accepted_at: person.terms_accepted_at,
       companies: person.companies,
     };
   }
@@ -91,11 +93,28 @@ export class PeopleService {
   }
 
   findByEmail(email: string): Promise<Person | null> {
-    return this.peopleRepository.findOne({ where: { email } });
+    return this.peopleRepository.findOne({
+      where: { email },
+      relations: ['companies'],
+    });
+  }
+
+  findByGoogleSub(googleSub: string): Promise<Person | null> {
+    return this.peopleRepository.findOne({
+      where: { google_sub: googleSub },
+      relations: ['companies'],
+    });
   }
 
   findByCpf(cpf: string): Promise<Person | null> {
     return this.peopleRepository.findOne({ where: { cpf } });
+  }
+
+  findByPublicIdWithCompanies(publicId: string): Promise<Person | null> {
+    return this.peopleRepository.findOne({
+      where: { public_id: publicId },
+      relations: ['companies'],
+    });
   }
 
   private async generateUniqueUsername(email: string): Promise<string> {
@@ -142,6 +161,50 @@ export class PeopleService {
       terms_accepted_at: input.termsAcceptedAt ?? null,
     });
     return this.peopleRepository.save(person);
+  }
+
+  /**
+   * Dono ativo via Google (e-mail já verificado pelo provedor).
+   * Termos/telefone ficam para o complete-profile; CPF só na conversão paga.
+   */
+  async createGoogleOwner(input: {
+    name: string;
+    email: string;
+    googleSub: string;
+  }): Promise<Person> {
+    const username = await this.generateUniqueUsername(input.email);
+    const person = this.peopleRepository.create({
+      name: input.name,
+      email: input.email,
+      username,
+      google_sub: input.googleSub,
+      password: null,
+      status: true,
+    });
+    return this.peopleRepository.save(person);
+  }
+
+  async linkGoogleSub(personId: number, googleSub: string): Promise<void> {
+    await this.peopleRepository.update(
+      { id: personId },
+      { google_sub: googleSub, status: true },
+    );
+  }
+
+  async completeOwnerProfile(
+    personId: number,
+    input: {
+      phone?: string;
+      termsAcceptedAt: Date;
+    },
+  ): Promise<void> {
+    const patch: Partial<Person> = {
+      terms_accepted_at: input.termsAcceptedAt,
+    };
+    if (input.phone) {
+      patch.phone = input.phone;
+    }
+    await this.peopleRepository.update({ id: personId }, patch);
   }
 
   async activate(personId: number): Promise<void> {

@@ -25,6 +25,8 @@ import {
   SignInDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  GoogleAuthDto,
+  CompleteProfileDto,
 } from './dto/signup.dto';
 
 type AuthedRequest = {
@@ -107,6 +109,39 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   signIn(@Body() signInDto: SignInDto) {
     return this.authService.signIn(signInDto.username, signInDto.password);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('google')
+  @ApiOperation({
+    summary:
+      'Login/cadastro com Google (id_token). Conta existente com senha exige password para vincular.',
+  })
+  @ApiBody({ type: GoogleAuthDto })
+  @ApiResponse({ status: 200, description: 'JWT emitido' })
+  @ApiResponse({
+    status: 401,
+    description: 'Token inválido ou GOOGLE_LINK_REQUIRED',
+  })
+  googleAuth(@Body() body: GoogleAuthDto) {
+    return this.authService.googleAuth(body);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @Post('complete-profile')
+  @ApiOperation({
+    summary:
+      'Após login Google: aceita termos e opcionalmente informa telefone de contato',
+  })
+  @ApiBody({ type: CompleteProfileDto })
+  @ApiResponse({ status: 200, description: 'Perfil completo + JWT atualizado' })
+  async completeProfile(
+    @Req() req: AuthedRequest,
+    @Body() body: CompleteProfileDto,
+  ) {
+    return this.authService.completeProfile(req.user.userId, body);
   }
 
   @HttpCode(HttpStatus.OK)

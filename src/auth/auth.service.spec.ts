@@ -30,8 +30,13 @@ describe('AuthService', () => {
     peopleService = {
       findByEmail: jest.fn(),
       findByCpf: jest.fn().mockResolvedValue(null),
+      findByGoogleSub: jest.fn(),
+      findByPublicIdWithCompanies: jest.fn(),
       hashPassword: jest.fn().mockResolvedValue('hashed'),
       createInactiveOwner: jest.fn(),
+      createGoogleOwner: jest.fn(),
+      linkGoogleSub: jest.fn(),
+      completeOwnerProfile: jest.fn(),
       activate: jest.fn(),
       findOneForAuth: jest.fn(),
       findOneByCompanyPublicId: jest.fn(),
@@ -322,13 +327,32 @@ describe('AuthService', () => {
         username: 'joao',
         public_id: 'pub-1',
         role: 'owner',
+        cpf: '52998224725',
+        terms_accepted_at: new Date(),
         companies: [],
       } as never);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.signIn('a@b.com', STRONG_PASSWORD);
-      expect(result).toEqual({ access_token: 'jwt-token' });
+      expect(result).toEqual({
+        access_token: 'jwt-token',
+        needsProfileCompletion: false,
+      });
       expect(peopleService.touchLastLoginAt).toHaveBeenCalledWith(1);
+    });
+
+    it('bloqueia login por senha em conta só-Google', async () => {
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 1,
+        status: true,
+        password: null,
+        email: 'a@b.com',
+        companies: [],
+      } as never);
+
+      await expect(service.signIn('a@b.com', STRONG_PASSWORD)).rejects.toThrow(
+        /google/i,
+      );
     });
 
     it('rejeita credenciais inválidas', async () => {
@@ -347,6 +371,8 @@ describe('AuthService', () => {
         username: 'joao',
         public_id: 'person-1',
         role: 'owner',
+        cpf: '52998224725',
+        terms_accepted_at: new Date(),
         companies: [{ public_id: 'company-1', name: 'Arena', plan_id: 1 }],
       } as never);
       (bcrypt.compare as jest.Mock)
@@ -361,8 +387,123 @@ describe('AuthService', () => {
           companyPublicId: 'company-1',
           updatedPassword: true,
           role: 'owner',
+          termsAccepted: true,
         }),
       );
+    });
+  });
+
+  describe('googleAuth', () => {
+    const googlePayload = {
+      sub: 'google-sub-1',
+      email: 'joao@gmail.com',
+      email_verified: true,
+      name: 'João Silva',
+    };
+
+    beforeEach(() => {
+      process.env.GOOGLE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
+      process.env.DEFAULT_PASSWORD = 'bemvindo';
+      jest
+        .spyOn(service as never, 'verifyGoogleIdToken' as never)
+        .mockResolvedValue(googlePayload as never);
+    });
+
+    it('cria dono novo e emite JWT com needsProfileCompletion', async () => {
+      peopleService.findByGoogleSub.mockResolvedValue(null);
+      peopleService.findByEmail.mockResolvedValue(null);
+      peopleService.createGoogleOwner.mockResolvedValue({
+        id: 9,
+        public_id: 'pub-g',
+        username: 'joao',
+        role: 'owner',
+        password: null,
+        cpf: null,
+        terms_accepted_at: null,
+        companies: [],
+      } as never);
+
+      const result = await service.googleAuth({ idToken: 'fake.jwt.token' });
+
+      expect(peopleService.createGoogleOwner).toHaveBeenCalledWith({
+        name: 'João Silva',
+        email: 'joao@gmail.com',
+        googleSub: 'google-sub-1',
+      });
+      expect(result.access_token).toBe('jwt-token');
+      expect(result.needsProfileCompletion).toBe(true);
+    });
+
+    it('exige senha para vincular conta ativa com senha local', async () => {
+      peopleService.findByGoogleSub.mockResolvedValue(null);
+      peopleService.findByEmail.mockResolvedValue({
+        id: 3,
+        status: true,
+        password: 'hashed',
+        google_sub: null,
+        email: 'joao@gmail.com',
+        companies: [],
+      } as never);
+
+      await expect(
+        service.googleAuth({ idToken: 'fake.jwt.token' }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'GOOGLE_LINK_REQUIRED' }),
+      });
+    });
+
+    it('vincula Google quando a senha da conta existente confere', async () => {
+      peopleService.findByGoogleSub.mockResolvedValue(null);
+      peopleService.findByEmail.mockResolvedValue({
+        id: 3,
+        status: true,
+        password: 'hashed',
+        google_sub: null,
+        email: 'joao@gmail.com',
+        public_id: 'pub-3',
+        username: 'joao',
+        role: 'owner',
+        cpf: '52998224725',
+        terms_accepted_at: new Date(),
+        companies: [],
+      } as never);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.googleAuth({
+        idToken: 'fake.jwt.token',
+        password: STRONG_PASSWORD,
+      });
+
+      expect(peopleService.linkGoogleSub).toHaveBeenCalledWith(
+        3,
+        'google-sub-1',
+      );
+      expect(result.needsProfileCompletion).toBe(false);
+    });
+
+    it('ativa conta pendente e vincula Google sem senha', async () => {
+      peopleService.findByGoogleSub.mockResolvedValue(null);
+      peopleService.findByEmail.mockResolvedValue({
+        id: 4,
+        status: false,
+        password: 'hashed',
+        google_sub: null,
+        email: 'joao@gmail.com',
+        public_id: 'pub-4',
+        username: 'joao',
+        role: 'owner',
+        cpf: '52998224725',
+        terms_accepted_at: new Date(),
+        companies: [],
+      } as never);
+
+      const result = await service.googleAuth({ idToken: 'fake.jwt.token' });
+
+      expect(peopleService.linkGoogleSub).toHaveBeenCalledWith(
+        4,
+        'google-sub-1',
+      );
+      expect(result.access_token).toBe('jwt-token');
     });
   });
 
@@ -470,6 +611,7 @@ describe('AuthService', () => {
       peopleService.findByEmail.mockResolvedValue({
         id: 7,
         status: true,
+        password: 'hashed',
       } as never);
       await service.forgotPassword('A@B.com');
       expect(verificationRepo.save).toHaveBeenCalledWith(
@@ -485,10 +627,22 @@ describe('AuthService', () => {
       );
     });
 
+    it('não envia para conta só-Google (sem senha local)', async () => {
+      peopleService.findByEmail.mockResolvedValue({
+        id: 7,
+        status: true,
+        password: null,
+      } as never);
+      const result = await service.forgotPassword('a@b.com');
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+      expect(result.message).toMatch(/se houver uma conta ativa/i);
+    });
+
     it('aplica rate-limit quando o último código de reset é recente', async () => {
       peopleService.findByEmail.mockResolvedValue({
         id: 7,
         status: true,
+        password: 'hashed',
       } as never);
       verificationRepo.findOne.mockResolvedValue({
         created_at: new Date(),

@@ -101,9 +101,19 @@ export class Person {
   @Expose()
   terms_accepted_at: Date | null;
 
-  @Column({ type: 'text' })
+  /** Senha local; null em contas criadas só via Google. */
+  @Column({ type: 'text', nullable: true })
   @Exclude()
-  password: string;
+  password: string | null;
+
+  /** Subject estável do Google Identity (`sub` do id_token). */
+  @Index('UQ_person_google_sub', {
+    unique: true,
+    where: '"google_sub" IS NOT NULL',
+  })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Exclude()
+  google_sub: string | null;
 
   @OneToMany(() => Company, (company) => company.administrator)
   companies: Company[];

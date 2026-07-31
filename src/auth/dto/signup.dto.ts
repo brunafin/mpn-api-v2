@@ -134,3 +134,45 @@ export class SignInDto {
   @MaxLength(72)
   password: string;
 }
+
+export class GoogleAuthDto {
+  @ApiProperty({
+    description: 'ID token (JWT) retornado pelo Google Identity Services',
+  })
+  @IsString()
+  @MinLength(20)
+  idToken: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Senha da conta local — obrigatória para vincular Google a e-mail já cadastrado com senha',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(72)
+  password?: string;
+}
+
+export class CompleteProfileDto {
+  @ApiPropertyOptional({
+    example: '51999999999',
+    description: 'Telefone de contato (opcional).',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{10,11}$/, {
+    message: 'Telefone deve ter 10 ou 11 dígitos.',
+  })
+  phone?: string;
+
+  @ApiProperty({
+    example: true,
+    description: 'Aceite dos Termos de Uso e da Política de Privacidade.',
+  })
+  @Transform(({ value }) => value === true || value === 'true')
+  @Equals(true, {
+    message: 'É necessário aceitar os Termos de Uso e a Política de Privacidade.',
+  })
+  acceptedTerms: boolean;
+}

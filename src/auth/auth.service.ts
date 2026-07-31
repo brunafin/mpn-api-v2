@@ -9,6 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
 import { IsNull, Repository } from 'typeorm';
+import { OAuth2Client } from 'google-auth-library';
 import { PeopleService } from '../people/people.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -16,12 +17,17 @@ import { Company } from 'src/companies/entities/company.entity';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { shouldExpireTrialCompany } from 'src/companies/utils/trial-expiry';
 import { PersonRole } from 'src/people/enums/person-role.enum';
+import { Person } from 'src/people/entities/person.entity';
 import { EmailService } from 'src/email/email.service';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
 import { normalizeCpf } from 'src/utils/normalize-cpf';
 import { EmailVerification } from './entities/email-verification.entity';
 import { EmailVerificationPurpose } from './enums/email-verification-purpose.enum';
-import { SignupDto } from './dto/signup.dto';
+import {
+  CompleteProfileDto,
+  GoogleAuthDto,
+  SignupDto,
+} from './dto/signup.dto';
 
 const CODE_TTL_MINUTES = 15;
 const MAX_VERIFICATION_ATTEMPTS = 5;
@@ -30,8 +36,15 @@ const RESEND_COOLDOWN_SECONDS = 30;
 const FORGOT_PASSWORD_GENERIC_MESSAGE =
   'Se houver uma conta ativa com este e-mail, enviamos um código para redefinir a senha.';
 
+type AuthTokenResult = {
+  access_token: string;
+  needsProfileCompletion: boolean;
+};
+
 @Injectable()
 export class AuthService {
+  private readonly googleClient: OAuth2Client;
+
   constructor(
     private readonly peopleService: PeopleService,
     private readonly jwtService: JwtService,
@@ -40,14 +53,22 @@ export class AuthService {
     private readonly emailVerificationRepository: Repository<EmailVerification>,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
-  ) {}
+  ) {
+    this.googleClient = new OAuth2Client();
+  }
 
-  async signIn(username: string, pass: string): Promise<any> {
+  async signIn(username: string, pass: string): Promise<AuthTokenResult> {
     const user = await this.peopleService.findOneForAuth(username);
 
     if (!user) {
       throw new UnauthorizedException(
         'Acesso inválido. Por favor, verifique suas credenciais ou contate a nossa equipe.',
+      );
+    }
+
+    if (!user.password) {
+      throw new UnauthorizedException(
+        'Esta conta usa login com Google. Clique em Continuar com Google.',
       );
     }
 
@@ -68,9 +89,155 @@ export class AuthService {
       });
     }
 
-    const company = user.companies?.[0];
+    return this.issueAuthToken({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      password: user.password,
+      public_id: user.public_id,
+      status: user.status,
+      role: user.role,
+      cpf: user.cpf,
+      terms_accepted_at: user.terms_accepted_at,
+      companies: user.companies,
+    } as Person);
+  }
+
+  async googleAuth(dto: GoogleAuthDto): Promise<AuthTokenResult> {
+    const payload = await this.verifyGoogleIdToken(dto.idToken);
+    const email = this.normalizeEmail(payload.email);
+    const googleSub = payload.sub;
+    const name = (payload.name?.trim() || email.split('@')[0]).slice(0, 50);
+
+    const bySub = await this.peopleService.findByGoogleSub(googleSub);
+    if (bySub) {
+      if (!bySub.status) {
+        await this.peopleService.activate(bySub.id);
+        bySub.status = true;
+      }
+      return this.issueAuthToken(bySub);
+    }
+
+    const existing = await this.peopleService.findByEmail(email);
+
+    if (!existing) {
+      const person = await this.peopleService.createGoogleOwner({
+        name,
+        email,
+        googleSub,
+      });
+      return this.issueAuthToken(person);
+    }
+
+    if (existing.google_sub && existing.google_sub !== googleSub) {
+      throw new ConflictException(
+        'Este e-mail já está vinculado a outra conta Google.',
+      );
+    }
+
+    // Conta pendente (código não confirmado): ativa e vincula Google.
+    if (!existing.status) {
+      await this.peopleService.linkGoogleSub(existing.id, googleSub);
+      existing.google_sub = googleSub;
+      existing.status = true;
+      return this.issueAuthToken(existing);
+    }
+
+    // Já vinculada (mesmo sub) — coberto pelo findByGoogleSub; aqui falta vincular.
+    if (existing.password) {
+      if (!dto.password) {
+        throw new UnauthorizedException({
+          message:
+            'Já existe uma conta com este e-mail. Informe a senha para vincular o Google.',
+          code: 'GOOGLE_LINK_REQUIRED',
+          email,
+        });
+      }
+      const passwordOk = await bcrypt.compare(dto.password, existing.password);
+      if (!passwordOk) {
+        throw new UnauthorizedException('Senha inválida.');
+      }
+    }
+
+    await this.peopleService.linkGoogleSub(existing.id, googleSub);
+    existing.google_sub = googleSub;
+    return this.issueAuthToken(existing);
+  }
+
+  async completeProfile(
+    personPublicId: string,
+    dto: CompleteProfileDto,
+  ): Promise<AuthTokenResult> {
+    const person =
+      await this.peopleService.findByPublicIdWithCompanies(personPublicId);
+    if (!person) {
+      throw new UnauthorizedException('Não autorizado.');
+    }
+
+    const phoneDigits = dto.phone?.replace(/\D/g, '') || undefined;
+    await this.peopleService.completeOwnerProfile(person.id, {
+      phone: phoneDigits,
+      termsAcceptedAt: new Date(),
+    });
+
+    const refreshed =
+      await this.peopleService.findByPublicIdWithCompanies(personPublicId);
+    if (!refreshed) {
+      throw new UnauthorizedException('Não autorizado.');
+    }
+    return this.issueAuthToken(refreshed);
+  }
+
+  private async verifyGoogleIdToken(idToken: string): Promise<{
+    sub: string;
+    email: string;
+    email_verified?: boolean;
+    name?: string;
+  }> {
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+    if (!clientId) {
+      throw new HttpException(
+        'Login com Google não está configurado.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    let ticket;
+    try {
+      ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+    } catch {
+      throw new UnauthorizedException('Token Google inválido.');
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload?.sub || !payload.email) {
+      throw new UnauthorizedException('Token Google incompleto.');
+    }
+    if (payload.email_verified === false) {
+      throw new UnauthorizedException(
+        'O e-mail da conta Google ainda não está verificado.',
+      );
+    }
+
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      email_verified: payload.email_verified,
+      name: payload.name,
+    };
+  }
+
+  private needsProfileCompletion(person: Person): boolean {
+    return !person.terms_accepted_at;
+  }
+
+  private async issueAuthToken(person: Person): Promise<AuthTokenResult> {
+    const company = person.companies?.[0];
     const role =
-      user.role === PersonRole.PLATFORM_ADMIN
+      person.role === PersonRole.PLATFORM_ADMIN
         ? PersonRole.PLATFORM_ADMIN
         : PersonRole.OWNER;
 
@@ -78,32 +245,38 @@ export class AuthService {
       await this.expireTrialIfNeeded(company);
     }
 
-    // Trial expirado e restrição read_only não bloqueiam login:
-    // o manager decide via capabilities (CTA / somente leitura).
-
-    const defaultPassword = process.env.DEFAULT_PASSWORD;
-    if (!defaultPassword) {
-      throw new Error(
-        'A variável de ambiente DEFAULT_PASSWORD não está definida.',
+    let updatedPassword = true;
+    if (person.password) {
+      const defaultPassword = process.env.DEFAULT_PASSWORD;
+      if (!defaultPassword) {
+        throw new Error(
+          'A variável de ambiente DEFAULT_PASSWORD não está definida.',
+        );
+      }
+      const isDefaultPassword = await bcrypt.compare(
+        defaultPassword,
+        person.password,
       );
+      updatedPassword = !isDefaultPassword;
     }
-    const isDefaultPassword = await bcrypt.compare(
-      defaultPassword,
-      user.password,
-    );
 
-    await this.peopleService.touchLastLoginAt(user.id);
+    await this.peopleService.touchLastLoginAt(person.id);
+
+    const needsProfileCompletion = this.needsProfileCompletion(person);
 
     const payload = {
-      sub: user.public_id,
-      username: user.username,
+      sub: person.public_id,
+      username: person.username,
       companyPublicId: company?.public_id ?? null,
       companyName: company?.name ?? null,
-      updatedPassword: !isDefaultPassword,
+      updatedPassword,
       role,
+      termsAccepted: !needsProfileCompletion,
     };
+
     return {
       access_token: this.jwtService.sign(payload),
+      needsProfileCompletion,
     };
   }
 
@@ -352,7 +525,8 @@ export class AuthService {
     const person = await this.peopleService.findByEmail(email);
 
     // Resposta genérica: não revela se o e-mail existe ou se a conta está ativa.
-    if (!person || !person.status) {
+    // Contas só-Google (sem senha local) também não recebem código.
+    if (!person || !person.status || !person.password) {
       return { message: FORGOT_PASSWORD_GENERIC_MESSAGE };
     }
 
@@ -391,11 +565,13 @@ export class AuthService {
       );
     }
 
-    const isSamePassword = await bcrypt.compare(newPassword, person.password);
-    if (isSamePassword) {
-      throw new BadRequestException(
-        'A nova senha não pode ser igual à senha atual.',
-      );
+    if (person.password) {
+      const isSamePassword = await bcrypt.compare(newPassword, person.password);
+      if (isSamePassword) {
+        throw new BadRequestException(
+          'A nova senha não pode ser igual à senha atual.',
+        );
+      }
     }
 
     valid.consumed_at = new Date();
@@ -422,6 +598,13 @@ export class AuthService {
       );
     if (!user) {
       throw new UnauthorizedException('Não autorizado.');
+    }
+
+    // Conta só-Google (sem senha): permite definir senha sem senha atual.
+    if (!user.password) {
+      const hashed = await bcrypt.hash(newPassword, 12);
+      await this.peopleService.updatePassword(user.id, hashed);
+      return { message: 'Senha alterada com sucesso.' };
     }
 
     const defaultPassword = process.env.DEFAULT_PASSWORD;
