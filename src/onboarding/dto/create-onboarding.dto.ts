@@ -12,6 +12,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
 
 export class OnboardingDayDto {
   @ApiProperty({
@@ -49,6 +50,7 @@ export class OnboardingPriceSlotDto {
   @ApiProperty({ description: 'Preço deste slot', example: 150 })
   @IsNumber()
   @Min(0)
+  @Max(MAX_COURT_PRICE_REAIS)
   price: number;
 }
 
@@ -82,6 +84,7 @@ export class OnboardingCourtDto {
   @ApiProperty({ description: 'Preço padrão da quadra', example: 120 })
   @IsNumber()
   @Min(0)
+  @Max(MAX_COURT_PRICE_REAIS)
   price: number;
 
   @ApiProperty({

@@ -6,7 +6,10 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
+  Min,
 } from 'class-validator';
+import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
 
 export class CreateOperatingScheduleDto {
   @ApiProperty({
@@ -24,8 +27,11 @@ export class CreateOperatingScheduleDto {
     format: 'decimal',
     description: 'Preço do agendamento',
     example: '90.00',
+    maximum: MAX_COURT_PRICE_REAIS,
   })
   @IsNumber()
+  @Min(0)
+  @Max(MAX_COURT_PRICE_REAIS)
   price: number;
 
   @ApiProperty({ description: 'ID do dia da semana' })

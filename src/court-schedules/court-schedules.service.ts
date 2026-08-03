@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +28,7 @@ import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { addHours, format, parse } from 'date-fns';
 import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
+import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import {
   addDaysToDateKey,
@@ -769,7 +770,7 @@ export class CourtSchedulesService {
             (reservation.contact_name !== contactName ||
               reservation.contact_phone !== contactPhone)
           ) {
-            throw new NotFoundException(
+            throw new ConflictException(
               `Não é possível fixar: já existem reservas feitas para este horário no dia ${formatDateDateToDDMMYYYY(String(schedule.date))} para ${reservation.contact_name}`,
             );
           }
@@ -1439,7 +1440,16 @@ export class CourtSchedulesService {
     });
 
     if (existingSchedule) {
-      throw new Error('O horário já existe');
+      throw new BadRequestException('O horário já existe');
+    }
+
+    if (
+      body.price !== undefined &&
+      (body.price < 0 || body.price > MAX_COURT_PRICE_REAIS)
+    ) {
+      throw new BadRequestException(
+        `O valor máximo por horário é R$ ${MAX_COURT_PRICE_REAIS},00.`,
+      );
     }
 
     const operatingSchedule = await this.operatingScheduleRepository.findOne({

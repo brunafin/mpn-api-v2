@@ -15,6 +15,7 @@ import { CompanyCustomer } from 'src/companies-customer/entities/company-custome
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
+import { sanitizePersonName } from 'src/utils/sanitize-person-name';
 
 @Injectable()
 export class ReservationsService {
@@ -82,15 +83,19 @@ export class ReservationsService {
         contactPhone = '51' + contactPhone;
       }
 
+      const contactName = sanitizePersonName(createReservationDto.contactName);
+      if (!contactName) {
+        throw new BadRequestException('Informe o nome do cliente');
+      }
+
+      const observation =
+        createReservationDto.observation?.trim().slice(0, 150) || undefined;
+
       const reservation = this.reservationsRepository.create({
-        contact_name: createReservationDto.contactName,
+        contact_name: contactName,
         contact_phone: contactPhone,
         court_schedule_id: courtSchedule.id,
-        observation:
-          createReservationDto.observation &&
-          createReservationDto.observation?.length > 0
-            ? createReservationDto.observation
-            : undefined,
+        observation: observation && observation.length > 0 ? observation : undefined,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
         is_event: createReservationDto.isEvent,
         sport_id: createReservationDto.sportId,
@@ -221,8 +226,11 @@ export class ReservationsService {
   ) {
     await this.assertReservationOwnedBy(public_id, ownerPublicId);
     const updateData: any = {};
-    if (fields.observation !== undefined)
-      updateData.observation = fields.observation;
+    if (fields.observation !== undefined) {
+      updateData.observation = fields.observation
+        ? fields.observation.trim().slice(0, 150)
+        : fields.observation;
+    }
     if (fields.is_barbecue_included !== undefined)
       updateData.is_barbecue_included = fields.is_barbecue_included;
     if (fields.is_event !== undefined) updateData.is_event = fields.is_event;
@@ -249,7 +257,7 @@ export class ReservationsService {
 
   async updateContact(
     courtSchedulePublicId: string,
-    contactName: string,
+    contactNameRaw: string,
     contactPhone: string,
     ownerPublicId: string,
   ) {
@@ -264,6 +272,11 @@ export class ReservationsService {
       courtSchedule.court?.company?.administrator?.public_id,
       ownerPublicId,
     );
+
+    const contactName = sanitizePersonName(contactNameRaw);
+    if (!contactName) {
+      throw new BadRequestException('Informe o nome do cliente');
+    }
 
     let contactPhoneSanitized = contactPhone?.replace(/\s+/g, '') || '';
 

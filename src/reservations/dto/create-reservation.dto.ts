@@ -36,13 +36,13 @@ export class CreateReservationDto {
 
   @ApiProperty({
     required: false,
-    maxLength: 255,
+    maxLength: 150,
     description: 'Observações adicionais',
     example: 'Levar bolas extras',
   })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(150)
   observation?: string;
 
   @ApiProperty({

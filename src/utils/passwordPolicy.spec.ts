@@ -14,6 +14,7 @@ describe('passwordPolicy', () => {
   });
 
   it('expõe hint estável para a UI', () => {
+    expect(PASSWORD_HINT).toMatch(/Precisa ter/i);
     expect(PASSWORD_HINT).toMatch(/8 caracteres/i);
   });
 });
