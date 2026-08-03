@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -41,8 +42,16 @@ type AuthTokenResult = {
   needsProfileCompletion: boolean;
 };
 
+function readGoogleClientId(): string | undefined {
+  const raw = process.env.GOOGLE_CLIENT_ID?.trim();
+  if (!raw) return undefined;
+  // Railway/dotenv às vezes gravam com aspas literais.
+  return raw.replace(/^['"]|['"]$/g, '').trim() || undefined;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly googleClient: OAuth2Client;
 
   constructor(
@@ -194,7 +203,7 @@ export class AuthService {
     email_verified?: boolean;
     name?: string;
   }> {
-    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+    const clientId = readGoogleClientId();
     if (!clientId) {
       throw new HttpException(
         'Login com Google não está configurado.',
@@ -208,7 +217,9 @@ export class AuthService {
         idToken,
         audience: clientId,
       });
-    } catch {
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Google verifyIdToken falhou: ${detail}`);
       throw new UnauthorizedException('Token Google inválido.');
     }
 
