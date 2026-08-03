@@ -21,14 +21,12 @@ import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { computeMonthlyFee, quotePlanPrices } from 'src/plans/utils/compute-monthly-fee';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { buildCapabilities } from 'src/companies/utils/company-access';
-
-const LOGO_MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
-const LOGO_MAX_BYTES = 2 * 1024 * 1024;
-const PHOTO_MAX_COUNT = 3;
+import {
+  COMPANY_PHOTO_MAX_COUNT,
+  IMAGE_UPLOAD_MAX_BYTES,
+  IMAGE_UPLOAD_MIME_TO_EXT,
+  imageUploadTooLargeMessage,
+} from './company-image-upload';
 
 export interface IReservationItemProps {
   scheduleId: string;
@@ -397,7 +395,7 @@ export class CompaniesService {
       companyPhone: company.phone || null,
       logoUrl: company.logo_url || null,
       photos: (company.images ?? [])
-        .slice(0, PHOTO_MAX_COUNT)
+        .slice(0, COMPANY_PHOTO_MAX_COUNT)
         .map((image) => ({ id: image.id, url: image.url })),
       owner,
       courts,
@@ -446,10 +444,10 @@ export class CompaniesService {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Envie um arquivo de imagem.');
     }
-    if (file.size > LOGO_MAX_BYTES) {
-      throw new BadRequestException('A imagem deve ter no máximo 2 MB.');
+    if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+      throw new BadRequestException(imageUploadTooLargeMessage());
     }
-    const extension = LOGO_MIME_TO_EXT[file.mimetype];
+    const extension = IMAGE_UPLOAD_MIME_TO_EXT[file.mimetype];
     if (!extension) {
       throw new BadRequestException(
         'Formato inválido. Use JPG, PNG ou WebP.',
@@ -529,7 +527,7 @@ export class CompaniesService {
     const images = await this.companyImageRepository.find({
       where: { company_id: company.id },
       order: { id: 'ASC' },
-      take: PHOTO_MAX_COUNT,
+      take: COMPANY_PHOTO_MAX_COUNT,
     });
     return images.map((image) => ({ id: image.id, url: image.url }));
   }
@@ -547,10 +545,10 @@ export class CompaniesService {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Envie um arquivo de imagem.');
     }
-    if (file.size > LOGO_MAX_BYTES) {
-      throw new BadRequestException('A imagem deve ter no máximo 2 MB.');
+    if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+      throw new BadRequestException(imageUploadTooLargeMessage());
     }
-    const extension = LOGO_MIME_TO_EXT[file.mimetype];
+    const extension = IMAGE_UPLOAD_MIME_TO_EXT[file.mimetype];
     if (!extension) {
       throw new BadRequestException(
         'Formato inválido. Use JPG, PNG ou WebP.',
@@ -565,9 +563,9 @@ export class CompaniesService {
     const currentCount = await this.companyImageRepository.count({
       where: { company_id: company.id },
     });
-    if (currentCount >= PHOTO_MAX_COUNT) {
+    if (currentCount >= COMPANY_PHOTO_MAX_COUNT) {
       throw new BadRequestException(
-        `Você já enviou ${PHOTO_MAX_COUNT} fotos. Remova uma para enviar outra.`,
+        `Você já enviou ${COMPANY_PHOTO_MAX_COUNT} fotos. Remova uma para enviar outra.`,
       );
     }
 

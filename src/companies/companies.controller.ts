@@ -27,6 +27,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
+import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MAX_MB } from './company-image-upload';
 
 type AuthedRequest = {
   user: { userId: string; email?: string };
@@ -327,7 +328,7 @@ export class CompaniesController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Imagem JPG, PNG ou WebP (máx. 2 MB)',
+          description: `Imagem JPG, PNG ou WebP (máx. ${IMAGE_UPLOAD_MAX_MB} MB)`,
         },
       },
       required: ['file'],
@@ -336,7 +337,7 @@ export class CompaniesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 2 * 1024 * 1024 },
+      limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES },
     }),
   )
   uploadLogo(
@@ -370,7 +371,7 @@ export class CompaniesController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'Imagem JPG, PNG ou WebP (máx. 2 MB)',
+          description: `Imagem JPG, PNG ou WebP (máx. ${IMAGE_UPLOAD_MAX_MB} MB)`,
         },
       },
       required: ['file'],
@@ -379,7 +380,7 @@ export class CompaniesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 2 * 1024 * 1024 },
+      limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES },
     }),
   )
   uploadPhoto(
