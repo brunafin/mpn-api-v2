@@ -115,7 +115,7 @@ export class ReservationsController {
   @ApiOperation({ summary: 'Atualizar dados de contato da reserva' })
   async updateContact(
     @Param('court_schedule_public_id') courtSchedulePublicId: string,
-    @Body() body: { contactName: string; contactPhone: string },
+    @Body() body: { contactName: string; contactPhone?: string | null },
     @Req() req: AuthedRequest,
   ) {
     return this.reservationsService.updateContact(

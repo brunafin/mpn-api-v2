@@ -28,10 +28,7 @@ import { addHours, format, parse } from 'date-fns';
 import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { sanitizePersonName } from 'src/utils/sanitize-person-name';
-import {
-  normalizeOptionalContactPhone,
-  normalizeReservationContactPhone,
-} from 'src/utils/normalize-contact-phone';
+import { normalizeOptionalContactPhone } from 'src/utils/normalize-contact-phone';
 import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import {
@@ -48,7 +45,6 @@ export enum ReservationStatusEnum {
   INACTIVE = 'inactive',
   RESERVED = 'reserved',
   AVAILABLE = 'available',
-  PREPAID = 'prepaid',
   UNKNOWN = 'unknown',
 }
 
@@ -59,9 +55,8 @@ interface IReservationDetailsItemProps {
   reservation: {
     publicId: string;
     createdAt: string;
-    isPrepaid: boolean;
     contactName: string;
-    contactPhone: string;
+    contactPhone: string | null;
     observation?: string;
     isBarbecueIncluded: boolean;
     isEvent: boolean;
@@ -291,7 +286,7 @@ export class CourtSchedulesService {
               reservationsToCreate.push({
                 court_schedule: schedule,
                 contact_name: schedule.fixed_contact_name,
-                contact_phone: normalizeReservationContactPhone(
+                contact_phone: normalizeOptionalContactPhone(
                   schedule.fixed_contact_phone,
                 ),
                 sport_id: schedule.sport_id,
@@ -482,7 +477,6 @@ export class CourtSchedulesService {
         is_fixed: true,
         reservation: {
           public_id: true,
-          is_prepaid: true,
           contact_name: true,
           contact_phone: true,
           created_at: true,
@@ -529,7 +523,6 @@ export class CourtSchedulesService {
             createdAt: formatDateTimestampToDDMMYYYY(
               courtSchedule?.reservation?.created_at,
             ),
-            isPrepaid: courtSchedule.reservation?.is_prepaid,
             contactName: courtSchedule.reservation?.contact_name,
             contactPhone: courtSchedule.reservation?.contact_phone,
             observation: courtSchedule.reservation?.observation,
@@ -703,8 +696,6 @@ export class CourtSchedulesService {
         const contactPhoneOptional = normalizeOptionalContactPhone(
           courtSchedule.reservation.contact_phone,
         );
-        const contactPhone =
-          normalizeReservationContactPhone(contactPhoneOptional);
 
         const sportId = courtSchedule.reservation.sport_id;
 
@@ -764,8 +755,8 @@ export class CourtSchedulesService {
           if (
             reservation &&
             (reservation.contact_name !== contactName ||
-              normalizeReservationContactPhone(reservation.contact_phone) !==
-                contactPhone)
+              normalizeOptionalContactPhone(reservation.contact_phone) !==
+                contactPhoneOptional)
           ) {
             throw new ConflictException(
               `Não é possível fixar: já existem reservas feitas para este horário no dia ${formatDateDateToDDMMYYYY(String(schedule.date))} para ${reservation.contact_name}`,
@@ -797,7 +788,7 @@ export class CourtSchedulesService {
               missingReservation.map((schedule) => ({
                 court_schedule_id: schedule.id,
                 contact_name: contactName,
-                contact_phone: contactPhone,
+                contact_phone: contactPhoneOptional,
                 sport_id: sportId,
               })),
             );

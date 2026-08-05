@@ -198,7 +198,6 @@ export class CompaniesService {
         'reservation.contact_name',
         'reservation.contact_phone',
         'reservation.created_at',
-        'reservation.is_prepaid',
         'reservation.observation',
         'reservation.is_barbecue_included',
         'reservation.is_event',

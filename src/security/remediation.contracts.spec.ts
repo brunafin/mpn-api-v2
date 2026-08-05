@@ -135,17 +135,12 @@ describe('Security remediation contracts', () => {
   });
 
   describe('Fase 1 — follow-ups (feito)', () => {
-    it('Person.password e Reservation.token_to_cancel usam @Exclude', () => {
+    it('Person.password usa @Exclude', () => {
       const personSrc = readFileSync(
         join(__dirname, '../people/entities/person.entity.ts'),
         'utf8',
       );
-      const reservationSrc = readFileSync(
-        join(__dirname, '../reservations/entities/reservation.entity.ts'),
-        'utf8',
-      );
       expect(personSrc).toMatch(/@Exclude\(\)[\s\S]*password:/);
-      expect(reservationSrc).toMatch(/@Exclude\(\)[\s\S]*token_to_cancel:/);
     });
 
     it('main.ts registra ClassSerializerInterceptor', () => {

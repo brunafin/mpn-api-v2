@@ -21,7 +21,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  // Respeita @Exclude() nas entities (ex.: password, token_to_cancel)
+  // Respeita @Exclude() nas entities (ex.: password)
   app.useGlobalInterceptors(
     new ClassSerializerInterceptor(app.get(Reflector)),
   );

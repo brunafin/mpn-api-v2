@@ -15,10 +15,7 @@ import { OperatingSchedule } from 'src/operating-schedule/entities/operating-sch
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import { sanitizePersonName } from 'src/utils/sanitize-person-name';
-import {
-  normalizeOptionalContactPhone,
-  normalizeReservationContactPhone,
-} from 'src/utils/normalize-contact-phone';
+import { normalizeOptionalContactPhone } from 'src/utils/normalize-contact-phone';
 
 @Injectable()
 export class ReservationsService {
@@ -74,15 +71,9 @@ export class ReservationsService {
         { available: false },
       );
 
-      // Normaliza o telefone de contato conforme as regras especificadas
-      let contactPhone =
-        createReservationDto.contactPhone?.replace(/\s+/g, '') || '';
-
-      if (!contactPhone) {
-        contactPhone = courtSchedule.court.company.phone.replace(/\s+/g, '');
-      } else if (contactPhone.length === 9 && contactPhone.startsWith('9')) {
-        contactPhone = '51' + contactPhone;
-      }
+      const contactPhone = normalizeOptionalContactPhone(
+        createReservationDto.contactPhone,
+      );
 
       const contactName = sanitizePersonName(createReservationDto.contactName);
       if (!contactName) {
@@ -213,16 +204,14 @@ export class ReservationsService {
       if (!contactName) {
         throw new BadRequestException('Informe o nome do cliente');
       }
-      let contactPhone =
-        updateReservationDto.contactPhone?.replace(/\s+/g, '') || '';
-      if (contactPhone.length === 9 && contactPhone.startsWith('9')) {
-        contactPhone = '51' + contactPhone;
-      }
+      const contactPhone = normalizeOptionalContactPhone(
+        updateReservationDto.contactPhone,
+      );
       return this.reservationsRepository.update(
         { public_id },
         {
           contact_name: contactName,
-          contact_phone: contactPhone || undefined,
+          contact_phone: contactPhone,
         },
       );
     });
@@ -271,7 +260,7 @@ export class ReservationsService {
   async updateContact(
     courtSchedulePublicId: string,
     contactNameRaw: string,
-    contactPhone: string,
+    contactPhone: string | null | undefined,
     ownerPublicId: string,
   ) {
     const courtSchedule = await this.courtSchedulesRepository.findOne({
@@ -292,16 +281,8 @@ export class ReservationsService {
     }
 
     const contactPhoneOptional = normalizeOptionalContactPhone(contactPhone);
-    // Reserva avulsa ainda precisa de telefone (coluna NOT NULL); se vazio, usa da arena.
-    const contactPhoneSanitized =
-      contactPhoneOptional ??
-      normalizeReservationContactPhone(courtSchedule.court.company.phone);
 
     if (courtSchedule.is_fixed) {
-      // Fixo: telefone opcional de verdade — não copia fone da arena.
-      const fixedPhone = contactPhoneOptional;
-      const reservationPhone = normalizeReservationContactPhone(fixedPhone);
-
       const allSchedules = await this.courtSchedulesRepository.find({
         where: {
           court: { id: courtSchedule.court_id },
@@ -320,7 +301,7 @@ export class ReservationsService {
         .update()
         .set({
           fixed_contact_name: contactName,
-          fixed_contact_phone: fixedPhone,
+          fixed_contact_phone: contactPhoneOptional,
         })
         .where('hour = :hour', { hour: courtSchedule.start_hour })
         .andWhere('court_id = :courtId', { courtId: courtSchedule.court_id })
@@ -335,7 +316,7 @@ export class ReservationsService {
           .update()
           .set({
             fixed_contact_name: contactName,
-            fixed_contact_phone: fixedPhone,
+            fixed_contact_phone: contactPhoneOptional,
           })
           .where('id IN (:...ids)', { ids: scheduleIds })
           .execute();
@@ -345,7 +326,7 @@ export class ReservationsService {
           .update()
           .set({
             contact_name: contactName,
-            contact_phone: reservationPhone,
+            contact_phone: contactPhoneOptional,
           })
           .where('court_schedule_id IN (:...ids)', { ids: scheduleIds })
           .execute();
@@ -358,7 +339,7 @@ export class ReservationsService {
         throw new NotFoundException('Reserva não encontrada.');
       }
       reservation.contact_name = contactName;
-      reservation.contact_phone = contactPhoneSanitized;
+      reservation.contact_phone = contactPhoneOptional;
       await this.reservationsRepository.save(reservation);
     }
   }

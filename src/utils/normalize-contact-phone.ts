@@ -11,10 +11,3 @@ export function normalizeOptionalContactPhone(
   }
   return phone || null;
 }
-
-/** Para `reservations.contact_phone` (NOT NULL char/varchar): vazio vira ''. */
-export function normalizeReservationContactPhone(
-  raw?: string | null,
-): string {
-  return normalizeOptionalContactPhone(raw) ?? '';
-}

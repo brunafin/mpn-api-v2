@@ -20,12 +20,15 @@ export class CreateReservationDto {
 
   @ApiProperty({
     maxLength: 11,
-    description: 'Telefone do contato com DDD',
+    description: 'Telefone do contato com DDD (opcional)',
     example: '51912345678',
+    required: false,
+    nullable: true,
   })
+  @IsOptional()
   @IsString()
   @MaxLength(20)
-  contactPhone: string;
+  contactPhone?: string | null;
 
   @ApiProperty({
     description: 'ID do agendamento da quadra',

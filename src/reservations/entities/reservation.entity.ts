@@ -37,17 +37,9 @@ export class Reservation {
   @Expose()
   contact_name: string;
 
-  @Column({ type: 'char', length: 11 })
+  @Column({ type: 'varchar', length: 11, nullable: true })
   @Expose()
-  contact_phone: string;
-
-  @Column({ type: 'text', nullable: true })
-  @Exclude()
-  token_to_cancel: string;
-
-  @Column({ default: false })
-  @Expose()
-  is_prepaid: boolean;
+  contact_phone: string | null;
 
   @Column({ default: false })
   @Expose()
