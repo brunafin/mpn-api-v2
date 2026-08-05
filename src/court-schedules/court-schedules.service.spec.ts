@@ -7,7 +7,6 @@ import { OperatingSchedule } from '../operating-schedule/entities/operating-sche
 import { Court } from '../courts/entities/court.entity';
 import { Reservation } from '../reservations/entities/reservation.entity';
 import { Company } from '../companies/entities/company.entity';
-import { CompanyCustomer } from '../companies-customer/entities/company-customer.entity';
 import { PublicListingCache } from '../cache/public-listing.cache';
 
 type MockFn = jest.Mock;
@@ -79,7 +78,6 @@ describe('CourtSchedulesService', () => {
 
   let txCourtSchedule: MockRepo;
   let txOperatingSchedule: MockRepo;
-  let txCompanyCustomer: MockRepo;
   let txReservation: MockRepo;
   let queryBuilder: {
     update: jest.Mock;
@@ -107,7 +105,6 @@ describe('CourtSchedulesService', () => {
 
     txCourtSchedule = makeRepo();
     txOperatingSchedule = makeRepo();
-    txCompanyCustomer = makeRepo();
     txReservation = makeRepo();
 
     queryBuilder = {
@@ -124,7 +121,6 @@ describe('CourtSchedulesService', () => {
       getRepository: jest.fn((entity) => {
         if (entity === CourtSchedule) return txCourtSchedule;
         if (entity === OperatingSchedule) return txOperatingSchedule;
-        if (entity === CompanyCustomer) return txCompanyCustomer;
         if (entity === Reservation) return txReservation;
         throw new Error(`Unexpected repository: ${entity?.name ?? entity}`);
       }),
@@ -244,7 +240,6 @@ describe('CourtSchedulesService', () => {
       courtSchedulesRepo.findOne.mockResolvedValue(ownedSchedule());
       txCourtSchedule.findOne.mockResolvedValue(baseSchedule);
       txOperatingSchedule.findOne.mockResolvedValue(operating);
-      txCompanyCustomer.findOne.mockResolvedValue({ id: 99 });
       txCourtSchedule.find.mockResolvedValue([]);
     });
 
@@ -257,7 +252,8 @@ describe('CourtSchedulesService', () => {
         expect.objectContaining({
           is_fixed: true,
           available: false,
-          company_customer_id: 99,
+          fixed_contact_name: 'João',
+          fixed_contact_phone: '51999999999',
           sport_id: 7,
         }),
       );
@@ -269,32 +265,31 @@ describe('CourtSchedulesService', () => {
         },
         expect.objectContaining({
           is_fixed: true,
-          company_customer_id: 99,
+          fixed_contact_name: 'João',
+          fixed_contact_phone: '51999999999',
           sport_id: 7,
         }),
       );
       expect(publicListingCache.clear).toHaveBeenCalled();
     });
 
-    it('cria CompanyCustomer quando o contato ainda não existe', async () => {
-      txCompanyCustomer.findOne.mockResolvedValue(null);
-      txCompanyCustomer.save.mockImplementation(async (entity: { id?: number }) => {
-        entity.id = 123;
-        return entity;
+    it('grava fixed_contact_phone null quando a reserva não tem telefone', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        ...baseSchedule,
+        reservation: {
+          ...baseSchedule.reservation,
+          contact_phone: '',
+        },
       });
 
       await service.fixSchedule(body, OWNER_ID);
 
-      expect(txCompanyCustomer.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          phone: '51999999999',
-          name: 'João',
-          company_id: 10,
-        }),
-      );
       expect(txCourtSchedule.update).toHaveBeenCalledWith(
         { id: 1 },
-        expect.objectContaining({ company_customer_id: 123 }),
+        expect.objectContaining({
+          fixed_contact_name: 'João',
+          fixed_contact_phone: null,
+        }),
       );
     });
 
@@ -326,7 +321,8 @@ describe('CourtSchedulesService', () => {
         expect.objectContaining({
           is_fixed: true,
           available: false,
-          company_customer_id: 99,
+          fixed_contact_name: 'João',
+          fixed_contact_phone: '51999999999',
           sport_id: 7,
         }),
       );
@@ -432,7 +428,8 @@ describe('CourtSchedulesService', () => {
         expect.objectContaining({
           is_fixed: false,
           available: true,
-          company_customer_id: null,
+          fixed_contact_name: null,
+          fixed_contact_phone: null,
           sport_id: null,
         }),
       );
@@ -444,7 +441,8 @@ describe('CourtSchedulesService', () => {
         },
         expect.objectContaining({
           is_fixed: false,
-          company_customer_id: null,
+          fixed_contact_name: null,
+          fixed_contact_phone: null,
           sport_id: null,
         }),
       );
@@ -562,6 +560,87 @@ describe('CourtSchedulesService', () => {
       expect(result.isDayClosed).toBe(false);
       expect(courtSchedulesRepo.update).not.toHaveBeenCalled();
       expect(publicListingCache.clear).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('populateCourtSchedule', () => {
+    it('copia fixed_contact_* do template e cria reserva fixa', async () => {
+      // 2025-08-20 = quarta (ref 3)
+      txOperatingSchedule.find.mockResolvedValue([
+        {
+          hour: '10:00:00',
+          price: 90,
+          day_of_week: { ref: 3 },
+          day_of_week_id: 3,
+          is_fixed: true,
+          fixed_contact_name: 'Ana',
+          fixed_contact_phone: '51988887777',
+          sport_id: 7,
+          is_active: true,
+        },
+      ]);
+      txCourtSchedule.find
+        .mockResolvedValueOnce([]) // existentes no intervalo
+        .mockResolvedValueOnce([
+          {
+            id: 55,
+            is_fixed: true,
+            fixed_contact_name: 'Ana',
+            fixed_contact_phone: '51988887777',
+            sport_id: 7,
+          },
+        ]);
+      txCourtSchedule.save.mockResolvedValue([{ id: 55 }]);
+
+      await service.populateCourtSchedule(2, '2025-08-20', '2025-08-20');
+
+      expect(txCourtSchedule.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          is_fixed: true,
+          fixed_contact_name: 'Ana',
+          fixed_contact_phone: '51988887777',
+          sport_id: 7,
+          available: false,
+        }),
+      ]);
+      expect(txReservation.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          contact_name: 'Ana',
+          contact_phone: '51988887777',
+          sport_id: 7,
+        }),
+      ]);
+    });
+
+    it('não cria reserva fixa sem fixed_contact_name', async () => {
+      txOperatingSchedule.find.mockResolvedValue([
+        {
+          hour: '10:00:00',
+          price: 90,
+          day_of_week: { ref: 3 },
+          day_of_week_id: 3,
+          is_fixed: true,
+          fixed_contact_name: null,
+          fixed_contact_phone: null,
+          sport_id: 7,
+          is_active: true,
+        },
+      ]);
+      txCourtSchedule.find
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 55,
+            is_fixed: true,
+            fixed_contact_name: null,
+            sport_id: 7,
+          },
+        ]);
+      txCourtSchedule.save.mockResolvedValue([{ id: 55 }]);
+
+      await service.populateCourtSchedule(2, '2025-08-20', '2025-08-20');
+
+      expect(txReservation.save).not.toHaveBeenCalled();
     });
   });
 });

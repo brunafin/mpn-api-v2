@@ -5,7 +5,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Reservation } from './entities/reservation.entity';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { EmailService } from 'src/email/email.service';
-import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { CompanyAccessModule } from 'src/companies/company-access.module';
 
@@ -14,7 +13,6 @@ import { CompanyAccessModule } from 'src/companies/company-access.module';
     TypeOrmModule.forFeature([
       Reservation,
       CourtSchedule,
-      CompanyCustomer,
       OperatingSchedule,
     ]),
     CompanyAccessModule,

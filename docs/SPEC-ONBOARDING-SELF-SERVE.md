@@ -24,8 +24,8 @@ Permitir que o **dono da arena** crie a conta sozinho, configure o negócio prog
 | **Template de horário** | *novo* (nível empresa) | Grade semanal padrão da arena (hora × dia × preço), **sem fixos** |
 | **Grade da quadra** | `OperatingSchedule` | Cópia do template na Court (+ fixos depois) |
 | **Agenda do dia** | `CourtSchedule` | Slots concretos por data |
-| **Cliente da arena** | `CompanyCustomer` | Contato da agenda; **não** é login. Identidade = `id` |
-| **Horário fixo** | `is_fixed` + cliente + esporte | Recorrência semanal naquela Court |
+| **Cliente / contato** | `reservations.contact_*` / `fixed_contact_*` | Contato da agenda (avulsa ou fixo); **não** é login |
+| **Horário fixo** | `is_fixed` + `fixed_contact_*` + esporte | Recorrência semanal naquela Court |
 
 ---
 
@@ -104,8 +104,9 @@ Se faltar item: botão desabilitado + lista do que falta.
 
 - Não há passo “cadastrar clientes” no signup
 - Cliente nasce no **fixar / reservar**: nome (+ telefone se souber)
-- Sistema cria `CompanyCustomer` com novo `id`, ou reutiliza escolha explícita por `id` (autocomplete)
-- **Proibido** identificar cliente só por telefone ou só por nome quando ambíguo
+- Reserva avulsa grava `reservations.contact_*`; fixo grava `fixed_contact_*` em `operating_schedule` / `court_schedule`
+- Telefone do fixo é **opcional** (não usa telefone da arena como identidade)
+- **Proibido** identificar cliente só por telefone ou só por nome quando ambíguo (sem CRM nesta fase)
 
 ---
 
@@ -116,7 +117,7 @@ Se faltar item: botão desabilitado + lista do que falta.
 - Dimensões: `day_of_week` × `hour` × `price`
 - Ausência de célula = fechado (não gera linha, ou gera inativa — preferir **não criar** slot fechado, alinhado ao uso atual)
 - Preço pode diferir entre horas/dias
-- **Sem** `company_customer_id` / `is_fixed` / `sport_id` no template
+- **Sem** `fixed_contact_*` / `is_fixed` / `sport_id` no template da empresa
 
 ### 5.2 Cópia para Court
 
@@ -153,14 +154,12 @@ Hoje `operating_schedule` exige `court_id`. Opções de implementação (escolhe
 
 **Recomendação:** **A** — separar template de operação da Court, evita misturar fixos com default da empresa.
 
-### 6.2 `CompanyCustomer`
+### 6.2 Contato do horário fixo
 
-- `phone` → **nullable**
-- Identidade = `id` (já existe)
-- Remover ou substituir unique `(name, phone, company_id)`:
-  - sem unique rígido no MVP, **ou**
-  - unique parcial só quando `phone IS NOT NULL` (evitar duplicata óbvia)
-- Fluxos `fix` / reserva: não exigir telefone
+- Nome/telefone denormalizados em `operating_schedule` e `court_schedule` (`fixed_contact_name`, `fixed_contact_phone`)
+- `fixed_contact_phone` é **nullable** — não copiar telefone da arena quando vazio
+- Fluxos `fix` / reserva: não exigir telefone no fixo
+- Tabela `company_customer` removida; avulsa continua em `reservations.contact_*`
 
 ### 6.3 DTOs / APIs (lacunas conhecidas hoje)
 
@@ -206,7 +205,7 @@ O que o SQL da LR Sports fazia → onde cai no produto:
 | Person + Company | Signup (§4.1) |
 | Company logo / instagram / characteristics | Perfil opcional (§4.2) |
 | Court + sports | Criar Quadra (§4.3) |
-| `company_customer` em massa | Desnecessário no onboarding; nasce no fix |
+| Contatos em massa | Desnecessário no onboarding; contato nasce no fix/reserva |
 | `operating_schedule` livre + fixo | Template (livres) + copy; fixos no manager |
 | Populate 1 semana | Automático no create Court / cron |
 

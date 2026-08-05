@@ -7,6 +7,7 @@ import {
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
@@ -52,12 +53,24 @@ export class CreateOperatingScheduleDto {
   is_fixed: boolean = false;
 
   @ApiProperty({
-    description: 'ID do cliente da empresa',
-    type: 'number',
+    description: 'Nome do contato do horário fixo',
+    type: 'string',
     nullable: true,
-    default: null,
+    required: false,
   })
   @IsOptional()
-  @IsInt()
-  company_customer_id: number | null = null;
+  @IsString()
+  @MaxLength(50)
+  fixed_contact_name: string | null = null;
+
+  @ApiProperty({
+    description: 'Telefone do contato do horário fixo (opcional)',
+    type: 'string',
+    nullable: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(11)
+  fixed_contact_phone: string | null = null;
 }

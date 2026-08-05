@@ -11,11 +11,14 @@ import { Reservation } from './entities/reservation.entity';
 import { DataSource, MoreThanOrEqual, QueryRunner, Repository } from 'typeorm';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { plainToInstance } from 'class-transformer';
-import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import { sanitizePersonName } from 'src/utils/sanitize-person-name';
+import {
+  normalizeOptionalContactPhone,
+  normalizeReservationContactPhone,
+} from 'src/utils/normalize-contact-phone';
 
 @Injectable()
 export class ReservationsService {
@@ -24,8 +27,6 @@ export class ReservationsService {
     private readonly reservationsRepository: Repository<Reservation>,
     @InjectRepository(CourtSchedule)
     private readonly courtSchedulesRepository: Repository<CourtSchedule>,
-    @InjectRepository(CompanyCustomer)
-    private readonly companyCustomerRepository: Repository<CompanyCustomer>,
     @InjectRepository(OperatingSchedule)
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
 
@@ -151,7 +152,8 @@ export class ReservationsService {
         {
           available: true,
           is_fixed: false,
-          company_customer_id: null,
+          fixed_contact_name: null,
+          fixed_contact_phone: null,
           sport_id: null,
         },
       );
@@ -204,15 +206,26 @@ export class ReservationsService {
     updateReservationDto: UpdateReservationDto,
     ownerPublicId: string,
   ) {
-    return this.assertReservationOwnedBy(public_id, ownerPublicId).then(() =>
-      this.reservationsRepository.update(
+    return this.assertReservationOwnedBy(public_id, ownerPublicId).then(() => {
+      const contactName = sanitizePersonName(
+        updateReservationDto.contactName ?? '',
+      );
+      if (!contactName) {
+        throw new BadRequestException('Informe o nome do cliente');
+      }
+      let contactPhone =
+        updateReservationDto.contactPhone?.replace(/\s+/g, '') || '';
+      if (contactPhone.length === 9 && contactPhone.startsWith('9')) {
+        contactPhone = '51' + contactPhone;
+      }
+      return this.reservationsRepository.update(
         { public_id },
         {
-          contact_name: updateReservationDto.contactName,
-          contact_phone: updateReservationDto.contactPhone,
+          contact_name: contactName,
+          contact_phone: contactPhone || undefined,
         },
-      ),
-    );
+      );
+    });
   }
 
   async updateExtraFields(
@@ -278,21 +291,17 @@ export class ReservationsService {
       throw new BadRequestException('Informe o nome do cliente');
     }
 
-    let contactPhoneSanitized = contactPhone?.replace(/\s+/g, '') || '';
-
-    if (!contactPhoneSanitized) {
-      contactPhoneSanitized = courtSchedule.court.company.phone.replace(
-        /\s+/g,
-        '',
-      );
-    } else if (
-      contactPhoneSanitized.length === 9 &&
-      contactPhoneSanitized.startsWith('9')
-    ) {
-      contactPhoneSanitized = '51' + contactPhoneSanitized;
-    }
+    const contactPhoneOptional = normalizeOptionalContactPhone(contactPhone);
+    // Reserva avulsa ainda precisa de telefone (coluna NOT NULL); se vazio, usa da arena.
+    const contactPhoneSanitized =
+      contactPhoneOptional ??
+      normalizeReservationContactPhone(courtSchedule.court.company.phone);
 
     if (courtSchedule.is_fixed) {
+      // Fixo: telefone opcional de verdade — não copia fone da arena.
+      const fixedPhone = contactPhoneOptional;
+      const reservationPhone = normalizeReservationContactPhone(fixedPhone);
+
       const allSchedules = await this.courtSchedulesRepository.find({
         where: {
           court: { id: courtSchedule.court_id },
@@ -306,30 +315,13 @@ export class ReservationsService {
 
       const scheduleIds = allSchedules.map((s) => s.id);
 
-      let customerId: number | null = null;
-      const foundCustomer = await this.companyCustomerRepository.findOne({
-        where: {
-          company_id: courtSchedule.court.company_id,
-          name: contactName,
-          phone: contactPhoneSanitized,
-        },
-      });
-
-      if (!foundCustomer) {
-        const newCustomer = await this.companyCustomerRepository.save({
-          company_id: courtSchedule.court.company_id,
-          name: contactName,
-          phone: contactPhoneSanitized,
-        });
-        customerId = newCustomer.id;
-      } else {
-        customerId = foundCustomer.id;
-      }
-
       await this.operatingScheduleRepository
         .createQueryBuilder()
         .update()
-        .set({ company_customer_id: customerId })
+        .set({
+          fixed_contact_name: contactName,
+          fixed_contact_phone: fixedPhone,
+        })
         .where('hour = :hour', { hour: courtSchedule.start_hour })
         .andWhere('court_id = :courtId', { courtId: courtSchedule.court_id })
         .andWhere('day_of_week_id = :dayOfWeekId', {
@@ -341,18 +333,19 @@ export class ReservationsService {
         await this.courtSchedulesRepository
           .createQueryBuilder()
           .update()
-          .set({ company_customer_id: customerId })
+          .set({
+            fixed_contact_name: contactName,
+            fixed_contact_phone: fixedPhone,
+          })
           .where('id IN (:...ids)', { ids: scheduleIds })
           .execute();
-      }
 
-      if (scheduleIds.length > 0) {
         await this.reservationsRepository
           .createQueryBuilder()
           .update()
           .set({
             contact_name: contactName,
-            contact_phone: contactPhoneSanitized,
+            contact_phone: reservationPhone,
           })
           .where('court_schedule_id IN (:...ids)', { ids: scheduleIds })
           .execute();

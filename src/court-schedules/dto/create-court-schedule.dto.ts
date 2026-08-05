@@ -46,10 +46,18 @@ export class CreateCourtScheduleDto {
   is_fixed: boolean;
 
   @ApiProperty({
-    description: 'ID do cliente da empresa',
+    description: 'Nome do contato do horário fixo',
     required: false,
     nullable: true,
-    type: 'number',
+    type: 'string',
   })
-  company_customer_id?: number | null;
+  fixed_contact_name?: string | null;
+
+  @ApiProperty({
+    description: 'Telefone do contato do horário fixo',
+    required: false,
+    nullable: true,
+    type: 'string',
+  })
+  fixed_contact_phone?: string | null;
 }

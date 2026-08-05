@@ -18,7 +18,6 @@ import { CompanyImagesModule } from './company-images/company-images.module';
 import { SportsModule } from './sports/sports.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
-import { CompaniesCustomerModule } from './companies-customer/companies-customer.module';
 import { NotesModule } from './notes/notes.module';
 import { PlansModule } from './plans/plans.module';
 import { PaymentCompanyModule } from './payment_company/payment_company.module';
@@ -56,7 +55,6 @@ import { BillingModule } from './billing/billing.module';
     CompanyImagesModule,
     SportsModule,
     AuthModule,
-    CompaniesCustomerModule,
     NotesModule,
     PlansModule,
     PaymentCompanyModule,

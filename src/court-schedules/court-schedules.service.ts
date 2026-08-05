@@ -15,7 +15,6 @@ import {
 import { Court } from 'src/courts/entities/court.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
-import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import {
   IAvailableHours,
   ICourt,
@@ -28,6 +27,11 @@ import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { addHours, format, parse } from 'date-fns';
 import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
+import { sanitizePersonName } from 'src/utils/sanitize-person-name';
+import {
+  normalizeOptionalContactPhone,
+  normalizeReservationContactPhone,
+} from 'src/utils/normalize-contact-phone';
 import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import {
@@ -191,7 +195,8 @@ export class CourtSchedulesService {
               weekday_ref: item.day_of_week.ref,
               weekday_id: item.day_of_week_id,
               is_fixed: item.is_fixed,
-              company_customer_id: item.company_customer_id,
+              fixed_contact_name: item.fixed_contact_name,
+              fixed_contact_phone: item.fixed_contact_phone,
               sport_id: item.sport_id,
               is_active: item.is_active,
             }))
@@ -218,8 +223,11 @@ export class CourtSchedulesService {
               available:
                 !operatingSchedule.is_fixed && operatingSchedule.is_active,
               is_fixed: operatingSchedule.is_fixed,
-              company_customer_id: operatingSchedule.is_fixed
-                ? operatingSchedule.company_customer_id
+              fixed_contact_name: operatingSchedule.is_fixed
+                ? operatingSchedule.fixed_contact_name
+                : null,
+              fixed_contact_phone: operatingSchedule.is_fixed
+                ? operatingSchedule.fixed_contact_phone
                 : null,
               sport_id: operatingSchedule.sport_id,
             };
@@ -267,7 +275,6 @@ export class CourtSchedulesService {
 
           createdSchedules = await manager.getRepository(CourtSchedule).find({
             where: { id: In(createdSchedulesRaw.map((s) => s.id)) },
-            relations: { company_customer: true },
           });
 
           console.log(
@@ -275,7 +282,7 @@ export class CourtSchedulesService {
           );
 
           for (const schedule of createdSchedules) {
-            if (schedule.is_fixed && schedule.company_customer_id) {
+            if (schedule.is_fixed && schedule.fixed_contact_name) {
               if (!schedule.sport_id) {
                 throw new Error(
                   'Não é possível popular uma reserva sem o vínculo do esporte.',
@@ -283,8 +290,10 @@ export class CourtSchedulesService {
               }
               reservationsToCreate.push({
                 court_schedule: schedule,
-                contact_name: schedule.company_customer?.name,
-                contact_phone: schedule.company_customer?.phone,
+                contact_name: schedule.fixed_contact_name,
+                contact_phone: normalizeReservationContactPhone(
+                  schedule.fixed_contact_phone,
+                ),
                 sport_id: schedule.sport_id,
               });
             }
@@ -676,7 +685,7 @@ export class CourtSchedulesService {
           .getRepository(CourtSchedule)
           .findOne({
             where: { public_id: body.court_schedule_public_id },
-            relations: ['reservation', 'court'],
+            relations: ['reservation', 'court', 'court.company'],
           });
         if (!courtSchedule) {
           throw new NotFoundException('Horário não encontrado');
@@ -685,41 +694,27 @@ export class CourtSchedulesService {
           throw new NotFoundException('Horário não possui reserva');
         }
 
-        let companyCustomerId: number | null = null;
-
-        const companyCustomer = await manager
-          .getRepository(CompanyCustomer)
-          .findOne({
-            where: {
-              phone: courtSchedule.reservation.contact_phone,
-              name: courtSchedule.reservation.contact_name,
-            },
-          });
-
-        if (!companyCustomer) {
-          const newCompanyCustomer = manager
-            .getRepository(CompanyCustomer)
-            .create({
-              phone: courtSchedule.reservation.contact_phone,
-              name: courtSchedule.reservation.contact_name,
-              company_id: courtSchedule.court.company_id,
-            });
-          await manager.getRepository(CompanyCustomer).save(newCompanyCustomer);
-          companyCustomerId = newCompanyCustomer.id;
-        } else {
-          companyCustomerId = companyCustomer.id;
+        const contactName = sanitizePersonName(
+          courtSchedule.reservation.contact_name ?? '',
+        );
+        if (!contactName) {
+          throw new BadRequestException('Informe o nome do cliente');
         }
+        const contactPhoneOptional = normalizeOptionalContactPhone(
+          courtSchedule.reservation.contact_phone,
+        );
+        const contactPhone =
+          normalizeReservationContactPhone(contactPhoneOptional);
 
         const sportId = courtSchedule.reservation.sport_id;
-        const contactName = courtSchedule.reservation.contact_name;
-        const contactPhone = courtSchedule.reservation.contact_phone;
 
         await manager.getRepository(CourtSchedule).update(
           { id: courtSchedule.id },
           {
             is_fixed: true,
             available: false,
-            company_customer_id: companyCustomerId,
+            fixed_contact_name: contactName,
+            fixed_contact_phone: contactPhoneOptional,
             sport_id: sportId,
           },
         );
@@ -747,7 +742,8 @@ export class CourtSchedulesService {
           },
           {
             is_fixed: true,
-            company_customer_id: companyCustomerId,
+            fixed_contact_name: contactName,
+            fixed_contact_phone: contactPhoneOptional,
             sport_id: sportId,
           },
         );
@@ -768,7 +764,8 @@ export class CourtSchedulesService {
           if (
             reservation &&
             (reservation.contact_name !== contactName ||
-              reservation.contact_phone !== contactPhone)
+              normalizeReservationContactPhone(reservation.contact_phone) !==
+                contactPhone)
           ) {
             throw new ConflictException(
               `Não é possível fixar: já existem reservas feitas para este horário no dia ${formatDateDateToDDMMYYYY(String(schedule.date))} para ${reservation.contact_name}`,
@@ -784,7 +781,8 @@ export class CourtSchedulesService {
             .set({
               is_fixed: true,
               available: false,
-              company_customer_id: companyCustomerId,
+              fixed_contact_name: contactName,
+              fixed_contact_phone: contactPhoneOptional,
               sport_id: sportId,
             })
             .whereInIds(futureIds)
@@ -835,7 +833,8 @@ export class CourtSchedulesService {
           { id: courtSchedule.id },
           {
             is_fixed: false,
-            company_customer_id: null,
+            fixed_contact_name: null,
+            fixed_contact_phone: null,
             sport_id: null,
             available: true,
           },
@@ -861,7 +860,8 @@ export class CourtSchedulesService {
           },
           {
             is_fixed: false,
-            company_customer_id: null,
+            fixed_contact_name: null,
+            fixed_contact_phone: null,
             sport_id: null,
           },
         );
@@ -889,7 +889,8 @@ export class CourtSchedulesService {
             .update(CourtSchedule)
             .set({
               is_fixed: false,
-              company_customer_id: null,
+              fixed_contact_name: null,
+              fixed_contact_phone: null,
               sport_id: null,
               available: true,
             })

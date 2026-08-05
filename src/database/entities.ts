@@ -8,7 +8,6 @@ import { CourtSchedule } from '../court-schedules/entities/court-schedule.entity
 import { Reservation } from '../reservations/entities/reservation.entity';
 import { CompanyImage } from '../company-images/entities/company-image.entity';
 import { Sport } from '../sports/entities/sport.entity';
-import { CompanyCustomer } from '../companies-customer/entities/company-customer.entity';
 import { Note } from '../notes/entities/note.entity';
 import { Plan } from '../plans/entities/plan.entity';
 import { PaymentCompany } from '../payment_company/entities/payment_company.entity';
@@ -31,7 +30,6 @@ export const entities = [
   Reservation,
   CompanyImage,
   Sport,
-  CompanyCustomer,
   Note,
   Plan,
   PaymentCompany,

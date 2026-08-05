@@ -48,10 +48,10 @@ export class OperatingScheduleService {
     );
     if (
       createOperatingScheduleDto.is_fixed === true &&
-      !createOperatingScheduleDto.company_customer_id
+      !createOperatingScheduleDto.fixed_contact_name?.trim()
     ) {
       throw new ForbiddenException(
-        'Horários fixos devem ter um cliente associado.',
+        'Horários fixos devem ter um nome de contato associado.',
       );
     }
     return this.operatingScheduleRepository.save(createOperatingScheduleDto);

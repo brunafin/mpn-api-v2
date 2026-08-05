@@ -1,5 +1,4 @@
 import { Exclude, Expose } from 'class-transformer';
-import { CompanyCustomer } from 'src/companies-customer/entities/company-customer.entity';
 import { CompanyImage } from 'src/company-images/entities/company-image.entity';
 import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
@@ -178,10 +177,6 @@ export class Company {
   @OneToMany(() => CompanyImage, (image) => image.company)
   @Expose()
   images: CompanyImage[];
-
-  @OneToMany(() => CompanyCustomer, (customer) => customer.company)
-  @Expose()
-  customers: CompanyCustomer[];
 
   @OneToMany(() => PaymentCompany, (paymentCompany) => paymentCompany.company)
   @Expose()

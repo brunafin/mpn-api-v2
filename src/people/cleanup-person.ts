@@ -198,14 +198,6 @@ async function runCascadeDeletes(
     );
 
     await del(
-      'company_customer',
-      `DELETE FROM company_customer
-       WHERE company_id = ANY($1::int[])
-       RETURNING id`,
-      [companyIds],
-    );
-
-    await del(
       'company',
       `DELETE FROM company WHERE id = ANY($1::int[]) RETURNING id`,
       [companyIds],
