@@ -33,12 +33,12 @@ export class CompanyIsTrialAndTrialEndsAtNotNull1784710000000
       ALTER COLUMN "trial_ends_at" SET NOT NULL
     `);
 
-    // Trial ativo = FREE + partner active + data ainda no futuro.
+    // Trial ativo = FREE (id 1) + partner active + data ainda no futuro.
     await queryRunner.query(`
       UPDATE "company"
       SET "is_trial" = true
       WHERE "partner_status" = 'active'
-        AND "plan_id" = 2
+        AND "plan_id" = 1
         AND "trial_ends_at" > NOW()
     `);
 

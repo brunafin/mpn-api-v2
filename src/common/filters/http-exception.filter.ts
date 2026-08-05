@@ -17,6 +17,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message: string | Record<string, unknown> = 'Ocorreu um erro inesperado';
     let errorDetails: string | null = null;
     let code: string | null = null;
+    let missing: string[] | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -50,6 +51,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
         if (typeof responseObject.code === 'string') {
           code = responseObject.code;
         }
+        if (
+          Array.isArray(responseObject.missing) &&
+          responseObject.missing.every((item) => typeof item === 'string')
+        ) {
+          missing = responseObject.missing as string[];
+        }
         errorDetails =
           typeof responseObject.error === 'string'
             ? responseObject.error
@@ -68,6 +75,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode: status,
       message,
       ...(code ? { code } : {}),
+      ...(missing ? { missing } : {}),
       ...(errorDetails ? { error: errorDetails } : {}),
       timestamp: new Date().toISOString(),
     });

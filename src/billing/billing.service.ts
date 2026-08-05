@@ -195,7 +195,7 @@ export class BillingService {
   async startContract(
     companyPublicId: string,
     ownerPublicId: string,
-    cpfFromBody?: string,
+    payer?: { cpf?: string; email?: string },
   ): Promise<BillingPixPayload> {
     if (!this.mercadoPago.isConfigured()) {
       throw new UnprocessableEntityException({
@@ -259,7 +259,7 @@ export class BillingService {
       companyPublicId,
       ownerPublicId,
       payment.id,
-      cpfFromBody,
+      payer,
     );
   }
 
@@ -288,7 +288,7 @@ export class BillingService {
     companyPublicId: string,
     ownerPublicId: string,
     paymentId: number,
-    cpfFromBody?: string,
+    payer?: { cpf?: string; email?: string },
   ): Promise<BillingPixPayload> {
     if (!this.mercadoPago.isConfigured()) {
       throw new UnprocessableEntityException({
@@ -310,28 +310,68 @@ export class BillingService {
     }
 
     const owner = company.administrator;
-    if (!owner?.email) {
-      throw new UnprocessableEntityException(
-        'Cadastre um e-mail na conta para gerar o PIX.',
-      );
-    }
-
-    let cpf = normalizeCpf(owner.cpf) ?? normalizeCpf(cpfFromBody);
-    if (!cpf) {
+    if (!owner) {
       throw new UnprocessableEntityException({
-        code: 'CPF_REQUIRED',
-        message: 'Informe o CPF do responsável para gerar o PIX.',
+        code: 'PAYER_DATA_REQUIRED',
+        missing: ['email', 'cpf'],
+        message: 'Complete os dados do responsável para gerar o PIX.',
       });
     }
 
-    if (!owner.cpf || normalizeCpf(owner.cpf) !== cpf) {
+    const emailFromBody = normalizePayerEmail(payer?.email);
+    let email = normalizePayerEmail(owner.email) ?? emailFromBody;
+
+    if (emailFromBody) {
+      const currentEmail = normalizePayerEmail(owner.email);
+      if (emailFromBody !== currentEmail) {
+        const existingEmail = await this.peopleRepository.findOne({
+          where: { email: ILike(emailFromBody) },
+        });
+        if (existingEmail && existingEmail.id !== owner.id) {
+          throw new ConflictException('Já existe uma conta com este e-mail.');
+        }
+        owner.email = emailFromBody;
+        await this.peopleRepository.save(owner);
+      }
+      email = emailFromBody;
+    }
+
+    let cpf = normalizeCpf(owner.cpf) ?? normalizeCpf(payer?.cpf);
+
+    const missing: Array<'email' | 'cpf'> = [];
+    if (!email) missing.push('email');
+    if (!cpf) missing.push('cpf');
+    if (missing.length > 0) {
+      const code =
+        missing.length === 2
+          ? 'PAYER_DATA_REQUIRED'
+          : missing[0] === 'email'
+            ? 'EMAIL_REQUIRED'
+            : 'CPF_REQUIRED';
+      const message =
+        missing.length === 2
+          ? 'Informe e-mail e CPF do responsável para gerar o PIX.'
+          : missing[0] === 'email'
+            ? 'Cadastre um e-mail na conta para gerar o PIX.'
+            : 'Informe o CPF do responsável para gerar o PIX.';
+      throw new UnprocessableEntityException({
+        code,
+        missing,
+        message,
+      });
+    }
+
+    const payerEmail = email as string;
+    const payerCpf = cpf as string;
+
+    if (!owner.cpf || normalizeCpf(owner.cpf) !== payerCpf) {
       const existingCpf = await this.peopleRepository.findOne({
-        where: { cpf },
+        where: { cpf: payerCpf },
       });
       if (existingCpf && existingCpf.id !== owner.id) {
         throw new ConflictException('Já existe uma conta com este CPF.');
       }
-      owner.cpf = cpf;
+      owner.cpf = payerCpf;
       await this.peopleRepository.save(owner);
     }
 
@@ -357,9 +397,9 @@ export class BillingService {
       externalReference: String(payment.id),
       idempotencyKey,
       payer: {
-        email: owner.email,
+        email: payerEmail,
         firstName: owner.name || company.name,
-        cpf,
+        cpf: payerCpf,
       },
     });
 
@@ -647,4 +687,11 @@ export class BillingService {
       mpPaymentId: payment.mp_payment_id ?? null,
     };
   }
+}
+
+function normalizePayerEmail(value?: string | null): string | null {
+  if (!value) return null;
+  const email = value.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return email;
 }

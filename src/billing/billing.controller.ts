@@ -54,7 +54,7 @@ export class BillingController {
     return this.billingService.startContract(
       companyPublicId,
       req.user.userId,
-      dto.cpf,
+      { cpf: dto.cpf, email: dto.email },
     );
   }
 
@@ -84,7 +84,7 @@ export class BillingController {
       companyPublicId,
       req.user.userId,
       paymentId,
-      dto.cpf,
+      { cpf: dto.cpf, email: dto.email },
     );
   }
 }

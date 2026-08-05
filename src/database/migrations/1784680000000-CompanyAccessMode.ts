@@ -20,8 +20,9 @@ export class CompanyAccessMode1784680000000 implements MigrationInterface {
       `ALTER TABLE "company" ADD "access_restricted_at" TIMESTAMP WITH TIME ZONE`,
     );
 
+    // Promo comercial: qualquer plano que não seja FREE (1) nem Pendência (3).
     const promoRows: Array<{ id: number }> = await queryRunner.query(
-      `SELECT id FROM plan WHERE id NOT IN (2, 3) ORDER BY id ASC LIMIT 1`,
+      `SELECT id FROM plan WHERE id NOT IN (1, 3) ORDER BY id ASC LIMIT 1`,
     );
     const promoPlanId: number | null = promoRows[0]?.id ?? null;
 
