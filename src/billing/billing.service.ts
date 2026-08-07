@@ -24,13 +24,15 @@ import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
-import { PlanEnum } from 'src/plans/enum/enum';
 import {
   computeMonthlyFee,
   quotePlanPrices,
 } from 'src/plans/utils/compute-monthly-fee';
 import { ILike, IsNull, Repository } from 'typeorm';
-import { isEligibleForAutoParcel } from './billing-eligibility';
+import {
+  isEligibleForAutoParcel,
+  needsPlanActivation,
+} from './billing-eligibility';
 import {
   BillingPaymentItem,
   BillingPaymentStatus,
@@ -151,7 +153,7 @@ export class BillingService {
   ): Promise<BillingSummary> {
     const company = await this.findOwnedCompany(companyPublicId, ownerPublicId);
     const isTrial = isCompanyOnTrial(company);
-    const quotePlan = this.needsPlanActivation(company)
+    const quotePlan = needsPlanActivation(company)
       ? await this.findPromotionalPlanOptional()
       : company.plan;
     const { basePrice, pricePerCourt } = quotePlanPrices(
@@ -206,10 +208,27 @@ export class BillingService {
     }
 
     const company = await this.findOwnedCompany(companyPublicId, ownerPublicId);
-    if (!this.needsPlanActivation(company)) {
-      throw new BadRequestException(
-        'Este estabelecimento já possui plano ativo. Use Mensalidades para pagar.',
-      );
+    if (!needsPlanActivation(company)) {
+      // Cliente pago: reutiliza o fluxo de Mensalidades (parcela em aberto).
+      const openPayment = await this.paymentsRepository.findOne({
+        where: {
+          company_id: company.id,
+          dt_payment: IsNull(),
+        },
+        order: { id: 'DESC' },
+      });
+      if (openPayment) {
+        return this.generatePix(
+          companyPublicId,
+          ownerPublicId,
+          openPayment.id,
+          payer,
+        );
+      }
+      throw new BadRequestException({
+        code: 'NO_OPEN_PAYMENT',
+        message: 'Não há mensalidade em aberto no momento.',
+      });
     }
 
     const promotional = await this.findPromotionalPlan();
@@ -483,7 +502,7 @@ export class BillingService {
     });
     if (!company) return;
 
-    if (this.needsPlanActivation(company)) {
+    if (needsPlanActivation(company)) {
       await this.activatePromotionalPlan(company, payment.dt_payment);
       return;
     }
@@ -505,16 +524,6 @@ export class BillingService {
       await this.paymentsRepository.save(payment);
       await this.onPaymentApproved(payment.id);
     }
-  }
-
-  /** Precisa da 1ª vinculação comercial (não é cliente pago ainda). */
-  private needsPlanActivation(company: Company): boolean {
-    if (isCompanyOnTrial(company)) return true;
-    if (company.partner_status === PartnerStatus.EXPIRED) return true;
-    if (company.partner_status === PartnerStatus.INACTIVE) return true;
-    if (company.plan_id == null) return true;
-    if (company.plan_id === PlanEnum.FREE) return true;
-    return false;
   }
 
   private async activatePromotionalPlan(

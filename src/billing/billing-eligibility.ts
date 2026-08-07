@@ -1,3 +1,7 @@
+import {
+  resolveEntitlement,
+  type CompanyAccessSnapshot,
+} from 'src/companies/utils/company-access';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { isCompanyOnTrial } from 'src/companies/utils/trial-expiry';
@@ -15,4 +19,14 @@ export function isEligibleForAutoParcel(company: {
   // Plano FREE (período de teste), mesmo se is_trial estiver inconsistente.
   if (company.plan_id === PlanEnum.FREE) return false;
   return true;
+}
+
+/**
+ * Precisa da 1ª vinculação comercial (ainda não é cliente pago).
+ * Alinhado a `resolveEntitlement` — evita loop Planos ↔ Mensalidades.
+ */
+export function needsPlanActivation(
+  company: CompanyAccessSnapshot,
+): boolean {
+  return resolveEntitlement(company) !== 'paid';
 }
