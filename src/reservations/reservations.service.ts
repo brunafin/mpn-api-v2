@@ -15,6 +15,10 @@ import { OperatingSchedule } from 'src/operating-schedule/entities/operating-sch
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
 import { sanitizePersonName } from 'src/utils/sanitize-person-name';
+import {
+  OBSERVATION_MAX_LENGTH,
+  sanitizeNoteText,
+} from 'src/utils/sanitize-note-text';
 import { normalizeOptionalContactPhone } from 'src/utils/normalize-contact-phone';
 
 @Injectable()
@@ -80,14 +84,17 @@ export class ReservationsService {
         throw new BadRequestException('Informe o nome do cliente');
       }
 
-      const observation =
-        createReservationDto.observation?.trim().slice(0, 150) || undefined;
+      const observationRaw = sanitizeNoteText(
+        createReservationDto.observation ?? '',
+        OBSERVATION_MAX_LENGTH,
+      );
+      const observation = observationRaw.length > 0 ? observationRaw : undefined;
 
       const reservation = this.reservationsRepository.create({
         contact_name: contactName,
         contact_phone: contactPhone,
         court_schedule_id: courtSchedule.id,
-        observation: observation && observation.length > 0 ? observation : undefined,
+        observation,
         is_barbecue_included: createReservationDto.isBarbecueIncluded,
         is_event: createReservationDto.isEvent,
         sport_id: createReservationDto.sportId,
@@ -230,7 +237,7 @@ export class ReservationsService {
     const updateData: any = {};
     if (fields.observation !== undefined) {
       updateData.observation = fields.observation
-        ? fields.observation.trim().slice(0, 150)
+        ? sanitizeNoteText(fields.observation, OBSERVATION_MAX_LENGTH)
         : fields.observation;
     }
     if (fields.is_barbecue_included !== undefined)

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Note } from './entities/note.entity';
@@ -7,6 +11,10 @@ import { Company } from 'src/companies/entities/company.entity';
 import { format, startOfDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
+import {
+  NOTE_MESSAGE_MAX_LENGTH,
+  sanitizeNoteText,
+} from 'src/utils/sanitize-note-text';
 
 @Injectable()
 export class NotesService {
@@ -39,10 +47,19 @@ export class NotesService {
       createNoteDto.companyPublicId,
       ownerPublicId,
     );
+    const message = sanitizeNoteText(
+      createNoteDto.message,
+      NOTE_MESSAGE_MAX_LENGTH,
+    );
+    if (!message) {
+      throw new BadRequestException(
+        'Uma mensagem é necessária para criar um lembrete.',
+      );
+    }
     const dateKey = createNoteDto.date.slice(0, 10);
     const noteFields = {
       date: dateKey,
-      message: createNoteDto.message,
+      message,
       company_id: company.id,
     };
     await this.notesRepository.save(noteFields);
