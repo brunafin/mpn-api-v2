@@ -74,7 +74,11 @@ describe('CourtSchedulesService', () => {
   let companyRepo: MockRepo;
   let operatingScheduleRepo: MockRepo;
   let courtRepo: MockRepo;
-  let publicListingCache: { getOrSet: jest.Mock; clear: jest.Mock };
+  let publicListingCache: {
+    getOrSet: jest.Mock;
+    clear: jest.Mock;
+    invalidateAfterMutation: jest.Mock;
+  };
 
   let txCourtSchedule: MockRepo;
   let txOperatingSchedule: MockRepo;
@@ -101,6 +105,7 @@ describe('CourtSchedulesService', () => {
     publicListingCache = {
       getOrSet: jest.fn((_k, factory) => factory()),
       clear: jest.fn(),
+      invalidateAfterMutation: jest.fn(),
     };
 
     txCourtSchedule = makeRepo();
@@ -270,7 +275,7 @@ describe('CourtSchedulesService', () => {
           sport_id: 7,
         }),
       );
-      expect(publicListingCache.clear).toHaveBeenCalled();
+      expect(publicListingCache.invalidateAfterMutation).toHaveBeenCalled();
     });
 
     it('grava fixed_contact_phone null quando a reserva não tem telefone', async () => {
@@ -460,7 +465,7 @@ describe('CourtSchedulesService', () => {
       );
       expect(queryBuilder.execute).toHaveBeenCalledTimes(2);
       expect(txCourtSchedule.save).not.toHaveBeenCalled();
-      expect(publicListingCache.clear).toHaveBeenCalled();
+      expect(publicListingCache.invalidateAfterMutation).toHaveBeenCalled();
     });
 
     it('não faz update em lote quando não há futuros', async () => {
@@ -526,7 +531,7 @@ describe('CourtSchedulesService', () => {
         { id: expect.anything() },
         { available: false, closed_by_day: true },
       );
-      expect(publicListingCache.clear).toHaveBeenCalled();
+      expect(publicListingCache.invalidateAfterMutation).toHaveBeenCalled();
     });
 
     it('reabre só horários marcados closed_by_day', async () => {
@@ -559,7 +564,7 @@ describe('CourtSchedulesService', () => {
       expect(result.updated).toBe(0);
       expect(result.isDayClosed).toBe(false);
       expect(courtSchedulesRepo.update).not.toHaveBeenCalled();
-      expect(publicListingCache.clear).not.toHaveBeenCalled();
+      expect(publicListingCache.invalidateAfterMutation).not.toHaveBeenCalled();
     });
   });
 

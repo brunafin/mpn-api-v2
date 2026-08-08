@@ -278,7 +278,10 @@ export class CompaniesService {
       { public_id: publicId },
       { preferences_is_hidden_inactive_hours: isHiddenInactiveHours },
     );
-    this.publicListingCache.clear();
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: publicId,
+      allAgendaDays: true,
+    });
     return result;
   }
 

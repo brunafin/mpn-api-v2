@@ -92,8 +92,23 @@ export class CourtSchedulesService {
     return toDateKey(date);
   }
 
-  invalidatePublicListingCache(): void {
-    this.publicListingCache.clear();
+  invalidatePublicListingCache(opts?: {
+    companyPublicId?: string;
+    dateKey?: string;
+    companySlug?: string;
+    allAgendaDays?: boolean;
+  }): void {
+    this.publicListingCache.invalidateAfterMutation(opts);
+  }
+
+  private cacheScopeFromCompany(company?: {
+    public_id?: string;
+    slug?: string;
+  } | null): { companyPublicId?: string; companySlug?: string } {
+    return {
+      companyPublicId: company?.public_id,
+      companySlug: company?.slug,
+    };
   }
 
   private async assertCourtOwnedBy(
@@ -136,7 +151,7 @@ export class CourtSchedulesService {
     createCourtScheduleDto: CreateCourtScheduleDto,
     ownerPublicId: string,
   ) {
-    await this.assertCourtOwnedBy(
+    const court = await this.assertCourtOwnedBy(
       createCourtScheduleDto.court_id,
       ownerPublicId,
     );
@@ -144,7 +159,10 @@ export class CourtSchedulesService {
       createCourtScheduleDto,
     );
     const saved = await this.courtSchedulesRepository.save(courtSchedule);
-    this.publicListingCache.clear();
+    this.invalidatePublicListingCache({
+      ...this.cacheScopeFromCompany(court.company),
+      dateKey: this.toDateKey(createCourtScheduleDto.date),
+    });
     return saved;
   }
 
@@ -376,13 +394,18 @@ export class CourtSchedulesService {
     }
   }
 
-  findAll({
-    courtId,
-    city,
-    date,
-    hour,
-    typeOfCourtId,
-  }: UrlQueryParamCourtScheduleDto) {
+  async findAll(
+    {
+      courtId,
+      city,
+      date,
+      hour,
+      typeOfCourtId,
+    }: UrlQueryParamCourtScheduleDto,
+    ownerPublicId: string,
+  ) {
+    await this.assertCourtOwnedBy(courtId, ownerPublicId);
+
     let where = {};
     if (courtId) {
       where = {
@@ -573,14 +596,17 @@ export class CourtSchedulesService {
     available: boolean,
     ownerPublicId: string,
   ) {
-    await this.assertScheduleOwnedBy(publicId, ownerPublicId);
+    const owned = await this.assertScheduleOwnedBy(publicId, ownerPublicId);
     const result = await this.courtSchedulesRepository.update(
       { public_id: publicId },
       available
         ? { available: true, closed_by_day: false }
         : { available: false, closed_by_day: false },
     );
-    this.publicListingCache.clear();
+    this.invalidatePublicListingCache({
+      ...this.cacheScopeFromCompany(owned.court?.company),
+      dateKey: this.toDateKey(owned.date),
+    });
     return result;
   }
 
@@ -648,7 +674,11 @@ export class CourtSchedulesService {
           ? { available: true, closed_by_day: false }
           : { available: false, closed_by_day: true },
       );
-      this.publicListingCache.clear();
+      this.invalidatePublicListingCache({
+        companyPublicId: company.public_id,
+        companySlug: company.slug,
+        dateKey,
+      });
     }
 
     return {
@@ -668,7 +698,7 @@ export class CourtSchedulesService {
     body: { court_schedule_public_id: string },
     ownerPublicId: string,
   ) {
-    await this.assertScheduleOwnedBy(
+    const owned = await this.assertScheduleOwnedBy(
       body.court_schedule_public_id,
       ownerPublicId,
     );
@@ -798,7 +828,10 @@ export class CourtSchedulesService {
         return { message: 'Horário fixado com sucesso' };
       },
     );
-    this.publicListingCache.clear();
+    this.invalidatePublicListingCache({
+      ...this.cacheScopeFromCompany(owned.court?.company),
+      allAgendaDays: true,
+    });
     return result;
   }
 
@@ -806,7 +839,7 @@ export class CourtSchedulesService {
     body: { court_schedule_public_id: string },
     ownerPublicId: string,
   ) {
-    await this.assertScheduleOwnedBy(
+    const owned = await this.assertScheduleOwnedBy(
       body.court_schedule_public_id,
       ownerPublicId,
     );
@@ -899,7 +932,10 @@ export class CourtSchedulesService {
         return { message: 'Horário desafixado com sucesso' };
       },
     );
-    this.publicListingCache.clear();
+    this.invalidatePublicListingCache({
+      ...this.cacheScopeFromCompany(owned.court?.company),
+      allAgendaDays: true,
+    });
     return result;
   }
 

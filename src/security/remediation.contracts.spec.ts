@@ -17,6 +17,7 @@ import { ContactController } from '../contact/contact.controller';
 import { PublicCourtSchedulesController } from '../court-schedules/public-court-schedules.controller';
 import { OperatingScheduleController } from '../operating-schedule/operating-schedule.controller';
 import { GoogleCourtsController } from '../google_courts/google_courts.controller';
+import { CourtSchedulesController } from '../court-schedules/court-schedules.controller';
 import { assertDeploySecurityGuards } from './assert-deploy-security';
 import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
 import { ConfigService } from '@nestjs/config';
@@ -231,6 +232,12 @@ describe('Security remediation contracts', () => {
           ReservationsController.prototype.cancel,
         )?.length,
       ).toBeGreaterThan(0);
+    });
+
+    it('GET court-schedules findAll exige owner (user.userId no handler)', () => {
+      const src = CourtSchedulesController.prototype.findAll.toString();
+      expect(src).toContain('user.userId');
+      expect(src).toContain('findAll');
     });
   });
 

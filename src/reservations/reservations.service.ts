@@ -20,6 +20,7 @@ import {
   sanitizeNoteText,
 } from 'src/utils/sanitize-note-text';
 import { normalizeOptionalContactPhone } from 'src/utils/normalize-contact-phone';
+import { toDateKey } from 'src/utils/calendarDate';
 
 @Injectable()
 export class ReservationsService {
@@ -106,7 +107,11 @@ export class ReservationsService {
       );
 
       await queryRunner.commitTransaction();
-      this.publicListingCache.clear();
+      this.publicListingCache.invalidateAfterMutation({
+        companyPublicId: courtSchedule.court.company.public_id,
+        companySlug: courtSchedule.court.company.slug,
+        dateKey: toDateKey(courtSchedule.date),
+      });
       return plainToInstance(Reservation, reservation);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -117,7 +122,7 @@ export class ReservationsService {
       ) {
         throw error;
       }
-      throw new BadRequestException('Erro ao criar reserva: ' + error.message);
+      throw new BadRequestException('Erro ao criar reserva');
     } finally {
       await queryRunner.release();
     }
@@ -157,7 +162,14 @@ export class ReservationsService {
       );
 
       await queryRunner.commitTransaction();
-      this.publicListingCache.clear();
+      const company = owned.court_schedule?.court?.company;
+      this.publicListingCache.invalidateAfterMutation({
+        companyPublicId: company?.public_id,
+        companySlug: company?.slug,
+        dateKey: owned.court_schedule?.date
+          ? toDateKey(owned.court_schedule.date)
+          : undefined,
+      });
       return { message: 'Reserva cancelada com sucesso!' };
     } catch (error) {
       await queryRunner.rollbackTransaction();

@@ -76,7 +76,7 @@ export class PublicListingCache {
     return promise;
   }
 
-  /** Invalida tudo (reserva/cancel/fix afetam várias chaves). */
+  /** Invalida tudo (ops administrativas / billing). Preferir invalidateAfterMutation. */
   clear(): void {
     this.store.clear();
   }
@@ -87,6 +87,45 @@ export class PublicListingCache {
         this.store.delete(key);
       }
     }
+  }
+
+  /**
+   * Invalida agenda da empresa + listagens públicas afetadas.
+   * Evita clear() global (agenda de outras empresas na mesma instância).
+   */
+  invalidateAfterMutation(opts?: {
+    companyPublicId?: string;
+    dateKey?: string;
+    companySlug?: string;
+    /** fix/unfix/populate: vários dias futuros */
+    allAgendaDays?: boolean;
+  }): void {
+    const { companyPublicId, dateKey, companySlug, allAgendaDays } =
+      opts ?? {};
+
+    if (companyPublicId) {
+      if (dateKey && !allAgendaDays) {
+        this.store.delete(`agenda:${companyPublicId}:${dateKey}`);
+        this.store.delete(`agenda-all:${companyPublicId}:${dateKey}`);
+      } else {
+        this.invalidatePrefix(`agenda:${companyPublicId}:`);
+        this.invalidatePrefix(`agenda-all:${companyPublicId}:`);
+      }
+    } else {
+      this.invalidatePrefix('agenda:');
+      this.invalidatePrefix('agenda-all:');
+    }
+
+    if (companySlug) {
+      this.invalidatePrefix(`details:${companySlug}:`);
+      this.invalidatePrefix(`hours:${companySlug}:`);
+    } else {
+      this.invalidatePrefix('details:');
+      this.invalidatePrefix('hours:');
+    }
+
+    // where-to-play é chave por cidade/data (sem company)
+    this.invalidatePrefix('wtp:');
   }
 
   size(): number {

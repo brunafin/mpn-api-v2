@@ -12,6 +12,8 @@ import {
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
+import { UpdateReservationExtraDto } from './dto/update-reservation-extra.dto';
+import { UpdateReservationContactDto } from './dto/update-reservation-contact.dto';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { WriteAccessGuard } from 'src/common/guards/write-access.guard';
@@ -78,12 +80,7 @@ export class ReservationsController {
   })
   async updateExtraFields(
     @Param('public_id') public_id: string,
-    @Body()
-    body: {
-      observation?: string;
-      is_barbecue_included?: boolean;
-      is_event?: boolean;
-    },
+    @Body() body: UpdateReservationExtraDto,
     @Req() req: AuthedRequest,
   ) {
     return this.reservationsService.updateExtraFields(
@@ -115,7 +112,7 @@ export class ReservationsController {
   @ApiOperation({ summary: 'Atualizar dados de contato da reserva' })
   async updateContact(
     @Param('court_schedule_public_id') courtSchedulePublicId: string,
-    @Body() body: { contactName: string; contactPhone?: string | null },
+    @Body() body: UpdateReservationContactDto,
     @Req() req: AuthedRequest,
   ) {
     return this.reservationsService.updateContact(

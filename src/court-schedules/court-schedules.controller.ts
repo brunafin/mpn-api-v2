@@ -14,6 +14,11 @@ import {
 import { CourtSchedulesService } from './court-schedules.service';
 import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
+import { FixScheduleDto } from './dto/fix-schedule.dto';
+import { UnfixScheduleDto } from './dto/unfix-schedule.dto';
+import { UpdateDayAvailabilityDto } from './dto/update-day-availability.dto';
+import { QuickCreateScheduleDto } from './dto/quick-create-schedule.dto';
+import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 import {
   ApiBody,
   ApiOperation,
@@ -82,28 +87,9 @@ export class CourtSchedulesController {
     summary:
       'Fechar ou reabrir todos os horários livres de um dia (sem alterar reservas/fixos)',
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['company_public_id', 'date', 'available'],
-      properties: {
-        company_public_id: { type: 'string', format: 'uuid' },
-        date: { type: 'string', format: 'date', example: '2026-07-26' },
-        available: {
-          type: 'boolean',
-          description:
-            'false = fechar o dia (inativar livres); true = reabrir inativos',
-        },
-      },
-    },
-  })
+  @ApiBody({ type: UpdateDayAvailabilityDto })
   updateDayAvailability(
-    @Body()
-    body: {
-      company_public_id: string;
-      date: string;
-      available: boolean;
-    },
+    @Body() body: UpdateDayAvailabilityDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.courtSchedulesService.updateDayAvailability(
@@ -113,7 +99,7 @@ export class CourtSchedulesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos os horários de quadra' })
+  @ApiOperation({ summary: 'Listar horários de uma quadra do owner autenticado' })
   @ApiQuery({ name: 'courtId', type: Number, required: true })
   @ApiQuery({ name: 'hour', type: Number, required: false })
   @ApiQuery({ name: 'date', type: String, format: 'date', required: false })
@@ -121,18 +107,22 @@ export class CourtSchedulesController {
   @ApiQuery({ name: 'typeOfCourtId', type: Number, required: false })
   findAll(
     @Query('courtId') courtId: number,
+    @CurrentUser() user: AuthUser,
     @Query('hour') hour?: string,
     @Query('date') date?: Date,
     @Query('city') city?: string,
     @Query('typeOfCourtId') typeOfCourtId?: number,
   ) {
-    return this.courtSchedulesService.findAll({
-      courtId,
-      hour,
-      date,
-      city,
-      typeOfCourtId,
-    });
+    return this.courtSchedulesService.findAll(
+      {
+        courtId,
+        hour,
+        date,
+        city,
+        typeOfCourtId,
+      },
+      user.userId,
+    );
   }
 
   @Get(':public_id')
@@ -185,12 +175,12 @@ export class CourtSchedulesController {
   })
   updateAvailability(
     @Param('public_id') publicId: string,
-    @Body('available') available: boolean,
+    @Body() body: UpdateAvailabilityDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.courtSchedulesService.updateAvailability(
       publicId,
-      available,
+      body.available,
       user.userId,
     );
   }
@@ -198,8 +188,9 @@ export class CourtSchedulesController {
   @Post('fix')
   @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Fixar horário para um cliente' })
+  @ApiBody({ type: FixScheduleDto })
   async fixSchedule(
-    @Body() body: { court_schedule_public_id: string },
+    @Body() body: FixScheduleDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.courtSchedulesService.fixSchedule(body, user.userId);
@@ -208,8 +199,9 @@ export class CourtSchedulesController {
   @Post('unfix')
   @UseGuards(WriteAccessGuard)
   @ApiOperation({ summary: 'Desafixar horário de um cliente' })
+  @ApiBody({ type: UnfixScheduleDto })
   async unfixSchedule(
-    @Body() body: { court_schedule_public_id: string },
+    @Body() body: UnfixScheduleDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.courtSchedulesService.unfixSchedule(body, user.userId);
@@ -220,8 +212,9 @@ export class CourtSchedulesController {
   @ApiOperation({
     summary: 'Criar horário de quadra rapidamente para o usuário logado',
   })
+  @ApiBody({ type: QuickCreateScheduleDto })
   async quickCreate(
-    @Body() body: { start_hour: string; date: string; court_id: number },
+    @Body() body: QuickCreateScheduleDto,
     @CurrentUser() user: AuthUser,
   ) {
     return this.courtSchedulesService.quickCreate(body, user.userId);
