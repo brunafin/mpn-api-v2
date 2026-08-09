@@ -1,6 +1,16 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsInt, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsDateString,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
+import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
 
 export class QuickCreateScheduleDto {
   @ApiProperty({ example: '10:00', description: 'Hora de início HH:mm' })
@@ -16,4 +26,18 @@ export class QuickCreateScheduleDto {
   @Type(() => Number)
   @IsInt()
   court_id: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Preço do horário em reais. Se omitido, usa o preço do horário de funcionamento ou 0.',
+    example: 80,
+    minimum: 0,
+    maximum: MAX_COURT_PRICE_REAIS,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(MAX_COURT_PRICE_REAIS)
+  price?: number;
 }
