@@ -469,8 +469,10 @@ export class CompaniesService {
       );
     }
 
+    const logoId = randomUUID();
     const key = this.storageService.companyLogoKey(
       company.public_id,
+      logoId,
       extension,
     );
     const previousKey = this.storageService.keyFromPublicUrl(company.logo_url);
@@ -484,7 +486,7 @@ export class CompaniesService {
     company.logo_url = logoUrl;
     await this.companiesRepository.save(company);
 
-    // Se o logo antigo tinha outra extensão/key no mesmo bucket, remove.
+    // Remove logo anterior (mesmo bucket); key antiga fixa ou versionada.
     if (previousKey && previousKey !== key) {
       await this.storageService.deleteObject(previousKey);
     }

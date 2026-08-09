@@ -51,11 +51,17 @@ export class StorageService {
 
   /**
    * Prefixo "pasta" por estabelecimento no R2.
-   * Ex.: companies/{companyPublicId}/logo.webp
+   * Ex.: companies/{companyPublicId}/logo/{uuid}.webp
+   * UUID na key evita URL idêntica após troca (cache de browser/CDN).
    */
-  companyLogoKey(companyPublicId: string, extension: string): string {
+  companyLogoKey(
+    companyPublicId: string,
+    logoId: string,
+    extension: string,
+  ): string {
     const ext = extension.replace(/^\./, '').toLowerCase();
-    return `companies/${companyPublicId}/logo.${ext}`;
+    const id = logoId.replace(/[^a-zA-Z0-9_-]/g, '');
+    return `companies/${companyPublicId}/logo/${id}.${ext}`;
   }
 
   /**
@@ -92,6 +98,8 @@ export class StorageService {
         Key: input.key,
         Body: input.body,
         ContentType: input.contentType,
+        // Keys versionadas: cache longo ok; URL nova a cada upload.
+        CacheControl: 'public, max-age=31536000, immutable',
       }),
     );
 
@@ -116,6 +124,7 @@ export class StorageService {
   keyFromPublicUrl(url: string | null | undefined): string | null {
     if (!url || !this.publicBaseUrl) return null;
     if (!url.startsWith(`${this.publicBaseUrl}/`)) return null;
-    return url.slice(this.publicBaseUrl.length + 1) || null;
+    const path = url.slice(this.publicBaseUrl.length + 1).split(/[?#]/)[0];
+    return path || null;
   }
 }

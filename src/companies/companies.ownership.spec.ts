@@ -44,7 +44,7 @@ describe('CompaniesService ownership (regression)', () => {
     storageService = {
       isConfigured: jest.fn().mockReturnValue(true),
       companyPhotoKey: jest.fn().mockReturnValue('key'),
-      companyLogoKey: jest.fn().mockReturnValue('logo-key'),
+      companyLogoKey: jest.fn().mockReturnValue('companies/x/logo/id.webp'),
       uploadObject: jest.fn().mockResolvedValue('https://cdn/x.webp'),
       deleteObject: jest.fn(),
       keyFromPublicUrl: jest.fn().mockReturnValue('key'),
