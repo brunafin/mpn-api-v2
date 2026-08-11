@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { CourtSchedulesService } from './court-schedules.service';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { CheckPublicSlotQueryDto } from './dto/check-public-slot.dto';
 
 @Controller('public-court-schedules')
 @ApiTags('public-court-schedules')
@@ -72,6 +73,20 @@ export class PublicCourtSchedulesController {
     return this.courtSchedulesService.findDetailsCourt({
       slug,
       date,
+    });
+  }
+
+  @Get('/slot-available')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({
+    summary: 'Confirma se um horário ainda está livre (sem cache)',
+  })
+  checkSlotAvailable(@Query() query: CheckPublicSlotQueryDto) {
+    return this.courtSchedulesService.checkPublicSlotAvailable({
+      slug: query.slug,
+      date: query.date,
+      startHour: query.startHour,
+      courtName: query.courtName,
     });
   }
 

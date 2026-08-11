@@ -230,6 +230,18 @@ describe('Security remediation contracts', () => {
       ).toBeFalsy();
     });
 
+    it('slot-available é GET público (revalidação do modal)', () => {
+      expect(
+        typeof PublicCourtSchedulesController.prototype.checkSlotAvailable,
+      ).toBe('function');
+      expect(
+        Reflect.getMetadata(
+          GUARDS_METADATA,
+          PublicCourtSchedulesController.prototype.checkSlotAvailable,
+        ),
+      ).toBeFalsy();
+    });
+
     it('cancel de reserva autenticado exige AuthGuard', () => {
       expect(
         Reflect.getMetadata(
@@ -243,6 +255,54 @@ describe('Security remediation contracts', () => {
       const src = CourtSchedulesController.prototype.findAll.toString();
       expect(src).toContain('user.userId');
       expect(src).toContain('findAll');
+    });
+  });
+
+  describe('Billing — PIX idempotente', () => {
+    it('chave de idempotência do PIX é estável por payment.id', () => {
+      const billingSrc = readFileSync(
+        join(__dirname, '../billing/billing.service.ts'),
+        'utf8',
+      );
+      expect(billingSrc).toMatch(
+        /idempotencyKey = `billing-\$\{payment\.id\}`/,
+      );
+      expect(billingSrc).not.toMatch(
+        /idempotencyKey = `billing-\$\{payment\.id\}-\$\{Date\.now\(\)\}`/,
+      );
+    });
+
+    it('parcela mensal tem unique company × mês e cron trata 23505', () => {
+      const migrationSrc = readFileSync(
+        join(
+          __dirname,
+          '../database/migrations/1784830000000-PaymentCompanyDueMonthUnique.ts',
+        ),
+        'utf8',
+      );
+      expect(migrationSrc).toContain('UQ_payment_company_company_due_month');
+      expect(migrationSrc).toContain("date_trunc('month'");
+
+      const billingSrc = readFileSync(
+        join(__dirname, '../billing/billing.service.ts'),
+        'utf8',
+      );
+      expect(billingSrc).toContain('isPgUniqueViolation');
+    });
+  });
+
+  describe('Auth — JWT revalida person', () => {
+    it('JwtStrategy lê role/status do DB, não do payload', () => {
+      const jwtSrc = readFileSync(
+        join(__dirname, '../auth/jwt.strategy.ts'),
+        'utf8',
+      );
+      expect(jwtSrc).toContain('findByPublicIdForJwt');
+      expect(jwtSrc).toContain('person.status');
+      expect(jwtSrc).toContain('person.role');
+      expect(jwtSrc).not.toMatch(
+        /role:\s*payload\.role === PersonRole\.PLATFORM_ADMIN/,
+      );
     });
   });
 

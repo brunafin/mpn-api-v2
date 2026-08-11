@@ -1282,4 +1282,64 @@ describe('CourtSchedulesService', () => {
       expect(result[0].schedules[0].startHour).toBe('10:00');
     });
   });
+
+  describe('checkPublicSlotAvailable', () => {
+    const openSlot = {
+      id: 9,
+      date: '2099-01-01',
+      start_hour: '19:00:00',
+      court_id: 2,
+      day_of_week_id: 3,
+      court: { id: 2, name: 'Quadra 1' },
+    };
+
+    it('retorna available true quando o slot público ainda está livre', async () => {
+      courtSchedulesRepo.find.mockResolvedValue([openSlot]);
+      operatingScheduleRepo.find.mockResolvedValue([]);
+
+      await expect(
+        service.checkPublicSlotAvailable({
+          slug: 'poliplay',
+          date: '2099-01-01',
+          startHour: '19:00',
+          courtName: 'Quadra 1',
+        }),
+      ).resolves.toEqual({ available: true });
+      expect(publicListingCache.getOrSet).not.toHaveBeenCalled();
+    });
+
+    it('retorna available false quando não há match', async () => {
+      courtSchedulesRepo.find.mockResolvedValue([]);
+
+      await expect(
+        service.checkPublicSlotAvailable({
+          slug: 'poliplay',
+          date: '2099-01-01',
+          startHour: '19:00',
+          courtName: 'Quadra 1',
+        }),
+      ).resolves.toEqual({ available: false });
+    });
+
+    it('retorna available false para horário interno', async () => {
+      courtSchedulesRepo.find.mockResolvedValue([openSlot]);
+      operatingScheduleRepo.find.mockResolvedValue([
+        {
+          court_id: 2,
+          day_of_week_id: 3,
+          hour: '19:00:00',
+          is_public: false,
+        },
+      ]);
+
+      await expect(
+        service.checkPublicSlotAvailable({
+          slug: 'poliplay',
+          date: '2099-01-01',
+          startHour: '19:00',
+          courtName: 'Quadra 1',
+        }),
+      ).resolves.toEqual({ available: false });
+    });
+  });
 });

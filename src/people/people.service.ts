@@ -117,6 +117,23 @@ export class PeopleService {
     });
   }
 
+  /** Role/status atuais para o JWT — não confiar no payload. */
+  findByPublicIdForJwt(publicId: string): Promise<Pick<
+    Person,
+    'public_id' | 'username' | 'status' | 'role'
+  > | null> {
+    return this.peopleRepository.findOne({
+      where: { public_id: publicId },
+      select: {
+        id: true,
+        public_id: true,
+        username: true,
+        status: true,
+        role: true,
+      },
+    });
+  }
+
   private async generateUniqueUsername(email: string): Promise<string> {
     const base =
       email

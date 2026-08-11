@@ -30,6 +30,7 @@ import {
   quotePlanPrices,
 } from 'src/plans/utils/compute-monthly-fee';
 import { ILike, IsNull, Repository } from 'typeorm';
+import { isPgUniqueViolation } from 'src/common/db/pg-error';
 import {
   isEligibleForAutoParcel,
   needsPlanActivation,
@@ -133,17 +134,24 @@ export class BillingService {
         continue;
       }
 
-      await this.paymentsRepository.save(
-        this.paymentsRepository.create({
-          company_id: company.id,
-          plan_id: company.plan_id,
-          dt_due: dueDate,
-          price,
-          form_of_payment: 'PIX',
-          dt_payment: null,
-        }),
-      );
-      created += 1;
+      try {
+        await this.paymentsRepository.save(
+          this.paymentsRepository.create({
+            company_id: company.id,
+            plan_id: company.plan_id,
+            dt_due: dueDate,
+            price,
+            form_of_payment: 'PIX',
+            dt_payment: null,
+          }),
+        );
+        created += 1;
+      } catch (error) {
+        if (!isPgUniqueViolation(error)) {
+          throw error;
+        }
+        skipped += 1;
+      }
     }
 
     return { eligible, created, skipped };
@@ -256,20 +264,34 @@ export class BillingService {
 
     const today = toZonedTime(new Date(), BRAZIL_TZ);
     if (!payment) {
-      payment = await this.paymentsRepository.save(
-        this.paymentsRepository.create({
-          company_id: company.id,
-          plan_id: promotional.id,
-          dt_due: this.buildDueDate(
-            today.getFullYear(),
-            today.getMonth() + 1,
-            Math.min(Math.max(today.getDate(), 1), 28),
-          ),
-          price,
-          form_of_payment: 'PIX',
-          dt_payment: null,
-        }),
-      );
+      try {
+        payment = await this.paymentsRepository.save(
+          this.paymentsRepository.create({
+            company_id: company.id,
+            plan_id: promotional.id,
+            dt_due: this.buildDueDate(
+              today.getFullYear(),
+              today.getMonth() + 1,
+              Math.min(Math.max(today.getDate(), 1), 28),
+            ),
+            price,
+            form_of_payment: 'PIX',
+            dt_payment: null,
+          }),
+        );
+      } catch (error) {
+        if (!isPgUniqueViolation(error)) {
+          throw error;
+        }
+        payment = await this.findPaymentForMonth(
+          company.id,
+          today.getFullYear(),
+          today.getMonth() + 1,
+        );
+        if (!payment) {
+          throw error;
+        }
+      }
     } else {
       payment.plan_id = promotional.id;
       payment.price = price;
@@ -410,7 +432,8 @@ export class BillingService {
     const dueLabel = payment.dt_due
       ? format(new Date(payment.dt_due), 'MM/yyyy')
       : format(now, 'MM/yyyy');
-    const idempotencyKey = `billing-${payment.id}-${Date.now()}`;
+    // Estável por parcela: retry/timeout do client não cria outro payment no MP.
+    const idempotencyKey = `billing-${payment.id}`;
 
     const mp = await this.mercadoPago.createPixPayment({
       amount: Number(payment.price),

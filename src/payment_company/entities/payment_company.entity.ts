@@ -28,6 +28,7 @@ export class PaymentCompany {
   @JoinColumn({ name: 'plan_id' })
   plan: Plan;
 
+  /** Mês civil de dt_due é único por company (índice UQ_payment_company_company_due_month). */
   @Column({ type: 'timestamp', nullable: true })
   dt_due: Date | null;
 

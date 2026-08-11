@@ -9,12 +9,14 @@ import { PaymentCompany } from 'src/payment_company/entities/payment_company.ent
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
+import { QueryFailedError } from 'typeorm';
 import { BillingService } from './billing.service';
 
-describe('BillingService.startContract', () => {
+describe('BillingService', () => {
   let service: BillingService;
-  let companiesRepo: { findOne: jest.Mock };
+  let companiesRepo: { findOne: jest.Mock; find: jest.Mock };
   let paymentsRepo: {
+    find: jest.Mock;
     findOne: jest.Mock;
     save: jest.Mock;
     create: jest.Mock;
@@ -57,8 +59,9 @@ describe('BillingService.startContract', () => {
   }
 
   beforeEach(async () => {
-    companiesRepo = { findOne: jest.fn() };
+    companiesRepo = { findOne: jest.fn(), find: jest.fn() };
     paymentsRepo = {
+      find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
       save: jest.fn(async (p) => ({ id: p.id ?? 55, ...p })),
       create: jest.fn((p) => p),
@@ -95,6 +98,7 @@ describe('BillingService.startContract', () => {
     service = module.get(BillingService);
   });
 
+  describe('startContract', () => {
   it('pago com parcela aberta: gera PIX dessa parcela (fluxo Mensalidades)', async () => {
     companiesRepo.findOne.mockResolvedValue(paidCompany());
     paymentsRepo.findOne
@@ -220,5 +224,102 @@ describe('BillingService.startContract', () => {
       ownerPublicId,
     );
     expect(result.pixCopyPaste).toBe('pix-code');
+  });
+  });
+
+  describe('generatePix', () => {
+    const openPayment = {
+      id: 42,
+      company_id: 10,
+      dt_payment: null,
+      price: 150,
+      dt_due: new Date('2026-08-10T12:00:00.000Z'),
+      mp_payment_id: null,
+      pix_copy_paste: null,
+      pix_qr_base64: null,
+      pix_expires_at: null,
+    };
+
+    beforeEach(() => {
+      companiesRepo.findOne.mockResolvedValue(paidCompany());
+      paymentsRepo.findOne.mockImplementation(async () => ({ ...openPayment }));
+    });
+
+    it('usa chave de idempotência estável billing-{id} em retries', async () => {
+      await service.generatePix(companyPublicId, ownerPublicId, 42);
+      await service.generatePix(companyPublicId, ownerPublicId, 42);
+
+      expect(mercadoPago.createPixPayment).toHaveBeenCalledTimes(2);
+      const keys = mercadoPago.createPixPayment.mock.calls.map(
+        (call) => call[0].idempotencyKey,
+      );
+      expect(keys).toEqual(['billing-42', 'billing-42']);
+    });
+
+    it('reusa QR válido e não chama o Mercado Pago de novo', async () => {
+      paymentsRepo.findOne.mockResolvedValue({
+        ...openPayment,
+        mp_payment_id: 'mp-1',
+        pix_copy_paste: 'pix-code',
+        pix_qr_base64: 'qr',
+        pix_expires_at: new Date(Date.now() + 3_600_000),
+      });
+
+      const result = await service.generatePix(
+        companyPublicId,
+        ownerPublicId,
+        42,
+      );
+
+      expect(result.pixCopyPaste).toBe('pix-code');
+      expect(mercadoPago.createPixPayment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generateDueParcels', () => {
+    const midMonth = new Date('2026-08-15T15:00:00.000Z');
+
+    function eligibleCompany() {
+      return { ...paidCompany(), day_due: 10 };
+    }
+
+    it('cria parcela quando não existe no mês', async () => {
+      companiesRepo.find = jest.fn().mockResolvedValue([eligibleCompany()]);
+      paymentsRepo.find.mockResolvedValue([]);
+
+      const result = await service.generateDueParcels(midMonth);
+
+      expect(result).toEqual({ eligible: 1, created: 1, skipped: 0 });
+      expect(paymentsRepo.save).toHaveBeenCalled();
+    });
+
+    it('trata unique 23505 de corrida como skip', async () => {
+      companiesRepo.find = jest.fn().mockResolvedValue([eligibleCompany()]);
+      paymentsRepo.find.mockResolvedValue([]);
+      paymentsRepo.save.mockRejectedValue(
+        new QueryFailedError(
+          'INSERT',
+          [],
+          Object.assign(new Error('duplicate key'), { code: '23505' }),
+        ),
+      );
+
+      const result = await service.generateDueParcels(midMonth);
+
+      expect(result).toEqual({ eligible: 1, created: 0, skipped: 1 });
+    });
+
+    it('não recria quando já existe parcela no mês', async () => {
+      companiesRepo.find = jest.fn().mockResolvedValue([eligibleCompany()]);
+      paymentsRepo.find.mockResolvedValue([
+        { id: 1, company_id: 10, dt_due: new Date(2026, 7, 10, 12) },
+      ]);
+
+      const result = await service.generateDueParcels(midMonth);
+
+      expect(result.created).toBe(0);
+      expect(result.skipped).toBe(1);
+      expect(paymentsRepo.save).not.toHaveBeenCalled();
+    });
   });
 });

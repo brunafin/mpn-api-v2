@@ -27,6 +27,7 @@ import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
 import { DataSource, Repository } from 'typeorm';
+import { isPgUniqueViolation } from 'src/common/db/pg-error';
 import { CreatePlatformPaymentDto } from './dto/create-platform-payment.dto';
 import {
   ListPlatformClientsQueryDto,
@@ -279,8 +280,17 @@ export class PlatformService {
       form_of_payment: 'PIX',
       dt_payment: null,
     });
-    const saved = await this.paymentsRepository.save(payment);
-    return this.mapPaymentHistoryItem(saved, company.day_due ?? 10);
+    try {
+      const saved = await this.paymentsRepository.save(payment);
+      return this.mapPaymentHistoryItem(saved, company.day_due ?? 10);
+    } catch (error) {
+      if (isPgUniqueViolation(error)) {
+        throw new ConflictException(
+          'Já existe parcela para este mês/ano neste cliente.',
+        );
+      }
+      throw error;
+    }
   }
 
   async markPaymentPaid(

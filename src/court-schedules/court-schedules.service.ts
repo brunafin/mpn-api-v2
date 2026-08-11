@@ -1991,6 +1991,70 @@ export class CourtSchedulesService {
     return objToFront;
   }
 
+  /**
+   * Checagem ao vivo (sem cache) para o modal do portal.
+   * Mesmas regras da listagem: disponível, público, não passado, arena ativa.
+   */
+  async checkPublicSlotAvailable(params: {
+    slug: string;
+    date: string;
+    startHour: string;
+    courtName: string;
+  }): Promise<{ available: boolean }> {
+    const dateKey = this.toDateKey(params.date);
+    const hourKey = params.startHour.slice(0, 5);
+    const courtName = params.courtName.trim();
+    const slug = params.slug.trim();
+    if (!dateKey || !hourKey || !courtName || !slug) {
+      return { available: false };
+    }
+
+    const candidates = await this.courtSchedulesRepository.find({
+      where: {
+        available: true,
+        date: dateKey as unknown as Date,
+        court: {
+          name: courtName,
+          show: true,
+          company: {
+            slug,
+            is_active: true,
+            partner_status: PartnerStatus.ACTIVE,
+            plan_id: Not(IsNull()),
+            access_mode: AccessMode.FULL,
+          },
+        },
+      },
+      relations: {
+        court: true,
+      },
+      select: {
+        id: true,
+        date: true,
+        start_hour: true,
+        court_id: true,
+        day_of_week_id: true,
+        court: {
+          id: true,
+          name: true,
+        },
+      },
+    });
+
+    const match = candidates.find(
+      (item) => String(item.start_hour).slice(0, 5) === hourKey,
+    );
+    if (!match) {
+      return { available: false };
+    }
+    if (isCourtScheduleInPast(match.date, match.start_hour)) {
+      return { available: false };
+    }
+
+    const publicSlots = await this.excludeInternalOperatingHours([match]);
+    return { available: publicSlots.length === 1 };
+  }
+
   async findAllCourts(): Promise<{ slug: string; updatedAt: Date }[]> {
     const companies = await this.companyRepository.find({
       where: {
