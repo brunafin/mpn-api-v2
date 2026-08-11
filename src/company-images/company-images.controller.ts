@@ -7,6 +7,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { CompanyImagesService } from './company-images.service';
 import { CreateCompanyImageDto } from './dto/create-company-image.dto';
@@ -19,6 +20,10 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
+type AuthedRequest = {
+  user: { userId: string };
+};
+
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
 @Controller('company-images')
@@ -27,7 +32,9 @@ export class CompanyImagesController {
   constructor(private readonly companyImagesService: CompanyImagesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Criar imagem para empresa' })
+  @ApiOperation({
+    summary: 'Criar imagem para empresa (legado; preferir /companies/:id/photos)',
+  })
   @ApiBody({
     description: 'Dados para criar uma nova imagem para empresa',
     type: CreateCompanyImageDto,
@@ -41,20 +48,29 @@ export class CompanyImagesController {
       },
     },
   })
-  create(@Body() createCompanyImageDto: CreateCompanyImageDto) {
-    return this.companyImagesService.create(createCompanyImageDto);
+  create(
+    @Body() createCompanyImageDto: CreateCompanyImageDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.companyImagesService.create(
+      createCompanyImageDto,
+      req.user.userId,
+    );
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas as imagens de uma quadra' })
+  @ApiOperation({ summary: 'Listar imagens da empresa (só do dono)' })
   @ApiQuery({ name: 'companyId', type: Number, required: true })
-  findAll(@Query('companyId') companyId: number) {
-    return this.companyImagesService.findAll(companyId);
+  findAll(
+    @Query('companyId') companyId: number,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.companyImagesService.findAll(+companyId, req.user.userId);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Remover uma imagem da quadra' })
-  remove(@Param('id') id: string) {
-    return this.companyImagesService.remove(+id);
+  @ApiOperation({ summary: 'Remover imagem (só do dono)' })
+  remove(@Param('id') id: string, @Req() req: AuthedRequest) {
+    return this.companyImagesService.remove(+id, req.user.userId);
   }
 }

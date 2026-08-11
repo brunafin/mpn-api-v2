@@ -160,4 +160,45 @@ describe('ReservationsService', () => {
       );
     });
   });
+
+  describe('create', () => {
+    it('rejeita horário que já passou', async () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 1,
+          public_id: 'cs-1',
+          available: true,
+          date: '2020-01-01',
+          start_hour: '10:00:00',
+          court: {
+            company: {
+              public_id: 'company-1',
+              slug: 'arena',
+              administrator: { public_id: OWNER_ID },
+            },
+          },
+        }),
+      };
+      (queryRunner.manager as unknown as { getRepository: jest.Mock }).getRepository =
+        jest.fn().mockReturnValue({
+          createQueryBuilder: () => qb,
+        });
+
+      await expect(
+        service.create(
+          {
+            courtSchedulePublicId: 'cs-1',
+            contactName: 'Cliente',
+          } as never,
+          OWNER_ID,
+        ),
+      ).rejects.toThrow(/já passou/i);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    });
+  });
 });

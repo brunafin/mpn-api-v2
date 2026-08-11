@@ -21,6 +21,7 @@ import {
 } from 'src/utils/sanitize-note-text';
 import { normalizeOptionalContactPhone } from 'src/utils/normalize-contact-phone';
 import { toDateKey } from 'src/utils/calendarDate';
+import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
 
 @Injectable()
 export class ReservationsService {
@@ -68,6 +69,14 @@ export class ReservationsService {
 
       if (!courtSchedule.available) {
         throw new BadRequestException('Horário indisponível');
+      }
+
+      if (
+        isCourtScheduleInPast(courtSchedule.date, courtSchedule.start_hour)
+      ) {
+        throw new BadRequestException(
+          'Não é possível reservar um horário que já passou.',
+        );
       }
 
       await queryRunner.manager.update(

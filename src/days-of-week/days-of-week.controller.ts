@@ -19,6 +19,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { PlatformAdminGuard } from 'src/common/guards/platform-admin.guard';
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
@@ -28,6 +29,7 @@ export class DaysOfWeekController {
   constructor(private readonly daysOfWeekService: DaysOfWeekService) {}
 
   @Post()
+  @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Criar um dia da semana' })
   @ApiBody({
     description: 'Dados para criar um novo dia da semana',
@@ -85,6 +87,7 @@ export class DaysOfWeekController {
   }
 
   @Patch(':id')
+  @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Atualizar um dia da semana pelo ID' })
   @ApiBody({
     description: 'Dados para atualizar um dia da semana',
@@ -108,6 +111,7 @@ export class DaysOfWeekController {
   }
 
   @Delete(':id')
+  @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Remover um dia da semana pelo ID' })
   remove(@Param('id') id: string) {
     return this.daysOfWeekService.remove(+id);

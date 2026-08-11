@@ -9,6 +9,7 @@ import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { PublicCourtSchedulesController } from './public-court-schedules.controller';
 import { Company } from 'src/companies/entities/company.entity';
 import { CompanyAccessModule } from 'src/companies/company-access.module';
+import { Plan } from 'src/plans/entities/plan.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CompanyAccessModule } from 'src/companies/company-access.module';
       Court,
       Reservation,
       Company,
+      Plan,
     ]),
     CompanyAccessModule,
   ],

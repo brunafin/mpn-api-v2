@@ -13,15 +13,31 @@ export class PublicCourtSchedulesController {
   @ApiQuery({ name: 'date', type: String, format: 'date', required: true })
   @ApiQuery({ name: 'uf', type: String, required: false })
   @ApiQuery({ name: 'city', type: String, required: false })
+  @ApiQuery({
+    name: 'sport',
+    type: String,
+    required: false,
+    description: 'ID do esporte (court_sports)',
+  })
+  @ApiQuery({
+    name: 'period',
+    type: String,
+    required: false,
+    description: 'morning | afternoon | evening',
+  })
   findWhereToPlay(
     @Query('date') date: Date,
     @Query('uf') uf?: string,
     @Query('city') city?: string,
+    @Query('sport') sport?: string,
+    @Query('period') period?: string,
   ) {
     return this.courtSchedulesService.findWhereToPlay({
       uf,
       city,
       date,
+      sport,
+      period,
     });
   }
 
@@ -88,5 +104,14 @@ export class PublicCourtSchedulesController {
   })
   findPartnerArenas() {
     return this.courtSchedulesService.findPartnerArenas();
+  }
+
+  @Get('/platform-plan-quote')
+  @ApiTags('Marca Pra Nós - Público')
+  @ApiOperation({
+    summary: 'Cotação do plano comercial (landing)',
+  })
+  findPlatformPlanQuote() {
+    return this.courtSchedulesService.findPlatformPlanQuote();
   }
 }

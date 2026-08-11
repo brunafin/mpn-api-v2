@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -7,6 +7,7 @@ import { Company } from 'src/companies/entities/company.entity';
 import { Repository } from 'typeorm';
 import { Sport } from 'src/sports/entities/sport.entity';
 import { assertAdministratorOwns } from 'src/common/tenancy/assert-administrator-owns';
+import { PublicListingCache } from 'src/cache/public-listing.cache';
 
 @Injectable()
 export class CourtsService {
@@ -15,6 +16,7 @@ export class CourtsService {
     private readonly courtRepository: Repository<Court>,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
+    private readonly publicListingCache: PublicListingCache,
   ) {}
 
   private async assertCompanyIdOwnedBy(
@@ -129,11 +131,74 @@ export class CourtsService {
     ownerPublicId: string,
   ) {
     const court = await this.assertCourtOwnedBy(publicId, ownerPublicId);
-    const { company_id: _ignored, ...safeUpdate } = updateCourtDto as UpdateCourtDto & {
-      company_id?: number;
-    };
-    this.courtRepository.merge(court, safeUpdate);
-    return this.courtRepository.save(court);
+
+    if (updateCourtDto.name !== undefined) {
+      const name = updateCourtDto.name.trim();
+      if (!name) {
+        throw new BadRequestException('Informe o nome da quadra.');
+      }
+      court.name = name;
+    }
+    if (updateCourtDto.floor !== undefined) {
+      const floor = updateCourtDto.floor?.trim() || null;
+      court.floor = floor;
+    }
+    if (updateCourtDto.show !== undefined) {
+      court.show = updateCourtDto.show;
+    }
+    if (updateCourtDto.is_covered !== undefined) {
+      court.is_covered = updateCourtDto.is_covered;
+    }
+    if (updateCourtDto.is_can_have_net !== undefined) {
+      court.is_can_have_net = updateCourtDto.is_can_have_net;
+    }
+
+    if (updateCourtDto.sports !== undefined) {
+      const names = Array.from(
+        new Set(
+          updateCourtDto.sports
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0),
+        ),
+      );
+      if (names.length === 0) {
+        throw new BadRequestException('Informe ao menos um esporte.');
+      }
+      court.court_sports = await this.resolveSportsByName(names);
+    }
+
+    const saved = await this.courtRepository.save(court);
+
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: court.company.public_id,
+      companySlug: court.company.slug,
+      allAgendaDays: true,
+    });
+
+    return saved;
+  }
+
+  private async resolveSportsByName(names: string[]): Promise<Sport[]> {
+    const existing = await this.courtRepository.manager.find(Sport);
+    const byName = new Map(
+      existing.map((sport) => [sport.name.toLowerCase(), sport]),
+    );
+    const missing = names.filter((name) => !byName.has(name.toLowerCase()));
+    if (missing.length > 0) {
+      const created = await this.courtRepository.manager.save(
+        Sport,
+        missing.map((name) =>
+          this.courtRepository.manager.create(Sport, {
+            name,
+            needsNet: false,
+          }),
+        ),
+      );
+      for (const sport of created) {
+        byName.set(sport.name.toLowerCase(), sport);
+      }
+    }
+    return names.map((name) => byName.get(name.toLowerCase())!);
   }
 
   async setVisibility(
@@ -154,6 +219,12 @@ export class CourtsService {
       { id: court.company_id },
       { is_active: companyActive },
     );
+
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: court.company.public_id,
+      companySlug: court.company.slug,
+      allAgendaDays: true,
+    });
 
     return {
       publicId: court.public_id,

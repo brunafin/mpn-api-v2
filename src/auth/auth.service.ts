@@ -598,7 +598,7 @@ export class AuthService {
     personPublicId: string,
     newPassword: string,
     currentPassword?: string,
-  ): Promise<{ message: string }> {
+  ): Promise<AuthTokenResult> {
     if (!isValidPassword(newPassword)) {
       throw new BadRequestException(PASSWORD_HINT);
     }
@@ -615,7 +615,7 @@ export class AuthService {
     if (!user.password) {
       const hashed = await bcrypt.hash(newPassword, 12);
       await this.peopleService.updatePassword(user.id, hashed);
-      return { message: 'Senha alterada com sucesso.' };
+      return this.issueTokenAfterPasswordChange(personPublicId);
     }
 
     const defaultPassword = process.env.DEFAULT_PASSWORD;
@@ -642,6 +642,18 @@ export class AuthService {
 
     const hashed = await bcrypt.hash(newPassword, 12);
     await this.peopleService.updatePassword(user.id, hashed);
-    return { message: 'Senha alterada com sucesso.' };
+    return this.issueTokenAfterPasswordChange(personPublicId);
+  }
+
+  /** JWT fresco com updatedPassword:true — evita preso em /alterar-senha. */
+  private async issueTokenAfterPasswordChange(
+    personPublicId: string,
+  ): Promise<AuthTokenResult> {
+    const refreshed =
+      await this.peopleService.findByPublicIdWithCompanies(personPublicId);
+    if (!refreshed) {
+      throw new UnauthorizedException('Não autorizado.');
+    }
+    return this.issueAuthToken(refreshed);
   }
 }

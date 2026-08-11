@@ -24,6 +24,7 @@ import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
+import { PlanEnum } from 'src/plans/enum/enum';
 import {
   computeMonthlyFee,
   quotePlanPrices,
@@ -42,7 +43,8 @@ import {
 import { normalizeCpf } from 'src/utils/normalize-cpf';
 
 const BRAZIL_TZ = 'America/Sao_Paulo';
-const PROMOTIONAL_PLAN_NAME = 'Promocional';
+/** Fallback só se o id do seed sumir do banco (não usar para rename de nome). */
+const PROMOTIONAL_PLAN_NAME_FALLBACK = 'Promocional';
 
 @Injectable()
 export class BillingService {
@@ -571,9 +573,7 @@ export class BillingService {
   }
 
   private async findPromotionalPlan(): Promise<Plan> {
-    const plan = await this.plansRepository.findOne({
-      where: { name: ILike(PROMOTIONAL_PLAN_NAME) },
-    });
+    const plan = await this.findPromotionalPlanOptional();
     if (!plan) {
       throw new NotFoundException(
         'Plano Promocional não encontrado. Contate o suporte.',
@@ -583,8 +583,13 @@ export class BillingService {
   }
 
   private async findPromotionalPlanOptional(): Promise<Plan | null> {
+    const byId = await this.plansRepository.findOne({
+      where: { id: PlanEnum.PROMOTIONAL },
+    });
+    if (byId) return byId;
+    // Ambientes legados sem id 2: último recurso por nome.
     return this.plansRepository.findOne({
-      where: { name: ILike(PROMOTIONAL_PLAN_NAME) },
+      where: { name: ILike(PROMOTIONAL_PLAN_NAME_FALLBACK) },
     });
   }
 

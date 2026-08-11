@@ -517,14 +517,32 @@ describe('AuthService', () => {
       });
       (bcrypt.compare as jest.Mock)
         .mockResolvedValueOnce(true) // is default
-        .mockResolvedValueOnce(false); // new != current
+        .mockResolvedValueOnce(false) // new != current
+        .mockResolvedValueOnce(false); // issueAuthToken: not default anymore
       (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
       peopleService.updatePassword.mockResolvedValue({ message: 'Senha alterada' });
+      peopleService.findByPublicIdWithCompanies.mockResolvedValue({
+        id: 7,
+        public_id: 'person-1',
+        username: 'dono@arena.com',
+        password: 'new-hash',
+        role: 'owner',
+        terms_accepted_at: new Date(),
+        companies: [{ public_id: 'company-1', name: 'Arena' }],
+      });
 
       const result = await service.changePassword('person-1', STRONG_PASSWORD);
 
       expect(peopleService.updatePassword).toHaveBeenCalledWith(7, 'new-hash');
-      expect(result.message).toMatch(/sucesso/i);
+      expect(result.access_token).toBe('jwt-token');
+      expect(result.needsProfileCompletion).toBe(false);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'person-1',
+          updatedPassword: true,
+          companyPublicId: 'company-1',
+        }),
+      );
     });
 
     it('exige senha atual quando a conta já não usa a senha padrão', async () => {

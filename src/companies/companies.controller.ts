@@ -68,8 +68,14 @@ export class CompaniesController {
       },
     },
   })
-  create(@Body() createCompanyDto: CreateCompanyDto) {
-    return this.companiesService.create(createCompanyDto);
+  create(
+    @Body() createCompanyDto: CreateCompanyDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.companiesService.createForOwner(
+      createCompanyDto,
+      req.user.userId,
+    );
   }
 
   @Get()

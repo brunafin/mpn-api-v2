@@ -153,7 +153,11 @@ export class AuthController {
       'Altera a senha do usuário autenticado (senha atual obrigatória, exceto se ainda for a senha padrão)',
   })
   @ApiBody({ type: ChangePasswordDto })
-  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Senha alterada; retorna access_token com updatedPassword=true',
+  })
   @ApiResponse({ status: 400, description: 'Invalid password' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async changePassword(

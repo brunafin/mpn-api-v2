@@ -46,7 +46,8 @@ type PlatformClientListItem = {
   uf: string | null;
   /** Publicação no portal (tarefa do manager). */
   onPortal: boolean | null;
-  partnerStatus: PartnerStatus;
+  /** Null em `kind: 'onboarding'` (person sem company — não é partner_status de Company). */
+  partnerStatus: PartnerStatus | null;
   trialEndsAt: string | Date | null;
   firstAccessAt: string | Date | null;
   isTrial: boolean;
@@ -588,6 +589,8 @@ export class PlatformService {
       [PartnerStatus.EXPIRED]: 2,
       [PartnerStatus.INACTIVE]: 3,
     };
+    const rankOf = (status: PartnerStatus | null) =>
+      status == null ? 1 : partnerRank[status];
 
     return [...items].sort((a, b) => {
       switch (sort) {
@@ -600,8 +603,7 @@ export class PlatformService {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
         case PlatformClientsSort.STATUS: {
-          const byStatus =
-            partnerRank[a.partnerStatus] - partnerRank[b.partnerStatus];
+          const byStatus = rankOf(a.partnerStatus) - rankOf(b.partnerStatus);
           if (byStatus !== 0) return byStatus;
           return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
         }
@@ -635,7 +637,8 @@ export class PlatformService {
       city: person.city || null,
       uf: person.uf || null,
       onPortal: null,
-      partnerStatus: PartnerStatus.ONBOARDING,
+      // Person sem company: status vem de `kind`, não de partner_status.
+      partnerStatus: null,
       trialEndsAt: null,
       firstAccessAt: null,
       isTrial: false,

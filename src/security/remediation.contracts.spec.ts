@@ -11,7 +11,6 @@ import { AuthController } from '../auth/auth.controller';
 import { PeopleController } from '../people/people.controller';
 import { AppModule } from '../app.module';
 import { PlansController } from '../plans/plans.controller';
-import { PaymentCompanyController } from '../payment_company/payment_company.controller';
 import { ReservationsController } from '../reservations/reservations.controller';
 import { ContactController } from '../contact/contact.controller';
 import { PublicCourtSchedulesController } from '../court-schedules/public-court-schedules.controller';
@@ -61,13 +60,19 @@ describe('Security remediation contracts', () => {
       expect(pkg.dependencies?.twilio).toBeUndefined();
     });
 
-    it('PlansController e PaymentCompanyController exigem AuthGuard', () => {
+    it('PlansController exige AuthGuard', () => {
       expect(
         Reflect.getMetadata(GUARDS_METADATA, PlansController)?.length,
       ).toBeGreaterThan(0);
-      expect(
-        Reflect.getMetadata(GUARDS_METADATA, PaymentCompanyController)?.length,
-      ).toBeGreaterThan(0);
+    });
+
+    it('PaymentCompanyModule não registra CRUD scaffold', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PaymentCompanyModule } = require('../payment_company/payment_company.module');
+      const controllers: unknown[] =
+        Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, PaymentCompanyModule) ??
+        [];
+      expect(controllers).toHaveLength(0);
     });
 
     it('PeopleController exige AuthGuard na classe', () => {

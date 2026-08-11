@@ -159,7 +159,7 @@ describe('BillingService.startContract', () => {
       }),
     );
     plansRepo.findOne.mockResolvedValue({
-      id: 99,
+      id: PlanEnum.PROMOTIONAL,
       name: 'Promocional',
       base_price: 100,
       price_per_court: 0,
@@ -175,7 +175,7 @@ describe('BillingService.startContract', () => {
         mp_payment_id: null,
         pix_copy_paste: null,
         pix_expires_at: null,
-        plan_id: 99,
+        plan_id: PlanEnum.PROMOTIONAL,
       });
 
     const result = await service.startContract(
@@ -197,7 +197,7 @@ describe('BillingService.startContract', () => {
       }),
     );
     plansRepo.findOne.mockResolvedValue({
-      id: 99,
+      id: PlanEnum.PROMOTIONAL,
       name: 'Promocional',
       base_price: 80,
       price_per_court: 0,

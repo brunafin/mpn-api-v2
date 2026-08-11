@@ -19,6 +19,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { PlatformAdminGuard } from 'src/common/guards/platform-admin.guard';
 
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
@@ -28,6 +29,7 @@ export class TypeOfCourtController {
   constructor(private readonly typeOfCourtService: TypeOfCourtService) {}
 
   @Post()
+  @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Criar um tipo de quadra' })
   @ApiBody({
     description: 'Dados para criar um novo tipo de quadra',
@@ -82,6 +84,7 @@ export class TypeOfCourtController {
   }
 
   @Patch(':id')
+  @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Atualizar um tipo de quadra pelo ID' })
   @ApiBody({
     description: 'Dados para atualizar um tipo de quadra',
@@ -104,6 +107,7 @@ export class TypeOfCourtController {
   }
 
   @Delete(':id')
+  @UseGuards(PlatformAdminGuard)
   @ApiOperation({ summary: 'Remover um tipo de quadra pelo ID' })
   remove(@Param('id') id: string) {
     return this.typeOfCourtService.remove(+id);

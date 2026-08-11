@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { PaymentCompanyService } from './payment_company.service';
-import { PaymentCompanyController } from './payment_company.controller';
 
-@Module({
-  controllers: [PaymentCompanyController],
-  providers: [PaymentCompanyService],
-})
+/**
+ * Entity `PaymentCompany` é usada por Billing/Platform.
+ * O CRUD Nest scaffold (`payment-company`) foi removido — pagamentos reais
+ * passam por `/billing` e `/platform`.
+ */
+@Module({})
 export class PaymentCompanyModule {}

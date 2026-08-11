@@ -7,6 +7,7 @@ import { OperatingSchedule } from '../operating-schedule/entities/operating-sche
 import { Court } from '../courts/entities/court.entity';
 import { Reservation } from '../reservations/entities/reservation.entity';
 import { Company } from '../companies/entities/company.entity';
+import { Plan } from '../plans/entities/plan.entity';
 import { PublicListingCache } from '../cache/public-listing.cache';
 
 type MockFn = jest.Mock;
@@ -154,6 +155,7 @@ describe('CourtSchedulesService', () => {
         },
         { provide: getRepositoryToken(Court), useValue: courtRepo },
         { provide: getRepositoryToken(Reservation), useValue: makeRepo() },
+        { provide: getRepositoryToken(Plan), useValue: makeRepo() },
         { provide: PublicListingCache, useValue: publicListingCache },
       ],
     }).compile();
@@ -166,7 +168,7 @@ describe('CourtSchedulesService', () => {
   });
 
   describe('quickCreate', () => {
-    const baseBody = { start_hour: '10:00', date: '2025-08-20', court_id: 2 };
+    const baseBody = { start_hour: '10:00', date: '2099-08-20', court_id: 2 };
 
     beforeEach(() => {
       courtRepo.findOne.mockResolvedValue(ownedCourt());
@@ -188,7 +190,7 @@ describe('CourtSchedulesService', () => {
           where: expect.objectContaining({
             court_id: 2,
             hour: '10:00',
-            day_of_week_id: 4,
+            day_of_week_id: 5,
           }),
         }),
       );

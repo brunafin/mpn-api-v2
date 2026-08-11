@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -28,6 +29,7 @@ import {
   imageUploadTooLargeMessage,
 } from './company-image-upload';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
+import { PeopleService } from 'src/people/people.service';
 
 export interface IReservationItemProps {
   scheduleId: string;
@@ -58,10 +60,28 @@ export class CompaniesService {
     private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
     private readonly storageService: StorageService,
     private readonly publicListingCache: PublicListingCache,
+    private readonly peopleService: PeopleService,
   ) {}
 
-  create(createCompanyDto: CreateCompanyDto) {
-    const company = this.companiesRepository.create(createCompanyDto);
+  /**
+   * Legado: criação fora do onboarding.
+   * administrator_id do body é ignorado — sempre o JWT autenticado.
+   */
+  async createForOwner(
+    createCompanyDto: CreateCompanyDto,
+    ownerPublicId: string,
+  ) {
+    const person =
+      await this.peopleService.findByPublicIdWithCompanies(ownerPublicId);
+    if (!person) {
+      throw new UnauthorizedException('Não autorizado.');
+    }
+    const { administrator_id: _ignored, ...safeCreate } =
+      createCompanyDto as CreateCompanyDto & { administrator_id?: number };
+    const company = this.companiesRepository.create({
+      ...safeCreate,
+      administrator_id: person.id,
+    });
     return this.companiesRepository.save(company);
   }
 
@@ -284,8 +304,23 @@ export class CompaniesService {
     // Não permitir reatribuir administrador via patch genérico (IDOR/escalação).
     const { administrator_id: _ignored, ...safeUpdate } =
       updateCompanyDto as UpdateCompanyDto & { administrator_id?: number };
+    if (safeUpdate.characteristics !== undefined) {
+      safeUpdate.characteristics = Array.from(
+        new Set(
+          (safeUpdate.characteristics ?? [])
+            .map((item) => String(item).trim())
+            .filter((item) => item.length > 0),
+        ),
+      );
+    }
     this.companiesRepository.merge(company, safeUpdate);
-    return this.companiesRepository.save(company);
+    const saved = await this.companiesRepository.save(company);
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: company.public_id,
+      companySlug: company.slug,
+      allAgendaDays: true,
+    });
+    return saved;
   }
 
   async removeByPublicId(publicId: string, ownerPublicId: string) {
@@ -327,6 +362,13 @@ export class CompaniesService {
         'company.phone',
         'company.logo_url',
         'company.instagram_url',
+        'company.cep',
+        'company.street',
+        'company.number',
+        'company.neighborhood',
+        'company.city',
+        'company.uf',
+        'company.characteristics',
         'company.slug',
         'company.is_active',
         'company.preferences_is_hidden_inactive_hours',
@@ -353,6 +395,8 @@ export class CompaniesService {
         'courts.name',
         'courts.floor',
         'courts.show',
+        'courts.is_covered',
+        'courts.is_can_have_net',
         'court_sports.id',
         'court_sports.name',
         'operating_schedule.hour',
@@ -395,6 +439,8 @@ export class CompaniesService {
           name: court.name,
           floor: court.floor,
           show: Boolean(court.show),
+          isCovered: Boolean(court.is_covered),
+          isCanHaveNet: Boolean(court.is_can_have_net),
           sports: (court.court_sports ?? []).map((sport) => sport.name),
           price,
         };
@@ -420,6 +466,16 @@ export class CompaniesService {
       },
       companyName: company.name,
       companyPhone: company.phone || null,
+      instagramUrl: company.instagram_url || null,
+      characteristics: company.characteristics ?? [],
+      address: {
+        cep: company.cep || null,
+        street: company.street || null,
+        number: company.number || null,
+        neighborhood: company.neighborhood || null,
+        city: company.city || null,
+        uf: company.uf || null,
+      },
       logoUrl: company.logo_url || null,
       photos: (company.images ?? [])
         .slice(0, COMPANY_PHOTO_MAX_COUNT)
@@ -515,6 +571,12 @@ export class CompaniesService {
     if (previousKey && previousKey !== key) {
       await this.storageService.deleteObject(previousKey);
     }
+
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: company.public_id,
+      companySlug: company.slug,
+      allAgendaDays: true,
+    });
 
     return { logoUrl };
   }
@@ -615,6 +677,12 @@ export class CompaniesService {
       company_id: company.id,
     });
 
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: company.public_id,
+      companySlug: company.slug,
+      allAgendaDays: true,
+    });
+
     return { id: saved.id, url: saved.url };
   }
 
@@ -640,6 +708,12 @@ export class CompaniesService {
     if (key) {
       await this.storageService.deleteObject(key);
     }
+
+    this.publicListingCache.invalidateAfterMutation({
+      companyPublicId: company.public_id,
+      companySlug: company.slug,
+      allAgendaDays: true,
+    });
 
     return { ok: true };
   }

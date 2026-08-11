@@ -10,6 +10,7 @@ import { CompanyImage } from '../company-images/entities/company-image.entity';
 import { StorageService } from '../storage/storage.service';
 import { PublicListingCache } from '../cache/public-listing.cache';
 import { OperatingSchedule } from '../operating-schedule/entities/operating-schedule.entity';
+import { PeopleService } from '../people/people.service';
 
 /**
  * Regressão da tenancy que JÁ existe (logo/fotos).
@@ -51,7 +52,7 @@ describe('CompaniesService ownership (regression)', () => {
       keyFromPublicUrl: jest.fn().mockReturnValue('key'),
     };
     publicListingCache = {
-      invalidateAll: jest.fn(),
+      invalidateAfterMutation: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -71,6 +72,10 @@ describe('CompaniesService ownership (regression)', () => {
         },
         { provide: StorageService, useValue: storageService },
         { provide: PublicListingCache, useValue: publicListingCache },
+        {
+          provide: PeopleService,
+          useValue: { findByPublicIdWithCompanies: jest.fn() },
+        },
       ],
     }).compile();
 

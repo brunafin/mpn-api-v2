@@ -8,11 +8,11 @@ export interface IAvailableHours {
 }
 
 export interface IWhereToPlayCourtList {
-  logoUrl: string;
+  logoUrl: string | null;
   name: string;
-  phone: string;
-  city?: string;
-  uf?: string;
+  phone: string | null;
+  city?: string | null;
+  uf?: string | null;
   address: string;
   /** Slug público da arena (URL /encontre-onde-jogar/{slug}). */
   slug: string;
