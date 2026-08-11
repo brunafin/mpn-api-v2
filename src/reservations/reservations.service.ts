@@ -131,6 +131,22 @@ export class ReservationsService {
   async cancelByPublicId(publicId: string, ownerPublicId: string) {
     const owned = await this.assertReservationOwnedBy(publicId, ownerPublicId);
 
+    const schedule = owned.court_schedule;
+    if (!schedule) {
+      throw new NotFoundException('Horário da reserva não encontrado.');
+    }
+
+    const operatingSchedule = await this.operatingScheduleRepository.findOne({
+      where: {
+        court_id: schedule.court_id,
+        day_of_week_id: schedule.day_of_week_id,
+        hour: schedule.start_hour,
+      },
+      select: { is_public: true },
+    });
+    // Fixo interno: buraco só na agenda do manager — não libera no portal.
+    const availableAfterCancel = operatingSchedule?.is_public !== false;
+
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -153,7 +169,7 @@ export class ReservationsService {
         CourtSchedule,
         reservation.court_schedule_id,
         {
-          available: true,
+          available: availableAfterCancel,
           is_fixed: false,
           fixed_contact_name: null,
           fixed_contact_phone: null,

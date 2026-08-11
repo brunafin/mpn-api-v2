@@ -9,7 +9,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Company } from './entities/company.entity';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { getStatusCourtSchedule } from 'src/utils/getStatusCourtSchedulet';
 import { ReservationStatusEnum } from 'src/court-schedules/court-schedules.service';
@@ -27,6 +27,7 @@ import {
   IMAGE_UPLOAD_MIME_TO_EXT,
   imageUploadTooLargeMessage,
 } from './company-image-upload';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 
 export interface IReservationItemProps {
   scheduleId: string;
@@ -39,6 +40,11 @@ export interface IReservationItemProps {
   isEvent?: boolean;
   isNeedsNetting?: boolean;
   isHiddenInactiveHours?: boolean;
+  /**
+   * Visibilidade no portal via OperatingSchedule.
+   * true = público; false = interno; null = sem OS (órfão / quick-create).
+   */
+  isPublic?: boolean | null;
 }
 
 @Injectable()
@@ -48,6 +54,8 @@ export class CompaniesService {
     private readonly companiesRepository: Repository<Company>,
     @InjectRepository(CompanyImage)
     private readonly companyImageRepository: Repository<CompanyImage>,
+    @InjectRepository(OperatingSchedule)
+    private readonly operatingScheduleRepository: Repository<OperatingSchedule>,
     private readonly storageService: StorageService,
     private readonly publicListingCache: PublicListingCache,
   ) {}
@@ -142,22 +150,10 @@ export class CompaniesService {
     dateKey: string,
   ): Promise<{ schedules: IReservationItemProps[]; isDayClosed: boolean }> {
     const schedules = await this.loadSchedulesByDate(publicId, dateKey, true);
-    const company = await this.companiesRepository
-      .createQueryBuilder('company')
-      .innerJoin('company.courts', 'court')
-      .innerJoin(
-        'court.court_schedule',
-        'schedule',
-        'schedule.date = :date AND schedule.closed_by_day = true',
-        { date: dateKey },
-      )
-      .where('company.public_id = :publicId', { publicId })
-      .select('company.id')
-      .getOne();
-
+    // isDayClosed legado: sempre false (closed_by_day removido).
     return {
       schedules,
-      isDayClosed: Boolean(company),
+      isDayClosed: false,
     };
   }
 
@@ -190,9 +186,10 @@ export class CompaniesService {
         'schedule.start_hour',
         'schedule.date',
         'schedule.available',
-        'schedule.closed_by_day',
         'schedule.price',
         'schedule.is_fixed',
+        'schedule.day_of_week_id',
+        'schedule.court_id',
         'reservation.id',
         'reservation.public_id',
         'reservation.contact_name',
@@ -204,6 +201,27 @@ export class CompaniesService {
         'sport.needsNet',
       ])
       .getOne();
+
+    const courtIds =
+      company?.courts?.map((court) => court.id).filter(Boolean) ?? [];
+    const publicByOsKey = new Map<string, boolean>();
+    if (courtIds.length > 0) {
+      const operatingRows = await this.operatingScheduleRepository.find({
+        where: { court_id: In(courtIds) },
+        select: {
+          court_id: true,
+          day_of_week_id: true,
+          hour: true,
+          is_public: true,
+        },
+      });
+      for (const os of operatingRows) {
+        publicByOsKey.set(
+          `${os.court_id}|${os.day_of_week_id}|${String(os.hour).slice(0, 5)}`,
+          os.is_public !== false,
+        );
+      }
+    }
 
     const reservations: IReservationItemProps[] =
       company?.courts
@@ -220,30 +238,37 @@ export class CompaniesService {
                 status === ReservationStatusEnum.INACTIVE
               );
             })
-            .map((schedule) => ({
-              scheduleId: schedule.public_id,
-              status: getStatusCourtSchedule(schedule),
-              date:
-                typeof schedule.date === 'string'
-                  ? String(schedule.date).slice(0, 10)
-                  : format(
-                      new Date(
-                        schedule.date.getTime() +
-                          schedule.date.getTimezoneOffset() * 60_000,
+            .map((schedule) => {
+              const osKey = `${schedule.court_id}|${schedule.day_of_week_id}|${String(schedule.start_hour).slice(0, 5)}`;
+              const isPublic = publicByOsKey.has(osKey)
+                ? publicByOsKey.get(osKey)!
+                : null;
+              return {
+                scheduleId: schedule.public_id,
+                status: getStatusCourtSchedule(schedule),
+                date:
+                  typeof schedule.date === 'string'
+                    ? String(schedule.date).slice(0, 10)
+                    : format(
+                        new Date(
+                          schedule.date.getTime() +
+                            schedule.date.getTimezoneOffset() * 60_000,
+                        ),
+                        'yyyy-MM-dd',
                       ),
-                      'yyyy-MM-dd',
-                    ),
-              court: court.name,
-              time: schedule.start_hour.slice(0, 5),
-              customerName: schedule.reservation?.contact_name ?? null,
-              isBarbecueIncluded:
-                schedule.reservation?.is_barbecue_included ?? false,
-              isEvent: schedule.reservation?.is_event ?? false,
-              isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
-              ...(includeHiddenInactive
-                ? { isHiddenInactiveHours }
-                : {}),
-            }));
+                court: court.name,
+                time: schedule.start_hour.slice(0, 5),
+                customerName: schedule.reservation?.contact_name ?? null,
+                isBarbecueIncluded:
+                  schedule.reservation?.is_barbecue_included ?? false,
+                isEvent: schedule.reservation?.is_event ?? false,
+                isNeedsNetting: schedule.reservation?.sport?.needsNet ?? false,
+                isPublic,
+                ...(includeHiddenInactive
+                  ? { isHiddenInactiveHours }
+                  : {}),
+              };
+            });
         })
         .sort((a, b) => a.time.localeCompare(b.time)) ?? [];
 

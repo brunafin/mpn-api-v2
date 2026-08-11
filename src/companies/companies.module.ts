@@ -5,10 +5,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Company } from './entities/company.entity';
 import { CompanyImage } from 'src/company-images/entities/company-image.entity';
 import { CompanyAccessModule } from './company-access.module';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Company, CompanyImage]),
+    TypeOrmModule.forFeature([Company, CompanyImage, OperatingSchedule]),
     CompanyAccessModule,
   ],
   controllers: [CompaniesController],

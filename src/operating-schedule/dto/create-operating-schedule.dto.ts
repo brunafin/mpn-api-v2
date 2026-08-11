@@ -53,6 +53,17 @@ export class CreateOperatingScheduleDto {
   is_fixed: boolean = false;
 
   @ApiProperty({
+    description:
+      'Se false, horário interno (não listado no portal). Default true.',
+    default: true,
+    type: 'boolean',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  is_public: boolean = true;
+
+  @ApiProperty({
     description: 'Nome do contato do horário fixo',
     type: 'string',
     nullable: true,

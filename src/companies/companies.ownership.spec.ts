@@ -9,6 +9,7 @@ import { Company } from './entities/company.entity';
 import { CompanyImage } from '../company-images/entities/company-image.entity';
 import { StorageService } from '../storage/storage.service';
 import { PublicListingCache } from '../cache/public-listing.cache';
+import { OperatingSchedule } from '../operating-schedule/entities/operating-schedule.entity';
 
 /**
  * Regressão da tenancy que JÁ existe (logo/fotos).
@@ -63,6 +64,10 @@ describe('CompaniesService ownership (regression)', () => {
         {
           provide: getRepositoryToken(CompanyImage),
           useValue: companyImageRepository,
+        },
+        {
+          provide: getRepositoryToken(OperatingSchedule),
+          useValue: { find: jest.fn().mockResolvedValue([]) },
         },
         { provide: StorageService, useValue: storageService },
         { provide: PublicListingCache, useValue: publicListingCache },

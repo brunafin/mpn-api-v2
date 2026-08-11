@@ -17,6 +17,7 @@ import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { FixScheduleDto } from './dto/fix-schedule.dto';
 import { UnfixScheduleDto } from './dto/unfix-schedule.dto';
 import { UpdateDayAvailabilityDto } from './dto/update-day-availability.dto';
+import { UpdateAvailabilityBatchDto } from './dto/update-availability-batch.dto';
 import { QuickCreateScheduleDto } from './dto/quick-create-schedule.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 import {
@@ -85,7 +86,7 @@ export class CourtSchedulesController {
   @UseGuards(WriteAccessGuard)
   @ApiOperation({
     summary:
-      'Fechar ou reabrir todos os horários livres de um dia (sem alterar reservas/fixos)',
+      'Atalho: inativar todos os livres OU ativar todos os inativos do dia (sem origem)',
   })
   @ApiBody({ type: UpdateDayAvailabilityDto })
   updateDayAvailability(
@@ -93,6 +94,23 @@ export class CourtSchedulesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.courtSchedulesService.updateDayAvailability(
+      body,
+      user.userId,
+    );
+  }
+
+  @Patch('availability-batch')
+  @UseGuards(WriteAccessGuard)
+  @ApiOperation({
+    summary:
+      'Inativar/ativar horários por lista de public_ids (seleção múltipla)',
+  })
+  @ApiBody({ type: UpdateAvailabilityBatchDto })
+  updateAvailabilityBatch(
+    @Body() body: UpdateAvailabilityBatchDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.courtSchedulesService.updateAvailabilityBatch(
       body,
       user.userId,
     );
@@ -160,7 +178,10 @@ export class CourtSchedulesController {
 
   @Delete(':public_id')
   @UseGuards(WriteAccessGuard)
-  @ApiOperation({ summary: 'Remover um horário de quadra pelo public_id' })
+  @ApiOperation({
+    summary:
+      'Excluir horário interno/órfão livre (disponível ou inativo; não remove grade comercial)',
+  })
   remove(
     @Param('public_id') publicId: string,
     @CurrentUser() user: AuthUser,

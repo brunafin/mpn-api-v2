@@ -90,6 +90,7 @@ describe('CourtSchedulesService', () => {
     delete: jest.Mock;
     from: jest.Mock;
     where: jest.Mock;
+    andWhere: jest.Mock;
     execute: jest.Mock;
   };
   let manager: {
@@ -119,6 +120,7 @@ describe('CourtSchedulesService', () => {
       delete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
@@ -181,6 +183,15 @@ describe('CourtSchedulesService', () => {
         court_id: 2,
         start_hour: '10:00',
       });
+      expect(operatingScheduleRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            court_id: 2,
+            hour: '10:00',
+            day_of_week_id: 4,
+          }),
+        }),
+      );
       expect(courtSchedulesRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({ price: 80 }),
       );
@@ -367,6 +378,60 @@ describe('CourtSchedulesService', () => {
       expect(txReservation.insert).not.toHaveBeenCalled();
     });
 
+    it('cria operating_schedule interno quando o slot está fora da grade', async () => {
+      txOperatingSchedule.findOne.mockResolvedValue(null);
+      txCourtSchedule.findOne.mockResolvedValue({
+        ...baseSchedule,
+        price: 90,
+      });
+      const populateSpy = jest
+        .spyOn(service, 'populateCourtSchedule')
+        .mockResolvedValue([]);
+
+      const result = await service.fixSchedule(body, OWNER_ID);
+
+      expect(result).toEqual({ message: 'Horário fixado com sucesso' });
+      expect(txOperatingSchedule.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          court_id: 2,
+          day_of_week_id: 3,
+          hour: '10:00:00',
+          price: 90,
+          is_active: true,
+          is_fixed: true,
+          is_public: false,
+          fixed_contact_name: 'João',
+          fixed_contact_phone: '51999999999',
+          sport_id: 7,
+        }),
+      );
+      expect(txOperatingSchedule.update).not.toHaveBeenCalled();
+      expect(populateSpy).toHaveBeenCalledWith(
+        2,
+        expect.any(String),
+        expect.any(String),
+        undefined,
+        expect.anything(),
+      );
+      populateSpy.mockRestore();
+    });
+
+    it('reverte o fix interno se o populate da série falhar', async () => {
+      txOperatingSchedule.findOne.mockResolvedValue(null);
+      txCourtSchedule.findOne.mockResolvedValue({
+        ...baseSchedule,
+        price: 90,
+      });
+      const populateSpy = jest
+        .spyOn(service, 'populateCourtSchedule')
+        .mockRejectedValue(new Error('grade indisponível'));
+
+      await expect(service.fixSchedule(body, OWNER_ID)).rejects.toThrow(
+        /Não foi possível gerar as próximas semanas/,
+      );
+      populateSpy.mockRestore();
+    });
+
     it('exige reserva no horário a fixar', async () => {
       txCourtSchedule.findOne.mockResolvedValue({
         ...baseSchedule,
@@ -375,14 +440,6 @@ describe('CourtSchedulesService', () => {
 
       await expect(service.fixSchedule(body, OWNER_ID)).rejects.toThrow(
         'Horário não possui reserva',
-      );
-    });
-
-    it('exige operating_schedule correspondente', async () => {
-      txOperatingSchedule.findOne.mockResolvedValue(null);
-
-      await expect(service.fixSchedule(body, OWNER_ID)).rejects.toThrow(
-        'Horário de funcionamento não encontrado',
       );
     });
 
@@ -420,6 +477,7 @@ describe('CourtSchedulesService', () => {
         court_id: 2,
         day_of_week_id: 3,
         hour: '10:00:00',
+        is_public: true,
       });
       txCourtSchedule.find.mockResolvedValue([{ id: 11 }, { id: 12 }]);
     });
@@ -427,7 +485,10 @@ describe('CourtSchedulesService', () => {
     it('libera o horário atual e futuros em lote (sem N+1)', async () => {
       const result = await service.unfixSchedule(body, OWNER_ID);
 
-      expect(result).toEqual({ message: 'Horário desafixado com sucesso' });
+      expect(result).toEqual({
+        message: 'Horário desafixado com sucesso',
+        removed: false,
+      });
       expect(txCourtSchedule.update).toHaveBeenCalledWith(
         { id: 1 },
         expect.objectContaining({
@@ -455,6 +516,13 @@ describe('CourtSchedulesService', () => {
         court_schedule_id: 1,
       });
 
+      expect(txCourtSchedule.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            is_fixed: true,
+          }),
+        }),
+      );
       expect(queryBuilder.update).toHaveBeenCalledWith(CourtSchedule);
       expect(queryBuilder.whereInIds).toHaveBeenCalledWith([11, 12]);
       expect(queryBuilder.delete).toHaveBeenCalled();
@@ -463,25 +531,299 @@ describe('CourtSchedulesService', () => {
         'court_schedule_id IN (:...ids)',
         { ids: [11, 12] },
       );
-      expect(queryBuilder.execute).toHaveBeenCalledTimes(2);
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('date < :date', {
+        date: expect.any(Date),
+      });
+      expect(queryBuilder.execute).toHaveBeenCalledTimes(3);
       expect(txCourtSchedule.save).not.toHaveBeenCalled();
+      expect(txOperatingSchedule.delete).not.toHaveBeenCalled();
       expect(publicListingCache.invalidateAfterMutation).toHaveBeenCalled();
     });
 
-    it('não faz update em lote quando não há futuros', async () => {
+    it('desafixa horário interno removendo a série inteira e o OS', async () => {
+      txOperatingSchedule.findOne.mockResolvedValue({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '10:00:00',
+        is_public: false,
+      });
+      txCourtSchedule.find.mockResolvedValue([{ id: 1 }, { id: 11 }, { id: 12 }]);
+
+      const result = await service.unfixSchedule(body, OWNER_ID);
+
+      expect(result).toEqual({
+        message: 'Horário desafixado com sucesso',
+        removed: true,
+      });
+      expect(txCourtSchedule.update).not.toHaveBeenCalled();
+      expect(txOperatingSchedule.delete).toHaveBeenCalledWith({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '10:00:00',
+      });
+      expect(txOperatingSchedule.update).not.toHaveBeenCalled();
+      expect(queryBuilder.from).toHaveBeenCalledWith(Reservation);
+      expect(queryBuilder.from).toHaveBeenCalledWith(CourtSchedule);
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'id IN (:...ids)',
+        { ids: [1, 11, 12] },
+      );
+    });
+
+    it('não faz update em lote de futuros quando não há futuros (comercial)', async () => {
       txCourtSchedule.find.mockResolvedValue([]);
 
-      await service.unfixSchedule(body, OWNER_ID);
+      const result = await service.unfixSchedule(body, OWNER_ID);
 
-      expect(queryBuilder.execute).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        message: 'Horário desafixado com sucesso',
+        removed: false,
+      });
+      // Só limpa is_fixed dos passados (sem whereInIds de futuros).
+      expect(queryBuilder.whereInIds).not.toHaveBeenCalled();
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith('date < :date', {
+        date: expect.any(Date),
+      });
+      expect(queryBuilder.execute).toHaveBeenCalledTimes(1);
       expect(txCourtSchedule.update).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('removeByPublicId', () => {
+    beforeEach(() => {
+      courtSchedulesRepo.findOne.mockResolvedValue(ownedSchedule());
+    });
+
+    it('exclui horário interno disponível e remove OS + futuros livres', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        id: 1,
+        public_id: SCHEDULE_PUBLIC_ID,
+        court_id: 2,
+        day_of_week_id: 3,
+        start_hour: '02:00:00',
+        available: true,
+        is_fixed: false,
+        reservation: null,
+      });
+      txOperatingSchedule.findOne.mockResolvedValue({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '02:00:00',
+        is_public: false,
+      });
+      txCourtSchedule.find.mockResolvedValue([
+        { id: 11, date: new Date('2025-08-27'), is_fixed: false, reservation: null },
+      ]);
+
+      const result = await service.removeByPublicId(
+        SCHEDULE_PUBLIC_ID,
+        OWNER_ID,
+      );
+
+      expect(result).toEqual({ message: 'Horário excluído com sucesso' });
+      expect(txOperatingSchedule.delete).toHaveBeenCalledWith({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '02:00:00',
+      });
+      expect(txCourtSchedule.delete).toHaveBeenCalledWith({ id: 1 });
+      expect(queryBuilder.from).toHaveBeenCalledWith(CourtSchedule);
+      expect(publicListingCache.invalidateAfterMutation).toHaveBeenCalled();
+    });
+
+    it('exclui órfão disponível sem OS', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        id: 1,
+        public_id: SCHEDULE_PUBLIC_ID,
+        court_id: 2,
+        day_of_week_id: 3,
+        start_hour: '02:00:00',
+        available: true,
+        is_fixed: false,
+        reservation: null,
+      });
+      txOperatingSchedule.findOne.mockResolvedValue(null);
+
+      await service.removeByPublicId(SCHEDULE_PUBLIC_ID, OWNER_ID);
+
+      expect(txCourtSchedule.delete).toHaveBeenCalledWith({ id: 1 });
+      expect(txOperatingSchedule.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejeita grade comercial pública', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        id: 1,
+        public_id: SCHEDULE_PUBLIC_ID,
+        court_id: 2,
+        day_of_week_id: 3,
+        start_hour: '18:00:00',
+        available: true,
+        is_fixed: false,
+        reservation: null,
+      });
+      txOperatingSchedule.findOne.mockResolvedValue({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '18:00:00',
+        is_public: true,
+      });
+
+      await expect(
+        service.removeByPublicId(SCHEDULE_PUBLIC_ID, OWNER_ID),
+      ).rejects.toThrow(/grade comercial/);
+      expect(txCourtSchedule.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejeita quando há reserva', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        id: 1,
+        public_id: SCHEDULE_PUBLIC_ID,
+        available: true,
+        is_fixed: false,
+        reservation: { id: 9 },
+      });
+
+      await expect(
+        service.removeByPublicId(SCHEDULE_PUBLIC_ID, OWNER_ID),
+      ).rejects.toThrow(/reserva/);
+    });
+
+    it('exclui horário interno inativo', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        id: 1,
+        public_id: SCHEDULE_PUBLIC_ID,
+        court_id: 2,
+        day_of_week_id: 3,
+        start_hour: '02:00:00',
+        available: false,
+        is_fixed: false,
+        reservation: null,
+      });
+      txOperatingSchedule.findOne.mockResolvedValue({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '02:00:00',
+        is_public: false,
+      });
+      txCourtSchedule.find.mockResolvedValue([]);
+
+      const result = await service.removeByPublicId(
+        SCHEDULE_PUBLIC_ID,
+        OWNER_ID,
+      );
+
+      expect(result).toEqual({ message: 'Horário excluído com sucesso' });
+      expect(txCourtSchedule.delete).toHaveBeenCalledWith({ id: 1 });
+      expect(txOperatingSchedule.delete).toHaveBeenCalled();
+    });
+
+    it('rejeita com reserva ou fixo futuro na série interna', async () => {
+      txCourtSchedule.findOne.mockResolvedValue({
+        id: 1,
+        public_id: SCHEDULE_PUBLIC_ID,
+        court_id: 2,
+        day_of_week_id: 3,
+        start_hour: '02:00:00',
+        available: true,
+        is_fixed: false,
+        reservation: null,
+      });
+      txOperatingSchedule.findOne.mockResolvedValue({
+        court_id: 2,
+        day_of_week_id: 3,
+        hour: '02:00:00',
+        is_public: false,
+      });
+      txCourtSchedule.find.mockResolvedValue([
+        {
+          id: 11,
+          date: new Date('2025-08-27'),
+          is_fixed: false,
+          reservation: { id: 99 },
+        },
+      ]);
+
+      await expect(
+        service.removeByPublicId(SCHEDULE_PUBLIC_ID, OWNER_ID),
+      ).rejects.toThrow(/reserva ou fixo/);
+      expect(txCourtSchedule.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateAvailability', () => {
+    beforeEach(() => {
+      courtSchedulesRepo.findOne
+        .mockResolvedValueOnce(ownedSchedule({ date: '2030-01-15' }))
+        .mockResolvedValueOnce({
+          id: 1,
+          public_id: SCHEDULE_PUBLIC_ID,
+          date: '2030-01-15',
+          start_hour: '10:00:00',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+        });
+      courtSchedulesRepo.update.mockResolvedValue({ affected: 1 });
+    });
+
+    it('ativa horário livre futuro', async () => {
+      const result = await service.updateAvailability(
+        SCHEDULE_PUBLIC_ID,
+        true,
+        OWNER_ID,
+      );
+
+      expect(result).toEqual({ affected: 1 });
+      expect(courtSchedulesRepo.update).toHaveBeenCalledWith(
+        { public_id: SCHEDULE_PUBLIC_ID },
+        { available: true },
+      );
+    });
+
+    it('rejeita ativar horário reservado ou fixo', async () => {
+      courtSchedulesRepo.findOne.mockReset();
+      courtSchedulesRepo.findOne
+        .mockResolvedValueOnce(ownedSchedule())
+        .mockResolvedValueOnce({
+          id: 1,
+          public_id: SCHEDULE_PUBLIC_ID,
+          date: '2030-01-15',
+          start_hour: '10:00:00',
+          is_fixed: true,
+          reservation: null,
+        });
+
+      await expect(
+        service.updateAvailability(SCHEDULE_PUBLIC_ID, true, OWNER_ID),
+      ).rejects.toThrow(/reservado ou fixo/);
+      expect(courtSchedulesRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('rejeita ativar horário que já passou', async () => {
+      courtSchedulesRepo.findOne.mockReset();
+      courtSchedulesRepo.findOne
+        .mockResolvedValueOnce(ownedSchedule({ date: '2020-01-15' }))
+        .mockResolvedValueOnce({
+          id: 1,
+          public_id: SCHEDULE_PUBLIC_ID,
+          date: '2020-01-15',
+          start_hour: '10:00:00',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+        });
+
+      await expect(
+        service.updateAvailability(SCHEDULE_PUBLIC_ID, true, OWNER_ID),
+      ).rejects.toThrow(/já passou/);
+      expect(courtSchedulesRepo.update).not.toHaveBeenCalled();
     });
   });
 
   describe('updateDayAvailability', () => {
     const body = {
       company_public_id: COMPANY_PUBLIC_ID,
-      date: '2026-07-26',
+      date: '2030-07-26',
       available: false,
     };
 
@@ -513,32 +855,89 @@ describe('CourtSchedulesService', () => {
 
     it('fecha só horários disponíveis (ignora reserva e fixo)', async () => {
       dayQueryBuilder.getMany.mockResolvedValue([
-        { id: 1, available: true, is_fixed: false, reservation: null, closed_by_day: false },
-        { id: 2, available: true, is_fixed: false, reservation: { id: 9 }, closed_by_day: false },
-        { id: 3, available: true, is_fixed: true, reservation: null, closed_by_day: false },
-        { id: 4, available: false, is_fixed: false, reservation: null, closed_by_day: false },
+        {
+          id: 1,
+          available: true,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '10:00:00',
+        },
+        {
+          id: 2,
+          available: true,
+          is_fixed: false,
+          reservation: { id: 9 },
+          date: '2030-07-26',
+          start_hour: '11:00:00',
+        },
+        {
+          id: 3,
+          available: true,
+          is_fixed: true,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '12:00:00',
+        },
+        {
+          id: 4,
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '13:00:00',
+        },
       ]);
 
       const result = await service.updateDayAvailability(body, OWNER_ID);
 
       expect(result).toEqual({
         updated: 1,
-        date: '2026-07-26',
+        date: '2030-07-26',
         available: false,
-        isDayClosed: true,
+        isDayClosed: false,
       });
       expect(courtSchedulesRepo.update).toHaveBeenCalledWith(
         { id: expect.anything() },
-        { available: false, closed_by_day: true },
+        { available: false },
       );
       expect(publicListingCache.invalidateAfterMutation).toHaveBeenCalled();
     });
 
-    it('reabre só horários marcados closed_by_day', async () => {
+    it('reativa todos os inativos futuros (pula passado)', async () => {
       dayQueryBuilder.getMany.mockResolvedValue([
-        { id: 1, available: false, is_fixed: false, reservation: null, closed_by_day: true },
-        { id: 2, available: true, is_fixed: false, reservation: null, closed_by_day: false },
-        { id: 3, available: false, is_fixed: false, reservation: null, closed_by_day: false },
+        {
+          id: 1,
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '10:00:00',
+        },
+        {
+          id: 2,
+          available: true,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '11:00:00',
+        },
+        {
+          id: 3,
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '12:00:00',
+        },
+        {
+          id: 4,
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2020-01-15',
+          start_hour: '09:00:00',
+        },
       ]);
 
       const result = await service.updateDayAvailability(
@@ -546,17 +945,19 @@ describe('CourtSchedulesService', () => {
         OWNER_ID,
       );
 
-      expect(result.updated).toBe(1);
+      expect(result.updated).toBe(2);
       expect(result.isDayClosed).toBe(false);
       expect(courtSchedulesRepo.update).toHaveBeenCalledWith(
         { id: expect.anything() },
-        { available: true, closed_by_day: false },
+        { available: true },
       );
+      const updateArg = courtSchedulesRepo.update.mock.calls[0][0];
+      expect(updateArg.id.value).toEqual([1, 3]);
     });
 
     it('não chama update quando não há alvos', async () => {
       dayQueryBuilder.getMany.mockResolvedValue([
-        { id: 1, available: false, is_fixed: false, reservation: null, closed_by_day: false },
+        { id: 1, available: false, is_fixed: false, reservation: null },
       ]);
 
       const result = await service.updateDayAvailability(body, OWNER_ID);
@@ -565,6 +966,158 @@ describe('CourtSchedulesService', () => {
       expect(result.isDayClosed).toBe(false);
       expect(courtSchedulesRepo.update).not.toHaveBeenCalled();
       expect(publicListingCache.invalidateAfterMutation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateAvailabilityBatch', () => {
+    let batchQueryBuilder: {
+      innerJoin: MockFn;
+      leftJoinAndSelect: MockFn;
+      where: MockFn;
+      andWhere: MockFn;
+      getMany: MockFn;
+    };
+
+    beforeEach(() => {
+      companyRepo.findOne.mockResolvedValue({
+        id: 10,
+        public_id: COMPANY_PUBLIC_ID,
+        slug: 'arena',
+        administrator: { public_id: OWNER_ID },
+      });
+      batchQueryBuilder = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn(),
+      };
+      courtSchedulesRepo.createQueryBuilder!.mockReturnValue(batchQueryBuilder);
+      courtSchedulesRepo.update.mockResolvedValue({ affected: 2 });
+    });
+
+    it('ativa só inativos selecionados', async () => {
+      batchQueryBuilder.getMany.mockResolvedValue([
+        {
+          id: 1,
+          public_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '10:00:00',
+        },
+        {
+          id: 2,
+          public_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '11:00:00',
+        },
+        {
+          id: 3,
+          public_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+          available: true,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '12:00:00',
+        },
+      ]);
+
+      const result = await service.updateAvailabilityBatch(
+        {
+          company_public_id: COMPANY_PUBLIC_ID,
+          date: '2030-07-26',
+          public_ids: [
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            'cccccccc-cccc-cccc-cccc-cccccccccccc',
+          ],
+          available: true,
+        },
+        OWNER_ID,
+      );
+
+      expect(result).toEqual({
+        updated: 2,
+        skipped: 1,
+        date: '2030-07-26',
+        available: true,
+      });
+      expect(courtSchedulesRepo.update.mock.calls[0][0].id.value).toEqual([
+        1, 2,
+      ]);
+      expect(courtSchedulesRepo.update.mock.calls[0][1]).toEqual({
+        available: true,
+      });
+    });
+
+    it('não ativa horários que já passaram', async () => {
+      batchQueryBuilder.getMany.mockResolvedValue([
+        {
+          id: 1,
+          public_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2020-01-15',
+          start_hour: '10:00:00',
+        },
+        {
+          id: 2,
+          public_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+          date: '2030-07-26',
+          start_hour: '11:00:00',
+        },
+      ]);
+
+      const result = await service.updateAvailabilityBatch(
+        {
+          company_public_id: COMPANY_PUBLIC_ID,
+          public_ids: [
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          ],
+          available: true,
+        },
+        OWNER_ID,
+      );
+
+      expect(result.updated).toBe(1);
+      expect(result.skipped).toBe(1);
+      expect(courtSchedulesRepo.update.mock.calls[0][0].id.value).toEqual([2]);
+    });
+
+    it('rejeita public_ids fora da arena', async () => {
+      batchQueryBuilder.getMany.mockResolvedValue([
+        {
+          id: 1,
+          public_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          available: false,
+          is_fixed: false,
+          reservation: null,
+        },
+      ]);
+
+      await expect(
+        service.updateAvailabilityBatch(
+          {
+            company_public_id: COMPANY_PUBLIC_ID,
+            public_ids: [
+              'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+              'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            ],
+            available: true,
+          },
+          OWNER_ID,
+        ),
+      ).rejects.toThrow(/não foram encontrados/);
     });
   });
 
@@ -646,6 +1199,85 @@ describe('CourtSchedulesService', () => {
       await service.populateCourtSchedule(2, '2025-08-20', '2025-08-20');
 
       expect(txReservation.save).not.toHaveBeenCalled();
+    });
+
+    it('marca available=false ao popular OS interno não fixo', async () => {
+      txOperatingSchedule.find.mockResolvedValue([
+        {
+          hour: '02:00:00',
+          price: 50,
+          day_of_week: { ref: 3 },
+          day_of_week_id: 3,
+          is_fixed: false,
+          fixed_contact_name: null,
+          fixed_contact_phone: null,
+          sport_id: null,
+          is_active: true,
+          is_public: false,
+        },
+      ]);
+      txCourtSchedule.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      txCourtSchedule.save.mockResolvedValue([{ id: 99 }]);
+
+      await service.populateCourtSchedule(2, '2025-08-20', '2025-08-20');
+
+      expect(txCourtSchedule.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          start_hour: '02:00',
+          available: false,
+          is_fixed: false,
+        }),
+      ]);
+    });
+  });
+
+  describe('excludeInternalOperatingHours (portal)', () => {
+    it('remove slots com OS is_public=false da listagem pública', async () => {
+      courtSchedulesRepo.find.mockResolvedValue([
+        {
+          date: new Date('2099-01-01'),
+          start_hour: '10:00:00',
+          price: 90,
+          court_id: 2,
+          day_of_week_id: 3,
+          court: {
+            id: 2,
+            name: 'Quadra 1',
+            court_sports: [{ id: 1, name: 'Society' }],
+          },
+          day_of_week: { description: 'Quarta' },
+        },
+        {
+          date: new Date('2099-01-01'),
+          start_hour: '02:00:00',
+          price: 50,
+          court_id: 2,
+          day_of_week_id: 3,
+          court: {
+            id: 2,
+            name: 'Quadra 1',
+            court_sports: [{ id: 1, name: 'Society' }],
+          },
+          day_of_week: { description: 'Quarta' },
+        },
+      ]);
+      operatingScheduleRepo.find.mockResolvedValue([
+        {
+          court_id: 2,
+          day_of_week_id: 3,
+          hour: '02:00:00',
+          is_public: false,
+        },
+      ]);
+
+      const result = await service.findAvailableHoursByCourt({
+        slug: 'poliplay',
+        date: new Date('2099-01-01'),
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].schedules).toHaveLength(1);
+      expect(result[0].schedules[0].startHour).toBe('10:00');
     });
   });
 });

@@ -160,6 +160,7 @@ export class OnboardingService {
                   courtDto.price,
                 is_active: true,
                 is_fixed: false,
+                is_public: true,
               }),
             ),
           );

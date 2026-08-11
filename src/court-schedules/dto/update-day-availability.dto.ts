@@ -16,7 +16,7 @@ export class UpdateDayAvailabilityDto {
 
   @ApiProperty({
     description:
-      'false = fechar o dia (inativar livres); true = reabrir inativos',
+      'false = inativar todos os livres do dia; true = ativar todos os inativos (sem distinção de origem)',
   })
   @IsBoolean()
   available: boolean;

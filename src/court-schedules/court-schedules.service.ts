@@ -3,7 +3,7 @@ import { CreateCourtScheduleDto } from './dto/create-court-schedule.dto';
 import { UpdateCourtScheduleDto } from './dto/update-court-schedule.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CourtSchedule } from './entities/court-schedule.entity';
-import { Between, ILike, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { Between, EntityManager, ILike, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { UrlQueryParamCourtScheduleDto } from './dto/url-query-param-court-schedule.dto';
 import { instanceToPlain } from 'class-transformer';
@@ -69,6 +69,8 @@ interface IReservationDetailsItemProps {
   price: number;
   weekday: string;
   companyPublicId: string;
+  /** true = público; false = interno; null = sem OS (órfão). */
+  isPublic: boolean | null;
 }
 
 @Injectable()
@@ -109,6 +111,67 @@ export class CourtSchedulesService {
       companyPublicId: company?.public_id,
       companySlug: company?.slug,
     };
+  }
+
+  /** Chave court|dow|HH:mm para casar CS ↔ OS. */
+  private scheduleHourKey(
+    courtId: number,
+    dayOfWeekId: number,
+    hour: string,
+  ): string {
+    return `${courtId}|${dayOfWeekId}|${String(hour).slice(0, 5)}`;
+  }
+
+  /**
+   * Remove da listagem pública slots cujo OS é interno (is_public=false).
+   * Órfãos (sem OS) continuam — quick-create pontual comercial.
+   */
+  private async excludeInternalOperatingHours<
+    T extends {
+      court_id?: number;
+      court?: { id: number };
+      day_of_week_id?: number;
+      start_hour: string;
+    },
+  >(schedules: T[]): Promise<T[]> {
+    if (schedules.length === 0) return schedules;
+
+    const courtIds = [
+      ...new Set(
+        schedules
+          .map((s) => s.court_id ?? s.court?.id)
+          .filter((id): id is number => typeof id === 'number'),
+      ),
+    ];
+    if (courtIds.length === 0) return schedules;
+
+    const privateOs = await this.operatingScheduleRepository.find({
+      where: {
+        court_id: In(courtIds),
+        is_public: false,
+      },
+      select: {
+        court_id: true,
+        day_of_week_id: true,
+        hour: true,
+      },
+    });
+    if (privateOs.length === 0) return schedules;
+
+    const privateKeys = new Set(
+      privateOs.map((os) =>
+        this.scheduleHourKey(os.court_id, os.day_of_week_id, os.hour),
+      ),
+    );
+
+    return schedules.filter((s) => {
+      const courtId = s.court_id ?? s.court?.id;
+      const dayOfWeekId = s.day_of_week_id;
+      if (courtId == null || dayOfWeekId == null) return true;
+      return !privateKeys.has(
+        this.scheduleHourKey(courtId, dayOfWeekId, s.start_hour),
+      );
+    });
   }
 
   private async assertCourtOwnedBy(
@@ -171,13 +234,13 @@ export class CourtSchedulesService {
     start_date: string,
     end_date: string,
     ownerPublicId?: string,
+    manager?: EntityManager,
   ) {
     if (ownerPublicId) {
       await this.assertCourtOwnedBy(court_id, ownerPublicId);
     }
-    return await this.courtSchedulesRepository.manager.transaction(
-      async (manager) => {
-        const operating_schedule = await manager
+    const run = async (tx: EntityManager) => {
+        const operating_schedule = await tx
           .getRepository(OperatingSchedule)
           .find({
             where: { court_id },
@@ -212,6 +275,7 @@ export class CourtSchedulesService {
               fixed_contact_phone: item.fixed_contact_phone,
               sport_id: item.sport_id,
               is_active: item.is_active,
+              is_public: item.is_public,
             }))
             .filter((element) => element.weekday_ref === weekdayRef);
 
@@ -234,7 +298,9 @@ export class CourtSchedulesService {
               price: operatingSchedule.price,
               court_id,
               available:
-                !operatingSchedule.is_fixed && operatingSchedule.is_active,
+                operatingSchedule.is_public !== false &&
+                !operatingSchedule.is_fixed &&
+                operatingSchedule.is_active,
               is_fixed: operatingSchedule.is_fixed,
               fixed_contact_name: operatingSchedule.is_fixed
                 ? operatingSchedule.fixed_contact_name
@@ -250,7 +316,7 @@ export class CourtSchedulesService {
 
         let createdSchedules;
         try {
-          const existingSchedules = await manager
+          const existingSchedules = await tx
             .getRepository(CourtSchedule)
             .find({
               where: {
@@ -282,11 +348,11 @@ export class CourtSchedulesService {
             return [];
           }
 
-          const createdSchedulesRaw = await manager
+          const createdSchedulesRaw = await tx
             .getRepository(CourtSchedule)
             .save(filteredSchedules);
 
-          createdSchedules = await manager.getRepository(CourtSchedule).find({
+          createdSchedules = await tx.getRepository(CourtSchedule).find({
             where: { id: In(createdSchedulesRaw.map((s) => s.id)) },
           });
 
@@ -313,7 +379,7 @@ export class CourtSchedulesService {
           }
 
           if (reservationsToCreate.length > 0) {
-            await manager.getRepository(Reservation).save(reservationsToCreate);
+            await tx.getRepository(Reservation).save(reservationsToCreate);
             console.log(
               `[Reservas Fixas] ${reservationsToCreate.length} reservas fixas criadas para a quadra ${court_id}.`,
             );
@@ -327,8 +393,12 @@ export class CourtSchedulesService {
         }
 
         return createdSchedules;
-      },
-    );
+    };
+
+    if (manager) {
+      return run(manager);
+    }
+    return this.courtSchedulesRepository.manager.transaction(run);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
@@ -498,6 +568,8 @@ export class CourtSchedulesService {
         end_hour: true,
         available: true,
         is_fixed: true,
+        court_id: true,
+        day_of_week_id: true,
         reservation: {
           public_id: true,
           contact_name: true,
@@ -537,6 +609,17 @@ export class CourtSchedulesService {
       ownerPublicId,
     );
 
+    const operatingSchedule = await this.operatingScheduleRepository.findOne({
+      where: {
+        court_id: courtSchedule.court_id,
+        day_of_week_id: courtSchedule.day_of_week_id,
+        hour: courtSchedule.start_hour,
+      },
+      select: {
+        is_public: true,
+      },
+    });
+
     const obj: IReservationDetailsItemProps = {
       scheduleId: courtSchedule.public_id,
       status: getStatusCourtSchedule(courtSchedule),
@@ -565,6 +648,10 @@ export class CourtSchedulesService {
       price: courtSchedule.price,
       weekday: courtSchedule.day_of_week.description,
       companyPublicId: courtSchedule.court.company.public_id,
+      isPublic:
+        operatingSchedule == null
+          ? null
+          : operatingSchedule.is_public !== false,
     };
 
     return instanceToPlain(obj);
@@ -587,8 +674,95 @@ export class CourtSchedulesService {
   }
 
   async removeByPublicId(publicId: string, ownerPublicId: string) {
-    await this.assertScheduleOwnedBy(publicId, ownerPublicId);
-    return this.courtSchedulesRepository.delete({ public_id: publicId });
+    const owned = await this.assertScheduleOwnedBy(publicId, ownerPublicId);
+
+    const result = await this.courtSchedulesRepository.manager.transaction(
+      async (manager) => {
+        const schedule = await manager.getRepository(CourtSchedule).findOne({
+          where: { public_id: publicId },
+          relations: ['reservation'],
+        });
+        if (!schedule) {
+          throw new NotFoundException('Horário de quadra não encontrado');
+        }
+
+        if (schedule.is_fixed) {
+          throw new BadRequestException(
+            'Não é possível excluir um horário fixo. Libere o fixo antes.',
+          );
+        }
+        if (schedule.reservation?.id) {
+          throw new BadRequestException(
+            'Não é possível excluir um horário com reserva. Cancele a reserva antes.',
+          );
+        }
+
+        const operatingSchedule = await manager
+          .getRepository(OperatingSchedule)
+          .findOne({
+            where: {
+              court_id: schedule.court_id,
+              day_of_week_id: schedule.day_of_week_id,
+              hour: schedule.start_hour,
+            },
+          });
+
+        // Grade comercial pública: não exclui (use inativar).
+        if (operatingSchedule && operatingSchedule.is_public !== false) {
+          throw new BadRequestException(
+            'Horários da grade comercial não podem ser excluídos. Inative o horário se precisar.',
+          );
+        }
+
+        // Interno: remove OS e futuros livres para não voltar no populate/cron.
+        if (operatingSchedule && operatingSchedule.is_public === false) {
+          const related = await manager.getRepository(CourtSchedule).find({
+            where: {
+              court_id: schedule.court_id,
+              day_of_week_id: schedule.day_of_week_id,
+              start_hour: schedule.start_hour,
+              public_id: Not(publicId),
+            },
+            relations: ['reservation'],
+          });
+
+          const blocked = related.find(
+            (s) => s.is_fixed || Boolean(s.reservation?.id),
+          );
+          if (blocked) {
+            throw new ConflictException(
+              `Não é possível excluir: há reserva ou fixo neste horário em ${formatDateDateToDDMMYYYY(String(blocked.date))}.`,
+            );
+          }
+
+          const relatedIds = related.map((s) => s.id);
+          if (relatedIds.length > 0) {
+            await manager
+              .createQueryBuilder()
+              .delete()
+              .from(CourtSchedule)
+              .where('id IN (:...ids)', { ids: relatedIds })
+              .execute();
+          }
+
+          await manager.getRepository(OperatingSchedule).delete({
+            court_id: operatingSchedule.court_id,
+            day_of_week_id: operatingSchedule.day_of_week_id,
+            hour: operatingSchedule.hour,
+          });
+        }
+
+        await manager.getRepository(CourtSchedule).delete({ id: schedule.id });
+
+        return { message: 'Horário excluído com sucesso' };
+      },
+    );
+
+    this.invalidatePublicListingCache({
+      ...this.cacheScopeFromCompany(owned.court?.company),
+      allAgendaDays: true,
+    });
+    return result;
   }
 
   async updateAvailability(
@@ -597,11 +771,33 @@ export class CourtSchedulesService {
     ownerPublicId: string,
   ) {
     const owned = await this.assertScheduleOwnedBy(publicId, ownerPublicId);
+
+    const schedule = await this.courtSchedulesRepository.findOne({
+      where: { public_id: publicId },
+      relations: ['reservation'],
+    });
+    if (!schedule) {
+      throw new NotFoundException('Horário de quadra não encontrado');
+    }
+    if (schedule.is_fixed || schedule.reservation) {
+      throw new BadRequestException(
+        available
+          ? 'Não é possível ativar um horário reservado ou fixo.'
+          : 'Não é possível inativar um horário reservado ou fixo.',
+      );
+    }
+    if (
+      available &&
+      isCourtScheduleInPast(schedule.date, schedule.start_hour)
+    ) {
+      throw new BadRequestException(
+        'Não é possível ativar um horário que já passou.',
+      );
+    }
+
     const result = await this.courtSchedulesRepository.update(
       { public_id: publicId },
-      available
-        ? { available: true, closed_by_day: false }
-        : { available: false, closed_by_day: false },
+      { available },
     );
     this.invalidatePublicListingCache({
       ...this.cacheScopeFromCompany(owned.court?.company),
@@ -611,9 +807,125 @@ export class CourtSchedulesService {
   }
 
   /**
-   * Fecha (available=false) ou reabre (available=true) o dia.
-   * Fecha: só livres; marca closed_by_day.
-   * Reabre: só horários com closed_by_day (não reabre inativação manual).
+   * Inativa ou ativa horários por public_id, sem distinguir origem
+   * (avulso vs fechamento de dia).
+   */
+  async updateAvailabilityBatch(
+    body: {
+      company_public_id: string;
+      date?: string;
+      public_ids: string[];
+      available: boolean;
+    },
+    ownerPublicId: string,
+  ) {
+    const { company_public_id, available } = body;
+    const publicIds = [
+      ...new Set(
+        (body.public_ids ?? [])
+          .map((id) => String(id ?? '').trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    if (typeof available !== 'boolean') {
+      throw new BadRequestException('Informe available (true|false).');
+    }
+    if (!company_public_id?.trim()) {
+      throw new BadRequestException('Informe company_public_id.');
+    }
+    if (publicIds.length === 0) {
+      throw new BadRequestException('Informe ao menos um horário (public_ids).');
+    }
+
+    let dateKey: string | undefined;
+    if (body.date?.trim()) {
+      dateKey = this.toDateKey(body.date);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        throw new BadRequestException('Data inválida.');
+      }
+    }
+
+    const company = await this.companyRepository.findOne({
+      where: { public_id: company_public_id },
+      relations: { administrator: true },
+    });
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+    assertAdministratorOwns(
+      company.administrator?.public_id,
+      ownerPublicId,
+    );
+
+    const qb = this.courtSchedulesRepository
+      .createQueryBuilder('schedule')
+      .innerJoin('schedule.court', 'court')
+      .leftJoinAndSelect('schedule.reservation', 'reservation')
+      .where('court.company_id = :companyId', { companyId: company.id })
+      .andWhere('schedule.public_id IN (:...publicIds)', { publicIds });
+
+    if (dateKey) {
+      qb.andWhere('schedule.date = :date', { date: dateKey });
+    }
+
+    const schedules = await qb.getMany();
+    const foundIds = new Set(schedules.map((s) => s.public_id));
+    const missing = publicIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        'Um ou mais horários não foram encontrados nesta arena.',
+      );
+    }
+
+    const targetIds: number[] = [];
+    let skipped = 0;
+    for (const schedule of schedules) {
+      if (schedule.is_fixed || schedule.reservation) {
+        skipped += 1;
+        continue;
+      }
+      if (
+        available &&
+        isCourtScheduleInPast(schedule.date, schedule.start_hour)
+      ) {
+        skipped += 1;
+        continue;
+      }
+      if (available) {
+        if (!schedule.available) targetIds.push(schedule.id);
+        else skipped += 1;
+      } else if (schedule.available) {
+        targetIds.push(schedule.id);
+      } else {
+        skipped += 1;
+      }
+    }
+
+    if (targetIds.length > 0) {
+      await this.courtSchedulesRepository.update(
+        { id: In(targetIds) },
+        { available },
+      );
+      this.invalidatePublicListingCache({
+        companyPublicId: company.public_id,
+        companySlug: company.slug,
+        dateKey,
+        allAgendaDays: !dateKey,
+      });
+    }
+
+    return {
+      updated: targetIds.length,
+      skipped,
+      date: dateKey ?? null,
+      available,
+    };
+  }
+
+  /**
+   * Atalho do dia: inativa todos os livres OU ativa todos os inativos
+   * (sem distinção de origem). Preferir availability-batch na UI de seleção.
    */
   async updateDayAvailability(
     body: {
@@ -661,7 +973,10 @@ export class CourtSchedulesService {
       .filter((schedule) => {
         if (schedule.is_fixed || schedule.reservation) return false;
         if (available) {
-          return schedule.closed_by_day;
+          if (isCourtScheduleInPast(schedule.date, schedule.start_hour)) {
+            return false;
+          }
+          return !schedule.available;
         }
         return schedule.available;
       })
@@ -670,9 +985,7 @@ export class CourtSchedulesService {
     if (targetIds.length > 0) {
       await this.courtSchedulesRepository.update(
         { id: In(targetIds) },
-        available
-          ? { available: true, closed_by_day: false }
-          : { available: false, closed_by_day: true },
+        { available },
       );
       this.invalidatePublicListingCache({
         companyPublicId: company.public_id,
@@ -685,12 +998,8 @@ export class CourtSchedulesService {
       updated: targetIds.length,
       date: dateKey,
       available,
-      isDayClosed: available
-        ? schedules.some(
-            (s) => s.closed_by_day && !targetIds.includes(s.id),
-          )
-        : targetIds.length > 0 ||
-          schedules.some((s) => s.closed_by_day),
+      // Legado: UI não usa mais para CTA de reabrir; mantém false.
+      isDayClosed: false,
     };
   }
 
@@ -702,6 +1011,7 @@ export class CourtSchedulesService {
       body.court_schedule_public_id,
       ownerPublicId,
     );
+
     const result = await this.courtSchedulesRepository.manager.transaction(
       async (manager) => {
         const courtSchedule = await manager
@@ -749,25 +1059,56 @@ export class CourtSchedulesService {
               hour: courtSchedule.start_hour,
             },
           });
+
         if (!operatingSchedule) {
-          throw new NotFoundException(
-            'Horário de funcionamento não encontrado',
+          // Slot fora da grade: promove a OS interno (não listado no portal).
+          await manager.getRepository(OperatingSchedule).save(
+            manager.getRepository(OperatingSchedule).create({
+              court_id: courtSchedule.court_id,
+              day_of_week_id: courtSchedule.day_of_week_id,
+              hour: courtSchedule.start_hour,
+              price: courtSchedule.price ?? 0,
+              is_active: true,
+              is_fixed: true,
+              is_public: false,
+              fixed_contact_name: contactName,
+              fixed_contact_phone: contactPhoneOptional,
+              sport_id: sportId,
+            }),
+          );
+          // Materializa semanas futuras na mesma transação — falha = rollback do fix.
+          const todayKey = todayDateKey();
+          const endKey = addDaysToDateKey(todayKey, 89);
+          try {
+            await this.populateCourtSchedule(
+              courtSchedule.court_id,
+              todayKey,
+              endKey,
+              undefined,
+              manager,
+            );
+          } catch (error) {
+            throw new BadRequestException(
+              `Não foi possível gerar as próximas semanas da série: ${
+                error instanceof Error ? error.message : 'erro desconhecido'
+              }`,
+            );
+          }
+        } else {
+          await manager.getRepository(OperatingSchedule).update(
+            {
+              court_id: operatingSchedule.court_id,
+              day_of_week_id: operatingSchedule.day_of_week_id,
+              hour: operatingSchedule.hour,
+            },
+            {
+              is_fixed: true,
+              fixed_contact_name: contactName,
+              fixed_contact_phone: contactPhoneOptional,
+              sport_id: sportId,
+            },
           );
         }
-
-        await manager.getRepository(OperatingSchedule).update(
-          {
-            court_id: operatingSchedule.court_id,
-            day_of_week_id: operatingSchedule.day_of_week_id,
-            hour: operatingSchedule.hour,
-          },
-          {
-            is_fixed: true,
-            fixed_contact_name: contactName,
-            fixed_contact_phone: contactPhoneOptional,
-            sport_id: sportId,
-          },
-        );
 
         const futureSchedules = await manager.getRepository(CourtSchedule).find({
           where: {
@@ -828,6 +1169,7 @@ export class CourtSchedulesService {
         return { message: 'Horário fixado com sucesso' };
       },
     );
+
     this.invalidatePublicListingCache({
       ...this.cacheScopeFromCompany(owned.court?.company),
       allAgendaDays: true,
@@ -853,17 +1195,6 @@ export class CourtSchedulesService {
         if (!courtSchedule)
           throw new NotFoundException('CourtSchedule não encontrado');
 
-        await manager.getRepository(CourtSchedule).update(
-          { id: courtSchedule.id },
-          {
-            is_fixed: false,
-            fixed_contact_name: null,
-            fixed_contact_phone: null,
-            sport_id: null,
-            available: true,
-          },
-        );
-
         const operatingSchedule = await manager
           .getRepository(OperatingSchedule)
           .findOne({
@@ -875,6 +1206,64 @@ export class CourtSchedulesService {
           });
         if (!operatingSchedule)
           throw new NotFoundException('OperatingSchedule não encontrado');
+
+        const isInternal = operatingSchedule.is_public === false;
+
+        if (isInternal) {
+          // Remove a série inteira (passados + âncora + futuros) para não
+          // deixar órfãos disponíveis no portal após apagar o OS.
+          const series = await manager.getRepository(CourtSchedule).find({
+            where: {
+              court_id: courtSchedule.court_id,
+              day_of_week_id: courtSchedule.day_of_week_id,
+              start_hour: courtSchedule.start_hour,
+            },
+            select: ['id'],
+          });
+          const seriesIds = series.map((s) => s.id);
+
+          if (seriesIds.length > 0) {
+            await manager
+              .createQueryBuilder()
+              .delete()
+              .from(Reservation)
+              .where('court_schedule_id IN (:...ids)', { ids: seriesIds })
+              .execute();
+
+            await manager
+              .createQueryBuilder()
+              .delete()
+              .from(CourtSchedule)
+              .where('id IN (:...ids)', { ids: seriesIds })
+              .execute();
+          }
+
+          await manager.getRepository(OperatingSchedule).delete({
+            court_id: operatingSchedule.court_id,
+            day_of_week_id: operatingSchedule.day_of_week_id,
+            hour: operatingSchedule.hour,
+          });
+
+          return {
+            message: 'Horário desafixado com sucesso',
+            removed: true,
+          };
+        }
+
+        await manager.getRepository(CourtSchedule).update(
+          { id: courtSchedule.id },
+          {
+            is_fixed: false,
+            fixed_contact_name: null,
+            fixed_contact_phone: null,
+            sport_id: null,
+            available: true,
+          },
+        );
+
+        await manager.getRepository(Reservation).delete({
+          court_schedule_id: courtSchedule.id,
+        });
 
         await manager.getRepository(OperatingSchedule).update(
           {
@@ -890,10 +1279,6 @@ export class CourtSchedulesService {
           },
         );
 
-        await manager.getRepository(Reservation).delete({
-          court_schedule_id: courtSchedule.id,
-        });
-
         const futureCourtSchedules = await manager
           .getRepository(CourtSchedule)
           .find({
@@ -902,6 +1287,7 @@ export class CourtSchedulesService {
               day_of_week_id: courtSchedule.day_of_week_id,
               court_id: courtSchedule.court_id,
               date: MoreThan(courtSchedule.date),
+              is_fixed: true,
             },
             select: ['id'],
           });
@@ -929,7 +1315,30 @@ export class CourtSchedulesService {
             .execute();
         }
 
-        return { message: 'Horário desafixado com sucesso' };
+        // Passados: só tira o carimbo de fixo (mantém reserva/available).
+        // Evita série “fantasma” is_fixed sem OS.is_fixed após liberar no meio.
+        await manager
+          .createQueryBuilder()
+          .update(CourtSchedule)
+          .set({
+            is_fixed: false,
+            fixed_contact_name: null,
+            fixed_contact_phone: null,
+            sport_id: null,
+          })
+          .where('court_id = :courtId', { courtId: courtSchedule.court_id })
+          .andWhere('day_of_week_id = :dow', {
+            dow: courtSchedule.day_of_week_id,
+          })
+          .andWhere('start_hour = :hour', { hour: courtSchedule.start_hour })
+          .andWhere('date < :date', { date: courtSchedule.date })
+          .andWhere('is_fixed = true')
+          .execute();
+
+        return {
+          message: 'Horário desafixado com sucesso',
+          removed: false,
+        };
       },
     );
     this.invalidatePublicListingCache({
@@ -995,6 +1404,8 @@ export class CourtSchedulesService {
         date: true,
         start_hour: true,
         price: true,
+        court_id: true,
+        day_of_week_id: true,
         court: {
           id: true,
           name: true,
@@ -1029,8 +1440,12 @@ export class CourtSchedulesService {
       },
     });
 
+    const publicSchedules = await this.excludeInternalOperatingHours(
+      courtSchedule,
+    );
+
     // Público: não listar horários cujo início já passou
-    const openSchedules = courtSchedule.filter(
+    const openSchedules = publicSchedules.filter(
       (item) => !isCourtScheduleInPast(item.date, item.start_hour),
     );
 
@@ -1250,6 +1665,30 @@ export class CourtSchedulesService {
     const photoHighlightUrl =
       photoUrls[0] ?? company.photo_highlight_url ?? '';
 
+    // Mesma regra do available-hours: só livres públicos e não passados.
+    const candidateSchedules = visibleCourts.flatMap((court) =>
+      (court.court_schedule ?? [])
+        .filter((schedule) => schedule.available)
+        .map((schedule) => {
+          schedule.court = court;
+          return schedule;
+        }),
+    );
+    const publicSchedules = await this.excludeInternalOperatingHours(
+      candidateSchedules,
+    );
+    const openSchedules = publicSchedules.filter(
+      (schedule) => !isCourtScheduleInPast(schedule.date, schedule.start_hour),
+    );
+    const openByCourtId = new Map<number, typeof openSchedules>();
+    for (const schedule of openSchedules) {
+      const courtId = schedule.court_id ?? schedule.court?.id;
+      if (courtId == null) continue;
+      const list = openByCourtId.get(courtId) ?? [];
+      list.push(schedule);
+      openByCourtId.set(courtId, list);
+    }
+
     const objToFront: IDetailsCourt = {
       logoUrl: company.logo_url,
       name: company.name,
@@ -1259,26 +1698,29 @@ export class CourtSchedulesService {
       city: company.city,
       uf: company.uf,
       address: `${company.street}, ${company.number} - ${company.neighborhood}, ${company.city} - ${company.uf}`,
-      courts: visibleCourts.map((court) => ({
-        courtName: court.name,
-        courtSports: (court.court_sports ?? []).map((sport) => ({
+      courts: visibleCourts.map((court) => {
+        const courtSports = (court.court_sports ?? []).map((sport) => ({
           label: sport.name,
           value: String(sport.id),
-        })),
-        schedules: (court.court_schedule ?? []).map((schedule) => ({
-          date: schedule.date,
-          startHour: schedule.start_hour.slice(0, 5),
-          price: schedule.price,
+        }));
+        const schedules = (openByCourtId.get(court.id) ?? []).map(
+          (schedule) => ({
+            date: schedule.date,
+            startHour: schedule.start_hour.slice(0, 5),
+            price: schedule.price,
+            courtName: court.name,
+            courtSports,
+            dayOfWeekAbb: schedule.day_of_week?.description
+              ? `(${schedule.day_of_week.description.slice(0, 3).toLowerCase()})`
+              : '',
+          }),
+        );
+        return {
           courtName: court.name,
-          courtSports: (court.court_sports ?? []).map((sport) => ({
-            label: sport.name,
-            value: String(sport.id),
-          })),
-          dayOfWeekAbb: schedule.day_of_week?.description
-            ? `(${schedule.day_of_week.description.slice(0, 3).toLowerCase()})`
-            : '',
-        })),
-      })),
+          courtSports,
+          schedules,
+        };
+      }),
       characteristics: company.characteristics ?? [],
       photoHighlightUrl,
       photoUrls:
@@ -1336,6 +1778,8 @@ export class CourtSchedulesService {
         date: true,
         start_hour: true,
         price: true,
+        court_id: true,
+        day_of_week_id: true,
         court: {
           id: true,
           name: true,
@@ -1353,7 +1797,11 @@ export class CourtSchedulesService {
       },
     });
 
-    const openSchedules = courtSchedule.filter(
+    const publicSchedules = await this.excludeInternalOperatingHours(
+      courtSchedule,
+    );
+
+    const openSchedules = publicSchedules.filter(
       (item) => !isCourtScheduleInPast(item.date, item.start_hour),
     );
 
@@ -1480,10 +1928,14 @@ export class CourtSchedulesService {
       );
     }
 
+    // Parse local (Y, M-1, D) — evita UTC midnight virar D-1 em America/Sao_Paulo.
+    const day_of_week_id = weekdayRefFromDateKey(dateKey) + 1;
+
     const operatingSchedule = await this.operatingScheduleRepository.findOne({
       where: {
         court_id: body.court_id,
         hour: body.start_hour,
+        day_of_week_id,
       },
       select: {
         price: true,
@@ -1493,9 +1945,6 @@ export class CourtSchedulesService {
     const startTime = parse(body.start_hour, 'HH:mm', new Date());
     const endTime = addHours(startTime, 1);
     const end_hour = format(endTime, 'HH:mm');
-
-    // Parse local (Y, M-1, D) — evita UTC midnight virar D-1 em America/Sao_Paulo.
-    const day_of_week_id = weekdayRefFromDateKey(dateKey) + 1;
 
     const schedule: CreateCourtScheduleDto = {
       start_hour: body.start_hour,

@@ -40,6 +40,13 @@ export class OperatingSchedule {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
+  /**
+   * false = horário interno (agenda do manager / fixo privado);
+   * não entra em where-to-play / available-hours.
+   */
+  @Column({ type: 'boolean', default: true })
+  is_public: boolean;
+
   @ManyToOne(() => Court, (court) => court.operating_schedule)
   @JoinColumn({ name: 'court_id' })
   court: Court;
