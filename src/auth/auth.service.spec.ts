@@ -11,7 +11,7 @@ import { AuthService } from './auth.service';
 import { PeopleService } from '../people/people.service';
 import { EmailService } from '../email/email.service';
 import { EmailVerification } from './entities/email-verification.entity';
-import { Company } from '../companies/entities/company.entity';
+import { TrialExpiryService } from '../companies/trial-expiry.service';
 
 jest.mock('bcrypt');
 
@@ -56,11 +56,6 @@ describe('AuthService', () => {
       create: jest.fn((v) => v),
       findOne: jest.fn(),
     };
-    const companyRepo = {
-      find: jest.fn().mockResolvedValue([]),
-      save: jest.fn(),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -72,8 +67,8 @@ describe('AuthService', () => {
           useValue: verificationRepo,
         },
         {
-          provide: getRepositoryToken(Company),
-          useValue: companyRepo,
+          provide: TrialExpiryService,
+          useValue: { expireCompanyIfNeeded: jest.fn().mockResolvedValue(false) },
         },
       ],
     }).compile();

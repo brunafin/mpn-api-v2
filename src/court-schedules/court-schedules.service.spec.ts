@@ -20,7 +20,7 @@ type MockRepo = {
   update: MockFn;
   delete: MockFn;
   insert: MockFn;
-  createQueryBuilder?: MockFn;
+  createQueryBuilder: MockFn;
   manager?: {
     transaction: MockFn;
   };
@@ -66,6 +66,19 @@ function ownedSchedule(overrides: Record<string, unknown> = {}) {
       },
     },
     ...overrides,
+  };
+}
+
+function lockedCsQb(getOne: unknown, getMany: unknown[] = []) {
+  return {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    innerJoinAndSelect: jest.fn().mockReturnThis(),
+    setLock: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    getOne: jest.fn().mockResolvedValue(getOne),
+    getMany: jest.fn().mockResolvedValue(getMany),
   };
 }
 
@@ -256,14 +269,23 @@ describe('CourtSchedulesService', () => {
 
     beforeEach(() => {
       courtSchedulesRepo.findOne.mockResolvedValue(ownedSchedule());
-      txCourtSchedule.findOne.mockResolvedValue(baseSchedule);
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb(baseSchedule, []),
+      );
       txOperatingSchedule.findOne.mockResolvedValue(operating);
-      txCourtSchedule.find.mockResolvedValue([]);
     });
 
     it('fixa o horário atual, operating_schedule e limpa cache público', async () => {
+      const qb = lockedCsQb(baseSchedule, []);
+      txCourtSchedule.createQueryBuilder.mockReturnValue(qb);
+
       const result = await service.fixSchedule(body, OWNER_ID);
 
+      expect(qb.setLock).toHaveBeenCalledWith(
+        'pessimistic_write',
+        undefined,
+        ['cs'],
+      );
       expect(result).toEqual({ message: 'Horário fixado com sucesso' });
       expect(txCourtSchedule.update).toHaveBeenCalledWith(
         { id: 1 },
@@ -292,13 +314,18 @@ describe('CourtSchedulesService', () => {
     });
 
     it('grava fixed_contact_phone null quando a reserva não tem telefone', async () => {
-      txCourtSchedule.findOne.mockResolvedValue({
-        ...baseSchedule,
-        reservation: {
-          ...baseSchedule.reservation,
-          contact_phone: '',
-        },
-      });
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb(
+          {
+            ...baseSchedule,
+            reservation: {
+              ...baseSchedule.reservation,
+              contact_phone: '',
+            },
+          },
+          [],
+        ),
+      );
 
       await service.fixSchedule(body, OWNER_ID);
 
@@ -326,10 +353,12 @@ describe('CourtSchedulesService', () => {
           contact_phone: '51999999999',
         },
       };
-      txCourtSchedule.find.mockResolvedValue([
-        futureWithoutReservation,
-        futureWithSameContact,
-      ]);
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb(baseSchedule, [
+          futureWithoutReservation,
+          futureWithSameContact,
+        ]),
+      );
 
       await service.fixSchedule(body, OWNER_ID);
 
@@ -361,17 +390,19 @@ describe('CourtSchedulesService', () => {
     });
 
     it('bloqueia fixar quando já há reserva futura de outro contato', async () => {
-      txCourtSchedule.find.mockResolvedValue([
-        {
-          id: 11,
-          date: new Date('2025-08-27'),
-          reservation: {
-            id: 60,
-            contact_name: 'Maria',
-            contact_phone: '51888888888',
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb(baseSchedule, [
+          {
+            id: 11,
+            date: new Date('2025-08-27'),
+            reservation: {
+              id: 60,
+              contact_name: 'Maria',
+              contact_phone: '51888888888',
+            },
           },
-        },
-      ]);
+        ]),
+      );
 
       await expect(service.fixSchedule(body, OWNER_ID)).rejects.toThrow(
         /Não é possível fixar.*Maria/,
@@ -382,10 +413,9 @@ describe('CourtSchedulesService', () => {
 
     it('cria operating_schedule interno quando o slot está fora da grade', async () => {
       txOperatingSchedule.findOne.mockResolvedValue(null);
-      txCourtSchedule.findOne.mockResolvedValue({
-        ...baseSchedule,
-        price: 90,
-      });
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb({ ...baseSchedule, price: 90 }, []),
+      );
       const populateSpy = jest
         .spyOn(service, 'populateCourtSchedule')
         .mockResolvedValue([]);
@@ -420,10 +450,9 @@ describe('CourtSchedulesService', () => {
 
     it('reverte o fix interno se o populate da série falhar', async () => {
       txOperatingSchedule.findOne.mockResolvedValue(null);
-      txCourtSchedule.findOne.mockResolvedValue({
-        ...baseSchedule,
-        price: 90,
-      });
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb({ ...baseSchedule, price: 90 }, []),
+      );
       const populateSpy = jest
         .spyOn(service, 'populateCourtSchedule')
         .mockRejectedValue(new Error('grade indisponível'));
@@ -435,10 +464,9 @@ describe('CourtSchedulesService', () => {
     });
 
     it('exige reserva no horário a fixar', async () => {
-      txCourtSchedule.findOne.mockResolvedValue({
-        ...baseSchedule,
-        reservation: null,
-      });
+      txCourtSchedule.createQueryBuilder.mockReturnValue(
+        lockedCsQb({ ...baseSchedule, reservation: null }, []),
+      );
 
       await expect(service.fixSchedule(body, OWNER_ID)).rejects.toThrow(
         'Horário não possui reserva',

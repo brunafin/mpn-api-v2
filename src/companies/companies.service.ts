@@ -21,6 +21,7 @@ import { randomUUID } from 'crypto';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { computeMonthlyFee, quotePlanPrices } from 'src/plans/utils/compute-monthly-fee';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
+import { TrialExpiryService } from 'src/companies/trial-expiry.service';
 import { buildCapabilities } from 'src/companies/utils/company-access';
 import {
   COMPANY_PHOTO_MAX_COUNT,
@@ -61,6 +62,7 @@ export class CompaniesService {
     private readonly storageService: StorageService,
     private readonly publicListingCache: PublicListingCache,
     private readonly peopleService: PeopleService,
+    private readonly trialExpiryService: TrialExpiryService,
   ) {}
 
   /**
@@ -358,6 +360,7 @@ export class CompaniesService {
       .leftJoinAndSelect('company.images', 'images')
       .where('company.public_id = :uuid', { uuid })
       .select([
+        'company.id',
         'company.name',
         'company.phone',
         'company.logo_url',
@@ -415,6 +418,8 @@ export class CompaniesService {
     if (!company) {
       throw new NotFoundException();
     }
+
+    await this.trialExpiryService.expireCompanyIfNeeded(company);
 
     const today = new Date();
     const fallbackDate = format(

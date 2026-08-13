@@ -67,7 +67,7 @@ export class ReservationsService {
         ownerPublicId,
       );
 
-      if (!courtSchedule.available) {
+      if (!courtSchedule.available || courtSchedule.is_fixed) {
         throw new BadRequestException('Horário indisponível');
       }
 
@@ -153,8 +153,11 @@ export class ReservationsService {
       },
       select: { is_public: true },
     });
-    // Fixo interno: buraco só na agenda do manager — não libera no portal.
-    const availableAfterCancel = operatingSchedule?.is_public !== false;
+    // Fixo (comercial ou interno): furo fechado — não reabre no portal.
+    // Reserva avulsa comercial: volta a available. Interno/órfão público: mesma regra de OS.
+    const availableAfterCancel = schedule.is_fixed
+      ? false
+      : operatingSchedule?.is_public !== false;
 
     const queryRunner: QueryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

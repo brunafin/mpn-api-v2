@@ -14,9 +14,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { PeopleService } from '../people/people.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { Company } from 'src/companies/entities/company.entity';
-import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
-import { shouldExpireTrialCompany } from 'src/companies/utils/trial-expiry';
+import { TrialExpiryService } from 'src/companies/trial-expiry.service';
 import { PersonRole } from 'src/people/enums/person-role.enum';
 import { Person } from 'src/people/entities/person.entity';
 import { EmailService } from 'src/email/email.service';
@@ -60,8 +58,7 @@ export class AuthService {
     private readonly emailService: EmailService,
     @InjectRepository(EmailVerification)
     private readonly emailVerificationRepository: Repository<EmailVerification>,
-    @InjectRepository(Company)
-    private readonly companyRepository: Repository<Company>,
+    private readonly trialExpiryService: TrialExpiryService,
   ) {
     this.googleClient = new OAuth2Client();
   }
@@ -253,7 +250,7 @@ export class AuthService {
         : PersonRole.OWNER;
 
     if (role !== PersonRole.PLATFORM_ADMIN && company) {
-      await this.expireTrialIfNeeded(company);
+      await this.trialExpiryService.expireCompanyIfNeeded(company);
     }
 
     let updatedPassword = true;
@@ -289,21 +286,6 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       needsProfileCompletion,
     };
-  }
-
-  private async expireTrialIfNeeded(company: Company): Promise<void> {
-    if (!shouldExpireTrialCompany(company)) return;
-    await this.companyRepository.update(
-      { id: company.id },
-      {
-        partner_status: PartnerStatus.EXPIRED,
-        plan_id: null,
-        is_trial: false,
-      },
-    );
-    company.partner_status = PartnerStatus.EXPIRED;
-    company.plan_id = null;
-    company.is_trial = false;
   }
 
   private generateCode(): string {

@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { format, getDaysInMonth } from 'date-fns';
 import { BillingService } from 'src/billing/billing.service';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
+import { TrialExpiryService } from 'src/companies/trial-expiry.service';
 import { Company } from 'src/companies/entities/company.entity';
 import { AccessMode } from 'src/companies/enums/access-mode.enum';
 import { AccessReason } from 'src/companies/enums/access-reason.enum';
@@ -121,6 +122,7 @@ export class PlatformService {
     private readonly dataSource: DataSource,
     private readonly billingService: BillingService,
     private readonly publicListingCache: PublicListingCache,
+    private readonly trialExpiryService: TrialExpiryService,
   ) {}
 
   async listClients(query: ListPlatformClientsQueryDto) {
@@ -129,7 +131,7 @@ export class PlatformService {
     const sort = query.sort ?? PlatformClientsSort.LAST_LOGIN_AT;
     const q = query.q?.trim().toLowerCase();
 
-    await this.expireDueTrials();
+    await this.trialExpiryService.expireDueTrials();
 
     const companies = await this.companiesRepository
       .createQueryBuilder('company')
@@ -183,7 +185,7 @@ export class PlatformService {
   }
 
   async getClient(publicId: string) {
-    await this.expireDueTrials();
+    await this.trialExpiryService.expireDueTrials();
 
     const company = await this.companiesRepository
       .createQueryBuilder('company')
@@ -475,26 +477,6 @@ export class PlatformService {
       })),
       deleted: result.deleted,
     };
-  }
-
-  private async expireDueTrials(): Promise<void> {
-    await this.companiesRepository
-      .createQueryBuilder()
-      .update(Company)
-      .set({
-        partner_status: PartnerStatus.EXPIRED,
-        plan_id: null,
-        is_trial: false,
-      })
-      .where('is_trial = true')
-      .andWhere('trial_ends_at <= NOW()')
-      .andWhere('partner_status = :active', {
-        active: PartnerStatus.ACTIVE,
-      })
-      .andWhere('(plan_id IS NULL OR plan_id = :free)', {
-        free: PlanEnum.FREE,
-      })
-      .execute();
   }
 
   private async findCompanyByPublicId(publicId: string): Promise<Company> {

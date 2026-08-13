@@ -24,6 +24,11 @@ import {
 import { Company } from 'src/companies/entities/company.entity';
 import { AccessMode } from 'src/companies/enums/access-mode.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
+import {
+  andWhereNotStaleTrial,
+  NOT_STALE_TRIAL,
+  portalCompanyWhere,
+} from 'src/companies/utils/portal-eligibility';
 import { addHours, format, parse } from 'date-fns';
 import { isCourtScheduleInPast } from 'src/utils/isCourtScheduleInPast';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
@@ -425,6 +430,7 @@ export class CourtSchedulesService {
           is_active: true,
           partner_status: PartnerStatus.ACTIVE,
           plan_id: Not(IsNull()),
+          is_trial: NOT_STALE_TRIAL,
         },
       },
       relations: { company: true },
@@ -1030,10 +1036,15 @@ export class CourtSchedulesService {
       async (manager) => {
         const courtSchedule = await manager
           .getRepository(CourtSchedule)
-          .findOne({
-            where: { public_id: body.court_schedule_public_id },
-            relations: ['reservation', 'court', 'court.company'],
-          });
+          .createQueryBuilder('cs')
+          .leftJoinAndSelect('cs.reservation', 'reservation')
+          .innerJoinAndSelect('cs.court', 'court')
+          .leftJoinAndSelect('court.company', 'company')
+          .setLock('pessimistic_write', undefined, ['cs'])
+          .where('cs.public_id = :publicId', {
+            publicId: body.court_schedule_public_id,
+          })
+          .getOne();
         if (!courtSchedule) {
           throw new NotFoundException('Horário não encontrado');
         }
@@ -1124,16 +1135,24 @@ export class CourtSchedulesService {
           );
         }
 
-        const futureSchedules = await manager.getRepository(CourtSchedule).find({
-          where: {
-            start_hour: courtSchedule.start_hour,
-            day_of_week_id: courtSchedule.day_of_week_id,
-            court_id: courtSchedule.court_id,
-            public_id: Not(body.court_schedule_public_id),
-            date: MoreThan(courtSchedule.date),
-          },
-          relations: ['reservation'],
-        });
+        const futureSchedules = await manager
+          .getRepository(CourtSchedule)
+          .createQueryBuilder('cs')
+          .leftJoinAndSelect('cs.reservation', 'reservation')
+          .setLock('pessimistic_write', undefined, ['cs'])
+          .where('cs.court_id = :courtId', { courtId: courtSchedule.court_id })
+          .andWhere('cs.day_of_week_id = :dow', {
+            dow: courtSchedule.day_of_week_id,
+          })
+          .andWhere('cs.start_hour = :hour', {
+            hour: courtSchedule.start_hour,
+          })
+          .andWhere('cs.public_id != :publicId', {
+            publicId: body.court_schedule_public_id,
+          })
+          .andWhere('cs.date > :date', { date: courtSchedule.date })
+          .orderBy('cs.id', 'ASC')
+          .getMany();
 
         for (const schedule of futureSchedules) {
           const reservation = schedule.reservation;
@@ -1420,14 +1439,10 @@ export class CourtSchedulesService {
         date,
         court: {
           show: true,
-          company: {
+          company: portalCompanyWhere({
             ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
             ...(cityNorm ? { city: ILike(cityNorm) } : {}),
-            is_active: true,
-            partner_status: PartnerStatus.ACTIVE,
-            plan_id: Not(IsNull()),
-            access_mode: AccessMode.FULL,
-          },
+          }),
         },
       },
       relations: {
@@ -1585,14 +1600,10 @@ export class CourtSchedulesService {
     excludeCompanyIds: Set<number>;
   }): Promise<IWhereToPlayCourtList[]> {
     const companies = await this.companyRepository.find({
-      where: {
-        is_active: true,
-        partner_status: PartnerStatus.ACTIVE,
-        plan_id: Not(IsNull()),
-        access_mode: AccessMode.FULL,
+      where: portalCompanyWhere({
         ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
         ...(cityNorm ? { city: ILike(cityNorm) } : {}),
-      },
+      }),
       relations: {
         courts: {
           court_sports: true,
@@ -1675,12 +1686,7 @@ export class CourtSchedulesService {
 
   async findStatesToPlay() {
     const companies = await this.companyRepository.find({
-      where: {
-        is_active: true,
-        partner_status: PartnerStatus.ACTIVE,
-        plan_id: Not(IsNull()),
-        access_mode: AccessMode.FULL,
-      },
+      where: portalCompanyWhere(),
       select: ['uf'],
       order: { uf: 'ASC' },
     });
@@ -1702,13 +1708,9 @@ export class CourtSchedulesService {
   async findCitiesToPlay(uf?: string) {
     const ufNorm = uf?.trim().toUpperCase() || '';
     const companies = await this.companyRepository.find({
-      where: {
-        is_active: true,
-        partner_status: PartnerStatus.ACTIVE,
-        plan_id: Not(IsNull()),
-        access_mode: AccessMode.FULL,
+      where: portalCompanyWhere({
         ...(ufNorm ? { uf: ILike(ufNorm) } : {}),
-      },
+      }),
       select: ['city', 'uf'],
       order: { city: 'ASC' },
     });
@@ -1730,7 +1732,7 @@ export class CourtSchedulesService {
   async findSportsToPlay() {
     // QueryBuilder: o find()+select só em relation não carrega id das
     // quadras e acaba omitindo esportes de parte das courts.
-    const rows = await this.courtRepository
+    const qb = this.courtRepository
       .createQueryBuilder('court')
       .innerJoin('court.company', 'company')
       .innerJoin('court.court_sports', 'sport')
@@ -1742,7 +1744,8 @@ export class CourtSchedulesService {
       .andWhere('company.plan_id IS NOT NULL')
       .andWhere('company.access_mode = :accessMode', {
         accessMode: AccessMode.FULL,
-      })
+      });
+    const rows = await andWhereNotStaleTrial(qb)
       .select('sport.id', 'id')
       .addSelect('sport.name', 'name')
       .distinct(true)
@@ -1775,7 +1778,7 @@ export class CourtSchedulesService {
     dateStr: string,
   ): Promise<IDetailsCourt> {
     // Join com filtro de date: evita carregar ~90 dias de court_schedule
-    const company = await this.companyRepository
+    const companyQb = this.companyRepository
       .createQueryBuilder('company')
       .leftJoinAndSelect('company.courts', 'court')
       .leftJoinAndSelect('court.court_sports', 'court_sports')
@@ -1795,8 +1798,8 @@ export class CourtSchedulesService {
       .andWhere('company.plan_id IS NOT NULL')
       .andWhere('company.access_mode = :accessMode', {
         accessMode: AccessMode.FULL,
-      })
-      .getOne();
+      });
+    const company = await andWhereNotStaleTrial(companyQb).getOne();
 
     if (!company) {
       throw new NotFoundException('Quadra não encontrada');
@@ -1908,13 +1911,7 @@ export class CourtSchedulesService {
         date,
         court: {
           show: true,
-          company: {
-            slug,
-            is_active: true,
-            partner_status: PartnerStatus.ACTIVE,
-            plan_id: Not(IsNull()),
-            access_mode: AccessMode.FULL,
-          },
+          company: portalCompanyWhere({ slug }),
         },
       },
       relations: {
@@ -2016,13 +2013,7 @@ export class CourtSchedulesService {
         court: {
           name: courtName,
           show: true,
-          company: {
-            slug,
-            is_active: true,
-            partner_status: PartnerStatus.ACTIVE,
-            plan_id: Not(IsNull()),
-            access_mode: AccessMode.FULL,
-          },
+          company: portalCompanyWhere({ slug }),
         },
       },
       relations: {
@@ -2057,12 +2048,7 @@ export class CourtSchedulesService {
 
   async findAllCourts(): Promise<{ slug: string; updatedAt: Date }[]> {
     const companies = await this.companyRepository.find({
-      where: {
-        is_active: true,
-        partner_status: PartnerStatus.ACTIVE,
-        plan_id: Not(IsNull()),
-        access_mode: AccessMode.FULL,
-      },
+      where: portalCompanyWhere(),
       select: {
         slug: true,
         updated_at: true,
@@ -2084,12 +2070,7 @@ export class CourtSchedulesService {
     { name: string; slug: string; logoUrl: string | null }[]
   > {
     const companies = await this.companyRepository.find({
-      where: {
-        is_active: true,
-        partner_status: PartnerStatus.ACTIVE,
-        plan_id: Not(IsNull()),
-        access_mode: AccessMode.FULL,
-      },
+      where: portalCompanyWhere(),
       select: {
         name: true,
         slug: true,

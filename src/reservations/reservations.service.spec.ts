@@ -93,6 +93,7 @@ describe('ReservationsService', () => {
         day_of_week_id: 3,
         start_hour: '10:00:00',
         date: '2030-07-26',
+        is_fixed: false,
         court: {
           company: {
             public_id: 'company-1',
@@ -104,6 +105,7 @@ describe('ReservationsService', () => {
     };
 
     beforeEach(() => {
+      owned.court_schedule.is_fixed = false;
       reservationsRepo.findOne.mockResolvedValue(owned);
       queryRunner.manager.findOne.mockResolvedValue({
         id: 9,
@@ -112,6 +114,7 @@ describe('ReservationsService', () => {
     });
 
     it('cancela fixo interno deixando o horário inativo', async () => {
+      owned.court_schedule.is_fixed = true;
       operatingScheduleRepo.findOne.mockResolvedValue({ is_public: false });
 
       const result = await service.cancelByPublicId(
@@ -131,7 +134,8 @@ describe('ReservationsService', () => {
       expect(queryRunner.commitTransaction).toHaveBeenCalled();
     });
 
-    it('cancela fixo comercial reabrindo o horário no portal', async () => {
+    it('cancela fixo comercial sem reabrir o horário no portal', async () => {
+      owned.court_schedule.is_fixed = true;
       operatingScheduleRepo.findOne.mockResolvedValue({ is_public: true });
 
       await service.cancelByPublicId(RESERVATION_PUBLIC_ID, OWNER_ID);
@@ -140,7 +144,7 @@ describe('ReservationsService', () => {
         CourtSchedule,
         1,
         expect.objectContaining({
-          available: true,
+          available: false,
           is_fixed: false,
         }),
       );
@@ -172,6 +176,7 @@ describe('ReservationsService', () => {
           id: 1,
           public_id: 'cs-1',
           available: true,
+          is_fixed: false,
           date: '2020-01-01',
           start_hour: '10:00:00',
           court: {
@@ -199,6 +204,45 @@ describe('ReservationsService', () => {
       ).rejects.toThrow(/já passou/i);
       expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
       expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejeita horário fixo mesmo se available estiver true', async () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 1,
+          public_id: 'cs-1',
+          available: true,
+          is_fixed: true,
+          date: '2030-07-26',
+          start_hour: '10:00:00',
+          court: {
+            company: {
+              public_id: 'company-1',
+              slug: 'arena',
+              administrator: { public_id: OWNER_ID },
+            },
+          },
+        }),
+      };
+      (queryRunner.manager as unknown as { getRepository: jest.Mock }).getRepository =
+        jest.fn().mockReturnValue({
+          createQueryBuilder: () => qb,
+        });
+
+      await expect(
+        service.create(
+          {
+            courtSchedulePublicId: 'cs-1',
+            contactName: 'Cliente',
+          } as never,
+          OWNER_ID,
+        ),
+      ).rejects.toThrow(/indisponível/i);
+      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
     });
   });
 });

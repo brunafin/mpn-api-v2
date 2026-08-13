@@ -7,12 +7,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtAuthUser } from 'src/auth/jwt.strategy';
 import { Company } from 'src/companies/entities/company.entity';
-import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
+import { TrialExpiryService } from 'src/companies/trial-expiry.service';
 import {
   canMutateCompany,
   hasProductEntitlement,
 } from 'src/companies/utils/company-access';
-import { shouldExpireTrialCompany } from 'src/companies/utils/trial-expiry';
 import { PersonRole } from 'src/people/enums/person-role.enum';
 import { Repository } from 'typeorm';
 
@@ -25,6 +24,7 @@ export class WriteAccessGuard implements CanActivate {
   constructor(
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
+    private readonly trialExpiryService: TrialExpiryService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -66,12 +66,7 @@ export class WriteAccessGuard implements CanActivate {
       });
     }
 
-    if (shouldExpireTrialCompany(company)) {
-      company.partner_status = PartnerStatus.EXPIRED;
-      company.plan_id = null;
-      company.is_trial = false;
-      await this.companyRepository.save(company);
-    }
+    await this.trialExpiryService.expireCompanyIfNeeded(company);
 
     if (!hasProductEntitlement(company)) {
       throw new ForbiddenException({

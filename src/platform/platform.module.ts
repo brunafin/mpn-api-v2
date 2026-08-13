@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingModule } from 'src/billing/billing.module';
 import { PublicListingCacheModule } from 'src/cache/cache.module';
+import { CompanyAccessModule } from 'src/companies/company-access.module';
 import { Company } from 'src/companies/entities/company.entity';
 import { Court } from 'src/courts/entities/court.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
@@ -13,6 +14,7 @@ import { PlatformService } from './platform.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Company, Person, PaymentCompany, Plan, Court]),
+    CompanyAccessModule,
     BillingModule,
     PublicListingCacheModule,
   ],
