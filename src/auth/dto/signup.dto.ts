@@ -9,6 +9,8 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { IsCpf } from 'src/utils/is-cpf.decorator';
+import { CPF_INVALID_MESSAGE } from 'src/utils/normalize-cpf';
 
 export class SignupDto {
   @ApiProperty({ example: 'João Silva' })
@@ -32,15 +34,14 @@ export class SignupDto {
 
   @ApiProperty({
     example: '52998224725',
-    description: 'CPF do responsável (11 dígitos). Usado no PIX das mensalidades.',
+    description:
+      'CPF do responsável (válido, 11 dígitos). Usado no PIX das mensalidades.',
   })
   @Transform(({ value }) =>
     typeof value === 'string' ? value.replace(/\D/g, '') : value,
   )
   @IsString()
-  @Matches(/^\d{11}$/, {
-    message: 'CPF deve ter 11 dígitos.',
-  })
+  @IsCpf({ message: CPF_INVALID_MESSAGE })
   cpf: string;
 
   @ApiProperty({ example: 'Senha@123' })
@@ -178,9 +179,7 @@ export class CompleteProfileDto {
     return digits || undefined;
   })
   @IsString()
-  @Matches(/^\d{11}$/, {
-    message: 'CPF deve ter 11 dígitos.',
-  })
+  @IsCpf({ message: CPF_INVALID_MESSAGE })
   cpf?: string;
 
   @ApiPropertyOptional({

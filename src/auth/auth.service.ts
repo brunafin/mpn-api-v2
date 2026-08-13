@@ -19,7 +19,7 @@ import { PersonRole } from 'src/people/enums/person-role.enum';
 import { Person } from 'src/people/entities/person.entity';
 import { EmailService } from 'src/email/email.service';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
-import { normalizeCpf } from 'src/utils/normalize-cpf';
+import { CPF_INVALID_MESSAGE, normalizeCpf } from 'src/utils/normalize-cpf';
 import { EmailVerification } from './entities/email-verification.entity';
 import { EmailVerificationPurpose } from './enums/email-verification-purpose.enum';
 import {
@@ -212,7 +212,7 @@ export class AuthService {
       );
     }
     if (!cpf) {
-      throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
+      throw new BadRequestException(CPF_INVALID_MESSAGE);
     }
     const existingCpf = await this.peopleService.findByCpf(cpf);
     if (existingCpf && existingCpf.id !== person.id) {
@@ -446,7 +446,7 @@ export class AuthService {
 
     const cpf = normalizeCpf(dto.cpf);
     if (!cpf) {
-      throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
+      throw new BadRequestException(CPF_INVALID_MESSAGE);
     }
 
     const existing = await this.peopleService.findByEmail(email);

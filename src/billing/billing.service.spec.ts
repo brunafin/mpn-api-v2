@@ -289,6 +289,21 @@ describe('BillingService', () => {
       ).toBe(`billing-42-x${expiredAt.getTime()}`);
     });
 
+    it('rejeita CPF inválido informado no PIX', async () => {
+      companiesRepo.findOne.mockResolvedValue(
+        paidCompany({
+          administrator: { ...owner, cpf: null } as never,
+        }),
+      );
+
+      await expect(
+        service.generatePix(companyPublicId, ownerPublicId, 42, {
+          cpf: '00000000000',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mercadoPago.createPixPayment).not.toHaveBeenCalled();
+    });
+
     it('não troca e-mail de login já cadastrado', async () => {
       await service.generatePix(companyPublicId, ownerPublicId, 42, {
         email: 'outro@email.com',

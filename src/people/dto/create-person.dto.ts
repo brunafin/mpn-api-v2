@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsString,
   IsBoolean,
@@ -6,6 +7,8 @@ import {
   IsOptional,
   MaxLength,
 } from 'class-validator';
+import { IsCpf } from 'src/utils/is-cpf.decorator';
+import { CPF_INVALID_MESSAGE } from 'src/utils/normalize-cpf';
 
 export class CreatePersonDto {
   @ApiProperty({ maxLength: 50, description: 'Nome da pessoa' })
@@ -36,14 +39,19 @@ export class CreatePersonDto {
   email: string;
 
   @ApiProperty({
-    maxLength: 11,
+    maxLength: 14,
     required: false,
-    description: 'Número de CPF da pessoa',
-    example: '12345678901',
+    description: 'Número de CPF da pessoa (com ou sem máscara)',
+    example: '52998224725',
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return value;
+    const digits = value.replace(/\D/g, '');
+    return digits || undefined;
+  })
   @IsString()
-  @MaxLength(11)
+  @IsCpf({ message: CPF_INVALID_MESSAGE })
   cpf: string;
 
   @ApiProperty({

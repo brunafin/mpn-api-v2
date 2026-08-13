@@ -41,7 +41,7 @@ import {
   BillingPixPayload,
   BillingSummary,
 } from './billing.types';
-import { normalizeCpf } from 'src/utils/normalize-cpf';
+import { CPF_INVALID_MESSAGE, normalizeCpf } from 'src/utils/normalize-cpf';
 
 const BRAZIL_TZ = 'America/Sao_Paulo';
 /** Fallback só se o id do seed sumir do banco (não usar para rename de nome). */
@@ -175,7 +175,7 @@ export class BillingService {
       courtsCount: company.courts?.length ?? 0,
     });
 
-    const hasCpf = Boolean(company.administrator?.cpf?.replace(/\D/g, ''));
+    const hasCpf = Boolean(normalizeCpf(company.administrator?.cpf));
     const payments = [...(company.payments ?? [])].sort((a, b) => {
       const aDue = a.dt_due ? new Date(a.dt_due).getTime() : 0;
       const bDue = b.dt_due ? new Date(b.dt_due).getTime() : 0;
@@ -323,7 +323,7 @@ export class BillingService {
       await this.syncPaymentFromMercadoPago(payment);
     }
 
-    const hasCpf = Boolean(company.administrator?.cpf?.replace(/\D/g, ''));
+    const hasCpf = Boolean(normalizeCpf(company.administrator?.cpf));
     return this.mapPaymentItem(payment, hasCpf);
   }
 
@@ -376,6 +376,9 @@ export class BillingService {
     }
     const email = normalizePayerEmail(owner.email) ?? emailFromBody;
 
+    if (payer?.cpf && !normalizeCpf(payer.cpf)) {
+      throw new BadRequestException(CPF_INVALID_MESSAGE);
+    }
     let cpf = normalizeCpf(owner.cpf) ?? normalizeCpf(payer?.cpf);
 
     const missing: Array<'email' | 'cpf'> = [];

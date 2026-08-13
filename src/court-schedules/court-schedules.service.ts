@@ -1398,6 +1398,7 @@ export class CourtSchedulesService {
     const ufNorm = uf?.trim().toUpperCase() || '';
     const cityNorm = city?.trim() || '';
     const dateKey = this.toDateKey(date);
+    const dateUtc = dateKeyToUtcDate(dateKey);
     const sportId = this.parseSportId(sport);
     const periodNorm = parsePublicListingPeriod(period);
     const cacheKey = `wtp:${dateKey}:${ufNorm}:${cityNorm.toLowerCase()}:s${sportId ?? ''}:p${periodNorm ?? ''}`;
@@ -1406,7 +1407,7 @@ export class CourtSchedulesService {
       this.loadWhereToPlay({
         cityNorm,
         ufNorm,
-        date,
+        date: dateUtc,
         sportId,
         period: periodNorm,
       }),
@@ -1897,7 +1898,7 @@ export class CourtSchedulesService {
     const cacheKey = `hours:${slug || ''}:${dateKey}`;
 
     return this.publicListingCache.getOrSet(cacheKey, () =>
-      this.loadAvailableHoursByCourt(slug, date),
+      this.loadAvailableHoursByCourt(slug, dateKeyToUtcDate(dateKey)),
     );
   }
 

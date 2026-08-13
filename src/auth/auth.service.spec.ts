@@ -140,6 +140,19 @@ describe('AuthService', () => {
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
     });
 
+    it('rejeita CPF com dígitos repetidos', async () => {
+      await expect(
+        service.signup({
+          name: 'João',
+          email: 'a@b.com',
+          cpf: '00000000000',
+          password: STRONG_PASSWORD,
+          acceptedTerms: true,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
+    });
+
     it('rejeita e-mail de conta já ativa', async () => {
       peopleService.findByEmail.mockResolvedValue({
         id: 1,
@@ -810,6 +823,26 @@ describe('AuthService', () => {
 
       await expect(
         service.completeProfile('pub-g', { acceptedTerms: true }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(peopleService.completeOwnerProfile).not.toHaveBeenCalled();
+    });
+
+    it('recusa conta nova com CPF inválido', async () => {
+      peopleService.findByPublicIdWithCompanies.mockResolvedValue({
+        id: 9,
+        public_id: 'pub-g',
+        username: 'joao',
+        role: 'owner',
+        cpf: null,
+        terms_accepted_at: null,
+        companies: [],
+      } as never);
+
+      await expect(
+        service.completeProfile('pub-g', {
+          acceptedTerms: true,
+          cpf: '11111111111',
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(peopleService.completeOwnerProfile).not.toHaveBeenCalled();
     });
