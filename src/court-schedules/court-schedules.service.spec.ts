@@ -1370,4 +1370,16 @@ describe('CourtSchedulesService', () => {
       ).resolves.toEqual({ available: false });
     });
   });
+
+  describe('handleCron', () => {
+    it('inclui company em trial ainda não publicada (sem filtrar is_active)', async () => {
+      courtRepo.find.mockResolvedValue([]);
+      await service.handleCron();
+      expect(courtRepo.find).toHaveBeenCalled();
+      const where = courtRepo.find.mock.calls[0][0].where.company;
+      expect(where.is_active).toBeUndefined();
+      expect(where.partner_status).toBeDefined();
+      expect(where.plan_id).toBeDefined();
+    });
+  });
 });

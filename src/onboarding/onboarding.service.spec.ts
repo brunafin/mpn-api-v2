@@ -13,6 +13,7 @@ import { DaysOfWeek } from '../days-of-week/entities/days-of-week.entity';
 import { Sport } from '../sports/entities/sport.entity';
 import { Person } from '../people/entities/person.entity';
 import { CourtSchedulesService } from '../court-schedules/court-schedules.service';
+import { CourtSchedule } from '../court-schedules/entities/court-schedule.entity';
 import { JwtService } from '@nestjs/jwt';
 import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 
@@ -34,13 +35,13 @@ const baseDto: CreateOnboardingDto = {
   courts: [
     {
       name: 'Q1',
-      sports: ['Futsal', 'Beach tennis'],
+      sports: [{ name: 'Futsal' }, { name: 'Beach tennis' }],
       floor: 'madeira',
       price: 100,
     },
     {
       name: 'Q2',
-      sports: ['Futsal'],
+      sports: [{ name: 'Futsal' }],
       floor: 'areia',
       price: 180,
     },
@@ -60,6 +61,8 @@ describe('OnboardingService', () => {
   let operatingSave: jest.Mock;
   let transaction: jest.Mock;
   let companyFindOne: jest.Mock;
+  let osCount: jest.Mock;
+  let csCount: jest.Mock;
 
   beforeEach(async () => {
     let courtSeq = 0;
@@ -78,14 +81,31 @@ describe('OnboardingService', () => {
     );
     operatingSave = jest.fn().mockResolvedValue(undefined);
     companyFindOne = jest.fn().mockResolvedValue(null);
+    osCount = jest.fn().mockResolvedValue(1);
+    csCount = jest.fn().mockResolvedValue(1);
 
     const companyExist = jest.fn().mockResolvedValue(false);
+
+    let sportSeq = 0;
+    personRepo = { findOne: jest.fn() };
+    sportRepo = {
+      find: jest.fn(),
+      create: jest.fn((x) => x),
+      save: jest.fn((x) =>
+        Promise.resolve(
+          Array.isArray(x)
+            ? x.map((s) => ({ ...s, id: 900 + sportSeq++ }))
+            : { ...x, id: 900 + sportSeq++ },
+        ),
+      ),
+    };
 
     const reposByEntity = new Map<
       unknown,
       {
         create?: jest.Mock;
         save?: jest.Mock;
+        find?: jest.Mock;
         findOne?: jest.Mock;
         exist?: jest.Mock;
         update?: jest.Mock;
@@ -103,25 +123,19 @@ describe('OnboardingService', () => {
       [Court, { create: jest.fn((x) => x), save: courtSave }],
       [OperatingSchedule, { create: jest.fn((x) => x), save: operatingSave }],
       [Person, { update: jest.fn().mockResolvedValue(undefined) }],
+      [
+        Sport,
+        {
+          find: sportRepo.find,
+          create: sportRepo.create,
+          save: sportRepo.save,
+        },
+      ],
     ]);
     const manager = {
       getRepository: (entity: unknown) => reposByEntity.get(entity),
     };
     transaction = jest.fn((cb) => cb(manager));
-
-    let sportSeq = 0;
-    personRepo = { findOne: jest.fn() };
-    sportRepo = {
-      find: jest.fn(),
-      create: jest.fn((x) => x),
-      save: jest.fn((x) =>
-        Promise.resolve(
-          Array.isArray(x)
-            ? x.map((s) => ({ ...s, id: 900 + sportSeq++ }))
-            : { ...x, id: 900 + sportSeq++ },
-        ),
-      ),
-    };
     daysRepo = { find: jest.fn() };
     courtSchedules = {
       populateCourtSchedule: jest.fn().mockResolvedValue(undefined),
@@ -129,7 +143,14 @@ describe('OnboardingService', () => {
     jwtService = { sign: jest.fn().mockReturnValue('new-jwt-token') };
 
     const companyRepo = {
-      manager: { transaction },
+      manager: {
+        transaction,
+        getRepository: jest.fn((entity: unknown) => {
+          if (entity === OperatingSchedule) return { count: osCount };
+          if (entity === CourtSchedule) return { count: csCount };
+          return reposByEntity.get(entity);
+        }),
+      },
       findOne: companyFindOne,
     };
 
@@ -138,7 +159,6 @@ describe('OnboardingService', () => {
         OnboardingService,
         { provide: getRepositoryToken(Company), useValue: companyRepo },
         { provide: getRepositoryToken(Person), useValue: personRepo },
-        { provide: getRepositoryToken(Sport), useValue: sportRepo },
         { provide: getRepositoryToken(DaysOfWeek), useValue: daysRepo },
         { provide: CourtSchedulesService, useValue: courtSchedules },
         { provide: JwtService, useValue: jwtService },
@@ -195,7 +215,7 @@ describe('OnboardingService', () => {
       id: 1,
       public_id: 'existing-company',
       name: 'Arena Existente',
-      courts: [{ public_id: 'court-a', name: 'Q1' }],
+      courts: [{ id: 7, public_id: 'court-a', name: 'Q1' }],
     });
 
     const result = await service.complete(OWNER_PUBLIC_ID, baseDto);
@@ -203,7 +223,48 @@ describe('OnboardingService', () => {
     expect(result.companyPublicId).toBe('existing-company');
     expect(result.companyName).toBe('Arena Existente');
     expect(result.access_token).toBe('new-jwt-token');
+    expect(result.alreadyExisted).toBe(true);
+    expect(result.schedulesReady).toBe(true);
     expect(transaction).not.toHaveBeenCalled();
+    expect(courtSchedules.populateCourtSchedule).not.toHaveBeenCalled();
+  });
+
+  it('re-popula a agenda quando o estabelecimento já existe mas o dia está vazio', async () => {
+    personRepo.findOne.mockResolvedValue({
+      id: 5,
+      public_id: 'owner-uuid',
+      username: 'owner',
+      status: true,
+    });
+    companyFindOne.mockResolvedValue({
+      id: 1,
+      public_id: 'existing-company',
+      name: 'Arena Existente',
+      courts: [{ id: 7, public_id: 'court-a', name: 'Q1' }],
+    });
+    osCount.mockResolvedValue(3);
+    csCount.mockResolvedValue(0);
+
+    const result = await service.complete(OWNER_PUBLIC_ID, baseDto);
+
+    expect(result.alreadyExisted).toBe(true);
+    expect(result.schedulesReady).toBe(true);
+    expect(courtSchedules.populateCourtSchedule).toHaveBeenCalled();
+  });
+
+  it('recusa grade sem nenhum horário', async () => {
+    personRepo.findOne.mockResolvedValue({
+      id: 5,
+      public_id: 'owner-uuid',
+      username: 'owner',
+      status: true,
+    });
+    await expect(
+      service.complete(OWNER_PUBLIC_ID, {
+        ...baseDto,
+        weekTemplate: [{ day_of_week_ref: 1, hours: [] }],
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('cria no catálogo os esportes que ainda não existem', async () => {
@@ -214,17 +275,26 @@ describe('OnboardingService', () => {
       status: true,
       companies: [],
     });
-    // Só "Futsal" existe; "Beach tennis" deve ser criado.
     sportRepo.find.mockResolvedValue([{ id: 1, name: 'Futsal' }]);
     daysRepo.find.mockResolvedValue([
       { id: 2, ref: 1 },
       { id: 3, ref: 2 },
     ]);
 
-    await service.complete(OWNER_PUBLIC_ID, baseDto);
+    await service.complete(OWNER_PUBLIC_ID, {
+      ...baseDto,
+      courts: [
+        {
+          name: 'Q1',
+          sports: [{ name: 'Futsal' }, { name: 'Fut5', needsNet: false }],
+          floor: 'madeira',
+          price: 100,
+        },
+      ],
+    });
 
     expect(sportRepo.save).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'Beach tennis', needsNet: false }),
+      expect.objectContaining({ name: 'Fut5', needsNet: false }),
     ]);
   });
 
@@ -274,13 +344,15 @@ describe('OnboardingService', () => {
       true,
     );
 
-    // Popula a agenda em background (não bloqueia a resposta).
+    // Dia atual síncrono (2 quadras) + horizonte em background (2).
     await new Promise((resolve) => setImmediate(resolve));
-    expect(courtSchedules.populateCourtSchedule).toHaveBeenCalledTimes(2);
+    expect(courtSchedules.populateCourtSchedule).toHaveBeenCalledTimes(4);
 
     expect(result.companyPublicId).toBe('company-uuid');
     expect(result.courts).toHaveLength(2);
-    expect(result.schedulesPopulated).toBe(false);
+    expect(result.alreadyExisted).toBe(false);
+    expect(result.schedulesReady).toBe(true);
+    expect(result.schedulesPopulated).toBe(true);
 
     // Reemite token com o estabelecimento recém-criado.
     expect(jwtService.sign).toHaveBeenCalledWith(
@@ -299,7 +371,7 @@ describe('OnboardingService', () => {
       courts: [
         {
           name: 'Q1',
-          sports: ['Futsal'],
+          sports: [{ name: 'Futsal' }],
           floor: 'madeira',
           price: 100,
           priceSlots: [
@@ -322,11 +394,13 @@ describe('OnboardingService', () => {
     expect(rows.find((r) => r.hour === '09:00')?.price).toBe(150);
   });
 
-  it('retorna schedulesPopulated=false quando o populate falha', async () => {
+  it('retorna schedulesReady=false quando o populate do dia atual falha', async () => {
     mockValidLookups();
     courtSchedules.populateCourtSchedule.mockRejectedValue(new Error('boom'));
 
     const result = await service.complete(OWNER_PUBLIC_ID, baseDto);
+    expect(result.alreadyExisted).toBe(false);
+    expect(result.schedulesReady).toBe(false);
     expect(result.schedulesPopulated).toBe(false);
   });
 });

@@ -11,10 +11,13 @@ import {
   UploadedFile,
   Req,
   BadRequestException,
+  GoneException,
 } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CourtsService } from 'src/courts/courts.service';
+import { CreateOwnedCourtDto } from 'src/courts/dto/create-owned-court.dto';
 import {
   ApiBody,
   ApiConsumes,
@@ -38,44 +41,36 @@ type AuthedRequest = {
 @Controller('companies')
 @ApiTags('companies')
 export class CompaniesController {
-  constructor(private readonly companiesService: CompaniesService) {}
+  constructor(
+    private readonly companiesService: CompaniesService,
+    private readonly courtsService: CourtsService,
+  ) {}
 
   @Post()
   @UseGuards(WriteAccessGuard)
-  @ApiOperation({ summary: 'Criar uma nova empresa' })
-  @ApiBody({
-    description: 'Dados para criar uma nova empresa',
-    type: CreateCompanyDto,
-    examples: {
-      exemplo1: {
-        summary: 'Empresa com todos os dados preenchidos',
-        value: {
-          name: 'Company Name',
-          phone: '123456789',
-          logo_url:
-            'https://storage.googleapis.com/mpn-bucket_public/mpn/logo_underline.svg',
-          instagram_url: 'https://instagram.com/company',
-          facebook_url: 'https://facebook.com/company',
-          email: 'company@example.com',
-          cep: '12345-678',
-          street: 'Company Street',
-          number: '123',
-          city: 'Company City',
-          neighborhood: 'Company Neighborhood',
-          uf: 'CC',
-          administrator_id: 1,
-        },
-      },
-    },
+  @ApiOperation({
+    summary: 'Descontinuado — use POST /onboarding',
+    deprecated: true,
   })
   create(
-    @Body() createCompanyDto: CreateCompanyDto,
+    @Body() _createCompanyDto: CreateCompanyDto,
+    @Req() _req: AuthedRequest,
+  ) {
+    throw new GoneException('Use POST /onboarding para criar o estabelecimento.');
+  }
+
+  @Post(':public_id/courts')
+  @UseGuards(WriteAccessGuard)
+  @ApiOperation({
+    summary: 'Adicionar quadra copiando a grade e populando a agenda',
+  })
+  @ApiBody({ type: CreateOwnedCourtDto })
+  createOwnedCourt(
+    @Param('public_id') publicId: string,
+    @Body() dto: CreateOwnedCourtDto,
     @Req() req: AuthedRequest,
   ) {
-    return this.companiesService.createForOwner(
-      createCompanyDto,
-      req.user.userId,
-    );
+    return this.courtsService.createOwned(publicId, req.user.userId, dto);
   }
 
   @Get()

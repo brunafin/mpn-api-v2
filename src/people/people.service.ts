@@ -207,7 +207,7 @@ export class PeopleService {
 
   /**
    * Dono ativo via Google (e-mail já verificado pelo provedor).
-   * Termos/telefone ficam para o complete-profile; CPF só na conversão paga.
+   * Termos, telefone e CPF ficam para o complete-profile.
    */
   async createGoogleOwner(input: {
     name: string;
@@ -237,11 +237,13 @@ export class PeopleService {
     personId: number,
     input: {
       phone?: string;
+      cpf: string;
       termsAcceptedAt: Date;
     },
   ): Promise<void> {
     const patch: Partial<Person> = {
       terms_accepted_at: input.termsAcceptedAt,
+      cpf: input.cpf,
     };
     if (input.phone) {
       patch.phone = input.phone;

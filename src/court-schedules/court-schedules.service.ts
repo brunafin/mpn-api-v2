@@ -422,12 +422,12 @@ export class CourtSchedulesService {
 
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
   async handleCron() {
-    // Quadra oculta (show=false) continua gerando; só pula company inativa.
-    // Onboarding / POST populate seguem livres para popular na mão.
+    // Quadra oculta (show=false) e company ainda não publicada (is_active=false)
+    // continuam gerando: is_active é portal, não entitlement.
+    // Pula só partner expirado / sem plano / trial stale.
     const courts = await this.courtRepository.find({
       where: {
         company: {
-          is_active: true,
           partner_status: PartnerStatus.ACTIVE,
           plan_id: Not(IsNull()),
           is_trial: NOT_STALE_TRIAL,
@@ -439,7 +439,7 @@ export class CourtSchedulesService {
     const endKey = addDaysToDateKey(todayKey, 89);
 
     console.log(
-      `Iniciando verificação de horários faltantes para ${courts.length} quadras (companies ativas)`,
+      `Iniciando verificação de horários faltantes para ${courts.length} quadras (trial/pago ativo)`,
     );
 
     for (const court of courts) {

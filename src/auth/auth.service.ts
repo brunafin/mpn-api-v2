@@ -181,8 +181,17 @@ export class AuthService {
     }
 
     const phoneDigits = dto.phone?.replace(/\D/g, '') || undefined;
+    const cpf = normalizeCpf(dto.cpf);
+    if (!cpf) {
+      throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
+    }
+    const existingCpf = await this.peopleService.findByCpf(cpf);
+    if (existingCpf && existingCpf.id !== person.id) {
+      throw new ConflictException('Já existe uma conta com este CPF.');
+    }
     await this.peopleService.completeOwnerProfile(person.id, {
       phone: phoneDigits,
+      cpf,
       termsAcceptedAt: new Date(),
     });
 
@@ -239,7 +248,7 @@ export class AuthService {
   }
 
   private needsProfileCompletion(person: Person): boolean {
-    return !person.terms_accepted_at;
+    return !person.terms_accepted_at || !normalizeCpf(person.cpf);
   }
 
   private async issueAuthToken(person: Person): Promise<AuthTokenResult> {

@@ -11,15 +11,24 @@ import { Court } from 'src/courts/entities/court.entity';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { DaysOfWeek } from 'src/days-of-week/entities/days-of-week.entity';
 import { Sport } from 'src/sports/entities/sport.entity';
+import {
+  canonicalSportName,
+  resolveSportsByName,
+} from 'src/sports/resolve-sports';
 import { Person } from 'src/people/entities/person.entity';
 import { CourtSchedulesService } from 'src/court-schedules/court-schedules.service';
+import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 import { JwtService } from '@nestjs/jwt';
 import { slugify } from 'src/utils/slugify';
 import { EntityManager } from 'typeorm';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { PlanEnum } from 'src/plans/enum/enum';
-import { addDaysToDateKey, todayDateKey } from 'src/utils/calendarDate';
+import {
+  addDaysToDateKey,
+  dateKeyToUtcDate,
+  todayDateKey,
+} from 'src/utils/calendarDate';
 
 const POPULATE_DAYS_AHEAD = 89;
 
@@ -30,8 +39,6 @@ export class OnboardingService {
     private readonly companyRepository: Repository<Company>,
     @InjectRepository(Person)
     private readonly personRepository: Repository<Person>,
-    @InjectRepository(Sport)
-    private readonly sportRepository: Repository<Sport>,
     @InjectRepository(DaysOfWeek)
     private readonly daysOfWeekRepository: Repository<DaysOfWeek>,
     private readonly courtSchedulesService: CourtSchedulesService,
@@ -52,6 +59,7 @@ export class OnboardingService {
 
     this.assertAddress(dto);
     this.assertCourts(dto);
+    this.assertWeekTemplate(dto);
 
     // Idempotente: se a 1ª tentativa criou e o client cancelou/timeout,
     // o retry devolve o estabelecimento já existente em vez de 409.
@@ -60,16 +68,20 @@ export class OnboardingService {
       relations: ['courts'],
     });
     if (existingCompany) {
-      return this.toResponse(
-        person,
-        existingCompany,
-        existingCompany.courts ?? [],
-        true,
-      );
+      const courts = existingCompany.courts ?? [];
+      const needsPopulate = await this.courtsNeedPopulate(courts);
+      let schedulesReady = !needsPopulate;
+      if (needsPopulate) {
+        schedulesReady = await this.populateToday(courts);
+        void this.populateSchedulesBackground(courts);
+      }
+      return this.toResponse(person, existingCompany, courts, {
+        alreadyExisted: true,
+        schedulesReady,
+      });
     }
 
     const dayIdByRef = await this.loadDayIdByRef(dto);
-    const sportByName = await this.resolveSportsByName(dto);
 
     const created = await this.companyRepository.manager.transaction(
       async (manager) => {
@@ -123,6 +135,14 @@ export class OnboardingService {
           { last_login_at: firstAccessAt },
         );
 
+        const resolvedSports = await resolveSportsByName(
+          manager.getRepository(Sport),
+          dto.courts.flatMap((court) => court.sports),
+        );
+        const sportByName = new Map(
+          resolvedSports.map((sport) => [sport.name.toLowerCase(), sport]),
+        );
+
         const courts: Court[] = [];
         for (const courtDto of dto.courts) {
           const court = await manager.getRepository(Court).save(
@@ -134,7 +154,11 @@ export class OnboardingService {
               is_can_have_net: courtDto.is_can_have_net ?? false,
               show: false,
               court_sports: courtDto.sports
-                .map((name) => sportByName.get(name.trim().toLowerCase()))
+                .map((sport) =>
+                  sportByName.get(
+                    canonicalSportName(sport.name).toLowerCase(),
+                  ),
+                )
                 .filter((s): s is Sport => Boolean(s)),
             }),
           );
@@ -173,18 +197,23 @@ export class OnboardingService {
       },
     );
 
-    // Agenda: best-effort em background — não segura a resposta HTTP
-    // (evita timeout/cancel no mobile enquanto a company já foi commitada).
+    let schedulesReady = true;
     if (!created.alreadyExisted) {
+      schedulesReady = await this.populateToday(created.courts);
       void this.populateSchedulesBackground(created.courts);
+    } else {
+      const needsPopulate = await this.courtsNeedPopulate(created.courts);
+      schedulesReady = !needsPopulate;
+      if (needsPopulate) {
+        schedulesReady = await this.populateToday(created.courts);
+        void this.populateSchedulesBackground(created.courts);
+      }
     }
 
-    return this.toResponse(
-      person,
-      created.company,
-      created.courts,
-      created.alreadyExisted,
-    );
+    return this.toResponse(person, created.company, created.courts, {
+      alreadyExisted: created.alreadyExisted,
+      schedulesReady,
+    });
   }
 
   private async allocateUniqueSlug(
@@ -226,12 +255,27 @@ export class OnboardingService {
     const requestedSportNames = Array.from(
       new Set(
         dto.courts
-          .flatMap((court) => court.sports.map((name) => name.trim()))
+          .flatMap((court) =>
+            court.sports.map((sport) => sport.name.trim()),
+          )
           .filter((name) => name.length > 0),
       ),
     );
     if (requestedSportNames.length === 0) {
       throw new BadRequestException('Informe ao menos um esporte por quadra.');
+    }
+  }
+
+  private assertWeekTemplate(dto: CreateOnboardingDto) {
+    const totalHours = dto.weekTemplate.reduce(
+      (sum, day) =>
+        sum + day.hours.filter((hour) => hour.trim().length > 0).length,
+      0,
+    );
+    if (totalHours === 0) {
+      throw new BadRequestException(
+        'Informe ao menos um horário de funcionamento.',
+      );
     }
   }
 
@@ -253,51 +297,77 @@ export class OnboardingService {
     return dayIdByRef;
   }
 
-  private async resolveSportsByName(dto: CreateOnboardingDto) {
-    const requestedSportNames = Array.from(
-      new Set(
-        dto.courts
-          .flatMap((court) => court.sports.map((name) => name.trim()))
-          .filter((name) => name.length > 0),
-      ),
-    );
+  private async courtsNeedPopulate(courts: Court[]): Promise<boolean> {
+    const today = dateKeyToUtcDate(todayDateKey());
+    const manager = this.companyRepository.manager;
+    const osRepo = manager.getRepository(OperatingSchedule);
+    const csRepo = manager.getRepository(CourtSchedule);
 
-    const existingSports = await this.sportRepository.find();
-    const sportByName = new Map(
-      existingSports.map((s) => [s.name.toLowerCase(), s]),
-    );
-    const sportsToCreate = requestedSportNames.filter(
-      (name) => !sportByName.has(name.toLowerCase()),
-    );
-    if (sportsToCreate.length > 0) {
-      const created = await this.sportRepository.save(
-        sportsToCreate.map((name) =>
-          this.sportRepository.create({ name, needsNet: false }),
-        ),
-      );
-      for (const sport of created) {
-        sportByName.set(sport.name.toLowerCase(), sport);
+    for (const court of courts) {
+      if (!court.id) continue;
+      const osCount = await osRepo.count({ where: { court_id: court.id } });
+      if (osCount === 0) continue;
+      const schedCount = await csRepo.count({
+        where: { court_id: court.id, date: today },
+      });
+      if (schedCount === 0) return true;
+    }
+    return false;
+  }
+
+  private async populateToday(courts: Court[]): Promise<boolean> {
+    const today = todayDateKey();
+    let allOk = true;
+    for (const court of courts) {
+      if (!court.id) continue;
+      try {
+        await this.courtSchedulesService.populateCourtSchedule(
+          court.id,
+          today,
+          today,
+        );
+      } catch (error) {
+        allOk = false;
+        const message =
+          error instanceof Error ? error.message : String(error);
+        console.error(
+          `[Onboarding] Falha ao popular o dia atual da quadra ${court.id}:`,
+          message,
+        );
       }
     }
-    return sportByName;
+    return allOk;
   }
 
   private async populateSchedulesBackground(courts: Court[]) {
-    const start = todayDateKey();
-    const end = addDaysToDateKey(start, POPULATE_DAYS_AHEAD);
+    const start = addDaysToDateKey(todayDateKey(), 1);
+    const end = addDaysToDateKey(todayDateKey(), POPULATE_DAYS_AHEAD);
 
     for (const court of courts) {
+      if (!court.id) continue;
+      await this.populateCourtWithRetry(court, start, end);
+    }
+  }
+
+  private async populateCourtWithRetry(
+    court: Court,
+    start: string,
+    end: string,
+    attempts = 2,
+  ) {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         await this.courtSchedulesService.populateCourtSchedule(
           court.id,
           start,
           end,
         );
+        return;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : String(error);
         console.error(
-          `[Onboarding] Falha ao popular agenda da quadra ${court.id}:`,
+          `[Onboarding] Falha ao popular agenda da quadra ${court.id} (tentativa ${attempt}/${attempts}):`,
           message,
         );
       }
@@ -308,7 +378,7 @@ export class OnboardingService {
     person: Person,
     company: Company,
     courts: Court[],
-    schedulesPopulated: boolean,
+    flags: { alreadyExisted: boolean; schedulesReady: boolean },
   ) {
     const access_token = this.jwtService.sign({
       sub: person.public_id,
@@ -325,7 +395,10 @@ export class OnboardingService {
         publicId: c.public_id,
         name: c.name,
       })),
-      schedulesPopulated,
+      alreadyExisted: flags.alreadyExisted,
+      schedulesReady: flags.schedulesReady,
+      /** @deprecated alias de schedulesReady — clientes antigos */
+      schedulesPopulated: flags.schedulesReady,
       access_token,
     };
   }

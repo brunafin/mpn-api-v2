@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Req,
+  GoneException,
 } from '@nestjs/common';
 import { CourtsService } from './courts.service';
 import { CreateCourtDto } from './dto/create-court.dto';
@@ -36,48 +37,17 @@ export class CourtsController {
 
   @Post()
   @UseGuards(WriteAccessGuard)
-  @ApiOperation({ summary: 'Criar uma quadra' })
-  @ApiBody({
-    description: 'Dados para criar uma nova quadra',
-    type: CreateCourtDto,
-    examples: {
-      exemplo1: {
-        summary: 'Quadra com todos os dados preenchidos',
-        value: {
-          name: 'Quadra 1',
-          company_id: 1,
-          show: true,
-          type_of_court_id: 1,
-          is_covered: false,
-          is_can_have_net: true,
-          sports: [1, 2],
-        },
-      },
-    },
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', example: 'Quadra 1' },
-        company_id: { type: 'number', example: 1 },
-        show: { type: 'boolean', example: true },
-        type_of_court_id: { type: 'number', example: 1 },
-        is_covered: { type: 'boolean', example: false },
-        is_can_have_net: { type: 'boolean', example: true },
-        sports: {
-          type: 'array',
-          items: { type: 'number', example: 1 },
-          example: [1, 2],
-          description: 'IDs dos esportes associados à quadra',
-        },
-      },
-      required: ['name', 'company_id', 'type_of_court_id', 'sports'],
-    },
+  @ApiOperation({
+    summary: 'Descontinuado — use POST /companies/:id/courts',
+    deprecated: true,
   })
   create(
-    @Body() createCourtDto: CreateCourtDto,
-    @Req() req: AuthedRequest,
+    @Body() _createCourtDto: CreateCourtDto,
+    @Req() _req: AuthedRequest,
   ) {
-    return this.courtsService.create(createCourtDto, req.user.userId);
+    throw new GoneException(
+      'Use POST /companies/:id/courts para adicionar uma quadra.',
+    );
   }
 
   @Get('/company/:public_id')

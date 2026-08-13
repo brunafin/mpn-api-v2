@@ -1,11 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { SportNameDto } from 'src/sports/dto/sport-name.dto';
 
 /**
  * Atualização estrutural da quadra (pós-onboarding).
@@ -40,12 +43,13 @@ export class UpdateCourtDto {
   is_can_have_net?: boolean;
 
   @ApiPropertyOptional({
-    type: [String],
-    description: 'Nomes dos esportes (ex.: Futsal, Voleibol)',
-    example: ['Futsal', 'Voleibol'],
+    type: [SportNameDto],
+    description: 'Esportes (catálogo ou nome novo com needsNet)',
+    example: [{ name: 'Futsal' }, { name: 'Vôlei de quadra' }],
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  sports?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => SportNameDto)
+  sports?: SportNameDto[];
 }

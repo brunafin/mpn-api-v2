@@ -532,6 +532,7 @@ describe('AuthService', () => {
         username: 'dono@arena.com',
         password: 'new-hash',
         role: 'owner',
+        cpf: '52998224725',
         terms_accepted_at: new Date(),
         companies: [{ public_id: 'company-1', name: 'Arena' }],
       });
@@ -721,6 +722,41 @@ describe('AuthService', () => {
       await expect(
         service.resetPassword('a@b.com', '123456', '123'),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('completeProfile', () => {
+    it('grava CPF e termos e emite JWT completo', async () => {
+      peopleService.findByPublicIdWithCompanies
+        .mockResolvedValueOnce({
+          id: 9,
+          public_id: 'pub-g',
+          username: 'joao',
+          role: 'owner',
+          cpf: null,
+          terms_accepted_at: null,
+          companies: [],
+        })
+        .mockResolvedValueOnce({
+          id: 9,
+          public_id: 'pub-g',
+          username: 'joao',
+          role: 'owner',
+          cpf: '52998224725',
+          terms_accepted_at: new Date(),
+          companies: [],
+        });
+
+      const result = await service.completeProfile('pub-g', {
+        acceptedTerms: true,
+        cpf: '529.982.247-25',
+      });
+
+      expect(peopleService.completeOwnerProfile).toHaveBeenCalledWith(
+        9,
+        expect.objectContaining({ cpf: '52998224725' }),
+      );
+      expect(result.needsProfileCompletion).toBe(false);
     });
   });
 });

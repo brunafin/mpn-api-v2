@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
+import { SportNameDto } from 'src/sports/dto/sport-name.dto';
 
 export class OnboardingDayDto {
   @ApiProperty({
@@ -29,6 +30,7 @@ export class OnboardingDayDto {
     example: ['08:00', '09:00'],
   })
   @IsArray()
+  @ArrayNotEmpty()
   @IsString({ each: true })
   hours: string[];
 }
@@ -60,13 +62,15 @@ export class OnboardingCourtDto {
   name: string;
 
   @ApiProperty({
-    description: 'Nomes dos esportes aceitos (mapeados/criados no catálogo)',
-    example: ['Futsal', 'Beach tennis'],
+    description: 'Esportes aceitos (catálogo ou nome novo com needsNet)',
+    type: [SportNameDto],
+    example: [{ name: 'Futsal' }, { name: 'Beach Tennis' }],
   })
   @IsArray()
   @ArrayNotEmpty()
-  @IsString({ each: true })
-  sports: string[];
+  @ValidateNested({ each: true })
+  @Type(() => SportNameDto)
+  sports: SportNameDto[];
 
   @ApiProperty({ description: 'Tipo de piso', example: 'madeira' })
   @IsString()
@@ -83,7 +87,7 @@ export class OnboardingCourtDto {
 
   @ApiProperty({ description: 'Preço padrão da quadra', example: 120 })
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   @Max(MAX_COURT_PRICE_REAIS)
   price: number;
 
@@ -106,6 +110,7 @@ export class CreateOnboardingDto {
     example: 'Arena Central',
   })
   @IsString()
+  @MaxLength(50)
   companyName: string;
 
   @ApiProperty({ required: false, example: '51999999999' })

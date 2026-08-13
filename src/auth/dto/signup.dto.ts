@@ -167,6 +167,19 @@ export class CompleteProfileDto {
   phone?: string;
 
   @ApiProperty({
+    example: '52998224725',
+    description: 'CPF do responsável (11 dígitos). Usado no PIX das mensalidades.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\D/g, '') : value,
+  )
+  @IsString()
+  @Matches(/^\d{11}$/, {
+    message: 'CPF deve ter 11 dígitos.',
+  })
+  cpf: string;
+
+  @ApiProperty({
     example: true,
     description: 'Aceite dos Termos de Uso e da Política de Privacidade.',
   })

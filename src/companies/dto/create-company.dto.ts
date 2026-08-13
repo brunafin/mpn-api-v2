@@ -7,8 +7,9 @@ import {
 } from 'class-validator';
 
 export class CreateCompanyDto {
-  @ApiProperty({ description: 'Nome da empresa' })
+  @ApiProperty({ description: 'Nome da empresa', maxLength: 50 })
   @IsString()
+  @MaxLength(50)
   name: string;
 
   @ApiProperty({
