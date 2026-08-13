@@ -166,26 +166,35 @@ export class CompleteProfileDto {
   })
   phone?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '52998224725',
-    description: 'CPF do responsável (11 dígitos). Usado no PIX das mensalidades.',
+    description:
+      'Obrigatório só para conta nova (sem termos). Cliente existente não reenvia.',
   })
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.replace(/\D/g, '') : value,
-  )
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return undefined;
+    const digits = value.replace(/\D/g, '');
+    return digits || undefined;
+  })
   @IsString()
   @Matches(/^\d{11}$/, {
     message: 'CPF deve ter 11 dígitos.',
   })
-  cpf: string;
+  cpf?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: true,
-    description: 'Aceite dos Termos de Uso e da Política de Privacidade.',
+    description:
+      'Obrigatório só para conta nova. Cliente com termos no banco pode omitir.',
   })
-  @Transform(({ value }) => value === true || value === 'true')
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    return value === true || value === 'true' ? true : value;
+  })
   @Equals(true, {
     message: 'É necessário aceitar os Termos de Uso e a Política de Privacidade.',
   })
-  acceptedTerms: boolean;
+  acceptedTerms?: boolean;
 }

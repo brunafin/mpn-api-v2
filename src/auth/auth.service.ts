@@ -182,6 +182,35 @@ export class AuthService {
 
     const phoneDigits = dto.phone?.replace(/\D/g, '') || undefined;
     const cpf = normalizeCpf(dto.cpf);
+
+    // Cliente já existente (termos no banco): não pede CPF/telefone de novo.
+    if (person.terms_accepted_at) {
+      if (cpf) {
+        const existingCpf = await this.peopleService.findByCpf(cpf);
+        if (existingCpf && existingCpf.id !== person.id) {
+          throw new ConflictException('Já existe uma conta com este CPF.');
+        }
+      }
+      if (cpf || phoneDigits) {
+        await this.peopleService.completeOwnerProfile(person.id, {
+          phone: phoneDigits,
+          cpf: cpf ?? undefined,
+          termsAcceptedAt: person.terms_accepted_at,
+        });
+      }
+      const refreshed =
+        await this.peopleService.findByPublicIdWithCompanies(personPublicId);
+      if (!refreshed) {
+        throw new UnauthorizedException('Não autorizado.');
+      }
+      return this.issueAuthToken(refreshed);
+    }
+
+    if (dto.acceptedTerms !== true) {
+      throw new BadRequestException(
+        'É necessário aceitar os Termos de Uso e a Política de Privacidade.',
+      );
+    }
     if (!cpf) {
       throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
     }
@@ -195,12 +224,12 @@ export class AuthService {
       termsAcceptedAt: new Date(),
     });
 
-    const refreshed =
+    const completed =
       await this.peopleService.findByPublicIdWithCompanies(personPublicId);
-    if (!refreshed) {
+    if (!completed) {
       throw new UnauthorizedException('Não autorizado.');
     }
-    return this.issueAuthToken(refreshed);
+    return this.issueAuthToken(completed);
   }
 
   private async verifyGoogleIdToken(idToken: string): Promise<{
@@ -248,7 +277,7 @@ export class AuthService {
   }
 
   private needsProfileCompletion(person: Person): boolean {
-    return !person.terms_accepted_at || !normalizeCpf(person.cpf);
+    return !person.terms_accepted_at;
   }
 
   private async issueAuthToken(person: Person): Promise<AuthTokenResult> {

@@ -346,6 +346,27 @@ describe('AuthService', () => {
       expect(peopleService.touchLastLoginAt).toHaveBeenCalledWith(1);
     });
 
+    it('não pede complete-profile se já aceitou termos mesmo sem CPF', async () => {
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 1,
+        status: true,
+        password: 'hashed',
+        username: 'joao',
+        public_id: 'pub-1',
+        role: 'owner',
+        cpf: null,
+        terms_accepted_at: new Date(),
+        companies: [{ public_id: 'company-1', name: 'Arena' }],
+      } as never);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.signIn('a@b.com', STRONG_PASSWORD);
+      expect(result.needsProfileCompletion).toBe(false);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ termsAccepted: true }),
+      );
+    });
+
     it('bloqueia login por senha em conta só-Google', async () => {
       peopleService.findOneForAuth.mockResolvedValue({
         id: 1,
@@ -757,6 +778,40 @@ describe('AuthService', () => {
         expect.objectContaining({ cpf: '52998224725' }),
       );
       expect(result.needsProfileCompletion).toBe(false);
+    });
+
+    it('libera cliente existente com termos mesmo sem CPF no payload', async () => {
+      peopleService.findByPublicIdWithCompanies.mockResolvedValue({
+        id: 2,
+        public_id: 'pub-old',
+        username: 'arena',
+        role: 'owner',
+        cpf: null,
+        terms_accepted_at: new Date('2024-01-01'),
+        companies: [{ public_id: 'company-1', name: 'Arena' }],
+      } as never);
+
+      const result = await service.completeProfile('pub-old', {});
+
+      expect(peopleService.completeOwnerProfile).not.toHaveBeenCalled();
+      expect(result.needsProfileCompletion).toBe(false);
+    });
+
+    it('recusa conta nova sem CPF', async () => {
+      peopleService.findByPublicIdWithCompanies.mockResolvedValue({
+        id: 9,
+        public_id: 'pub-g',
+        username: 'joao',
+        role: 'owner',
+        cpf: null,
+        terms_accepted_at: null,
+        companies: [],
+      } as never);
+
+      await expect(
+        service.completeProfile('pub-g', { acceptedTerms: true }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(peopleService.completeOwnerProfile).not.toHaveBeenCalled();
     });
   });
 });

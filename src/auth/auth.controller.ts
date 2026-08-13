@@ -133,7 +133,7 @@ export class AuthController {
   @Post('complete-profile')
   @ApiOperation({
     summary:
-      'Após login Google: aceita termos e opcionalmente informa telefone de contato',
+      'Conta nova (Google): aceita termos e informa CPF. Cliente com termos no banco só renova o JWT.',
   })
   @ApiBody({ type: CompleteProfileDto })
   @ApiResponse({ status: 200, description: 'Perfil completo + JWT atualizado' })
