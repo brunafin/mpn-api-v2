@@ -259,14 +259,12 @@ describe('Security remediation contracts', () => {
   });
 
   describe('Billing — PIX idempotente', () => {
-    it('chave de idempotência do PIX é estável por payment.id', () => {
+    it('chave PIX é estável no retry e nova após expirar', () => {
       const billingSrc = readFileSync(
         join(__dirname, '../billing/billing.service.ts'),
         'utf8',
       );
-      expect(billingSrc).toMatch(
-        /idempotencyKey = `billing-\$\{payment\.id\}`/,
-      );
+      expect(billingSrc).toContain('billingPixIdempotencyKey');
       expect(billingSrc).not.toMatch(
         /idempotencyKey = `billing-\$\{payment\.id\}-\$\{Date\.now\(\)\}`/,
       );
@@ -288,6 +286,28 @@ describe('Security remediation contracts', () => {
         'utf8',
       );
       expect(billingSrc).toContain('isPgUniqueViolation');
+    });
+  });
+
+  describe('Auth — signup e e-mail', () => {
+    it('retake de cadastro pendente atualiza senha', () => {
+      const authSrc = readFileSync(
+        join(__dirname, '../auth/auth.service.ts'),
+        'utf8',
+      );
+      expect(authSrc).toContain('updateInactiveSignup');
+    });
+
+    it('e-mail de login tem unique case-insensitive', () => {
+      const migrationSrc = readFileSync(
+        join(
+          __dirname,
+          '../database/migrations/1784840000000-PersonEmailUnique.ts',
+        ),
+        'utf8',
+      );
+      expect(migrationSrc).toContain('UQ_person_email');
+      expect(migrationSrc).toContain('LOWER("email")');
     });
   });
 

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { Person } from './entities/person.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
 
@@ -94,7 +94,7 @@ export class PeopleService {
 
   findByEmail(email: string): Promise<Person | null> {
     return this.peopleRepository.findOne({
-      where: { email },
+      where: { email: ILike(email) },
       relations: ['companies'],
     });
   }
@@ -178,6 +178,31 @@ export class PeopleService {
       terms_accepted_at: input.termsAcceptedAt ?? null,
     });
     return this.peopleRepository.save(person);
+  }
+
+  /** Retake de cadastro pendente: a senha/dados do último signup é que valem. */
+  async updateInactiveSignup(
+    personId: number,
+    input: {
+      name: string;
+      phone?: string;
+      cpf?: string;
+      passwordHash: string;
+      termsAcceptedAt: Date;
+    },
+  ): Promise<void> {
+    const patch: Partial<Person> = {
+      name: input.name,
+      password: input.passwordHash,
+      terms_accepted_at: input.termsAcceptedAt,
+    };
+    if (input.phone) {
+      patch.phone = input.phone;
+    }
+    if (input.cpf) {
+      patch.cpf = input.cpf;
+    }
+    await this.peopleRepository.update({ id: personId }, patch);
   }
 
   /**

@@ -44,6 +44,7 @@ export class Person {
   @Expose()
   phone: string;
 
+  /** Unique case-insensitive: UQ_person_email (LOWER(email)). */
   @Column({ length: 100, nullable: true })
   @Expose()
   email: string;

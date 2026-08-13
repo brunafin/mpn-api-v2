@@ -42,6 +42,7 @@ describe('AuthService', () => {
       findOneByCompanyPublicId: jest.fn(),
       findOneByPublicIdForPasswordChange: jest.fn(),
       updatePassword: jest.fn(),
+      updateInactiveSignup: jest.fn(),
       touchLastLoginAt: jest.fn().mockResolvedValue(undefined),
     };
     emailService = {
@@ -175,7 +176,7 @@ describe('AuthService', () => {
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
     });
 
-    it('retoma cadastro pendente reenviando o código', async () => {
+    it('retoma cadastro pendente atualizando senha e reenviando o código', async () => {
       peopleService.findByEmail.mockResolvedValue({
         id: 1,
         status: false,
@@ -190,6 +191,15 @@ describe('AuthService', () => {
       });
 
       expect(peopleService.createInactiveOwner).not.toHaveBeenCalled();
+      expect(peopleService.hashPassword).toHaveBeenCalledWith(STRONG_PASSWORD);
+      expect(peopleService.updateInactiveSignup).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'João',
+          cpf: '52998224725',
+          passwordHash: 'hashed',
+        }),
+      );
       expect(emailService.sendVerificationCodeEmail).toHaveBeenCalledWith(
         'a@b.com',
         expect.stringMatching(/^\d{6}$/),

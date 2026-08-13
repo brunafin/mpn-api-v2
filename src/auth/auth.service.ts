@@ -424,15 +424,31 @@ export class AuthService {
       throw new BadRequestException(PASSWORD_HINT);
     }
 
+    const cpf = normalizeCpf(dto.cpf);
+    if (!cpf) {
+      throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
+    }
+
     const existing = await this.peopleService.findByEmail(email);
     if (existing) {
-      // Conta já ativa: e-mail realmente em uso.
       if (existing.status) {
         throw new ConflictException('Já existe uma conta com este e-mail.');
       }
 
-      // Conta pendente (não verificada): retoma o cadastro reenviando o código
-      // em vez de travar o usuário num 409 sem saída.
+      const existingCpf = await this.peopleService.findByCpf(cpf);
+      if (existingCpf && existingCpf.id !== existing.id) {
+        throw new ConflictException('Já existe uma conta com este CPF.');
+      }
+
+      const passwordHash = await this.peopleService.hashPassword(dto.password);
+      await this.peopleService.updateInactiveSignup(existing.id, {
+        name,
+        phone: dto.phone?.replace(/\D/g, '') || undefined,
+        cpf,
+        passwordHash,
+        termsAcceptedAt: new Date(),
+      });
+
       await this.assertResendAllowed(
         existing.id,
         EmailVerificationPurpose.EMAIL_VERIFICATION,
@@ -447,11 +463,6 @@ export class AuthService {
           'Já havia um cadastro pendente para este e-mail. Enviamos um novo código de confirmação.',
         email,
       };
-    }
-
-    const cpf = normalizeCpf(dto.cpf);
-    if (!cpf) {
-      throw new BadRequestException('Informe um CPF válido com 11 dígitos.');
     }
 
     const existingCpf = await this.peopleService.findByCpf(cpf);

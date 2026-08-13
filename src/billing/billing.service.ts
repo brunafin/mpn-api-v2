@@ -362,22 +362,19 @@ export class BillingService {
     }
 
     const emailFromBody = normalizePayerEmail(payer?.email);
-    let email = normalizePayerEmail(owner.email) ?? emailFromBody;
-
-    if (emailFromBody) {
-      const currentEmail = normalizePayerEmail(owner.email);
-      if (emailFromBody !== currentEmail) {
-        const existingEmail = await this.peopleRepository.findOne({
-          where: { email: ILike(emailFromBody) },
-        });
-        if (existingEmail && existingEmail.id !== owner.id) {
-          throw new ConflictException('Já existe uma conta com este e-mail.');
-        }
-        owner.email = emailFromBody;
-        await this.peopleRepository.save(owner);
+    const currentEmail = normalizePayerEmail(owner.email);
+    // E-mail de login não muda no PIX. Só preenche se a conta ainda não tem.
+    if (emailFromBody && !currentEmail) {
+      const existingEmail = await this.peopleRepository.findOne({
+        where: { email: ILike(emailFromBody) },
+      });
+      if (existingEmail && existingEmail.id !== owner.id) {
+        throw new ConflictException('Já existe uma conta com este e-mail.');
       }
-      email = emailFromBody;
+      owner.email = emailFromBody;
+      await this.peopleRepository.save(owner);
     }
+    const email = normalizePayerEmail(owner.email) ?? emailFromBody;
 
     let cpf = normalizeCpf(owner.cpf) ?? normalizeCpf(payer?.cpf);
 
@@ -432,8 +429,7 @@ export class BillingService {
     const dueLabel = payment.dt_due
       ? format(new Date(payment.dt_due), 'MM/yyyy')
       : format(now, 'MM/yyyy');
-    // Estável por parcela: retry/timeout do client não cria outro payment no MP.
-    const idempotencyKey = `billing-${payment.id}`;
+    const idempotencyKey = billingPixIdempotencyKey(payment, now);
 
     const mp = await this.mercadoPago.createPixPayment({
       amount: Number(payment.price),
@@ -724,6 +720,20 @@ export class BillingService {
       mpPaymentId: payment.mp_payment_id ?? null,
     };
   }
+}
+
+/** Estável no retry; depois do QR vencer gera chave nova para o MP emitir outro PIX. */
+export function billingPixIdempotencyKey(
+  payment: { id: number; pix_expires_at?: Date | null },
+  now = new Date(),
+): string {
+  const expiredAt = payment.pix_expires_at
+    ? new Date(payment.pix_expires_at).getTime()
+    : 0;
+  if (expiredAt > 0 && expiredAt <= now.getTime()) {
+    return `billing-${payment.id}-x${expiredAt}`;
+  }
+  return `billing-${payment.id}`;
 }
 
 function normalizePayerEmail(value?: string | null): string | null {

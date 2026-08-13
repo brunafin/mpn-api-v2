@@ -10,7 +10,20 @@ import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { QueryFailedError } from 'typeorm';
-import { BillingService } from './billing.service';
+import {
+  BillingService,
+  billingPixIdempotencyKey,
+} from './billing.service';
+
+describe('billingPixIdempotencyKey', () => {
+  it('é estável sem expiry e muda depois de vencer', () => {
+    expect(billingPixIdempotencyKey({ id: 7 })).toBe('billing-7');
+    const expired = new Date('2026-01-01T00:00:00.000Z');
+    expect(
+      billingPixIdempotencyKey({ id: 7, pix_expires_at: expired }, new Date('2026-01-02')),
+    ).toBe(`billing-7-x${expired.getTime()}`);
+  });
+});
 
 describe('BillingService', () => {
   let service: BillingService;
@@ -22,6 +35,7 @@ describe('BillingService', () => {
     create: jest.Mock;
   };
   let plansRepo: { findOne: jest.Mock };
+  let peopleRepo: { findOne: jest.Mock; save: jest.Mock };
   let mercadoPago: {
     isConfigured: jest.Mock;
     createPixPayment: jest.Mock;
@@ -67,6 +81,7 @@ describe('BillingService', () => {
       create: jest.fn((p) => p),
     };
     plansRepo = { findOne: jest.fn() };
+    peopleRepo = { findOne: jest.fn(), save: jest.fn() };
     mercadoPago = {
       isConfigured: jest.fn().mockReturnValue(true),
       createPixPayment: jest.fn().mockResolvedValue({
@@ -85,7 +100,7 @@ describe('BillingService', () => {
           provide: getRepositoryToken(PaymentCompany),
           useValue: paymentsRepo,
         },
-        { provide: getRepositoryToken(Person), useValue: { findOne: jest.fn(), save: jest.fn() } },
+        { provide: getRepositoryToken(Person), useValue: peopleRepo },
         { provide: getRepositoryToken(Plan), useValue: plansRepo },
         { provide: MercadoPagoService, useValue: mercadoPago },
         {
@@ -254,6 +269,35 @@ describe('BillingService', () => {
         (call) => call[0].idempotencyKey,
       );
       expect(keys).toEqual(['billing-42', 'billing-42']);
+    });
+
+    it('após QR expirado usa chave nova billing-{id}-x{ts}', async () => {
+      const expiredAt = new Date(Date.now() - 60_000);
+      paymentsRepo.findOne.mockImplementation(async () => ({
+        ...openPayment,
+        mp_payment_id: 'mp-old',
+        pix_copy_paste: 'old-pix',
+        pix_qr_base64: 'old-qr',
+        pix_expires_at: expiredAt,
+      }));
+
+      await service.generatePix(companyPublicId, ownerPublicId, 42);
+
+      expect(mercadoPago.createPixPayment).toHaveBeenCalledTimes(1);
+      expect(
+        mercadoPago.createPixPayment.mock.calls[0][0].idempotencyKey,
+      ).toBe(`billing-42-x${expiredAt.getTime()}`);
+    });
+
+    it('não troca e-mail de login já cadastrado', async () => {
+      await service.generatePix(companyPublicId, ownerPublicId, 42, {
+        email: 'outro@email.com',
+      });
+
+      expect(peopleRepo.save).not.toHaveBeenCalled();
+      expect(mercadoPago.createPixPayment.mock.calls[0][0].payer.email).toBe(
+        'dono@arena.com',
+      );
     });
 
     it('reusa QR válido e não chama o Mercado Pago de novo', async () => {
