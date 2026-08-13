@@ -44,6 +44,7 @@ async function bootstrap() {
     'https://sistemamarcapranos-stable.up.railway.app',
     'https://marcapranos.up.railway.app',
     'https://mpn-court-v2-new.up.railway.app',
+    'https://mpn-court-v2-production.up.railway.app',
     'https://mpnadmin.up.railway.app',
     'https://mpn-admin-v2.vercel.app',
     'https://sistema.marcapranos.com.br',
