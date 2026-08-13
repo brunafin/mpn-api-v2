@@ -18,6 +18,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let errorDetails: string | null = null;
     let code: string | null = null;
     let missing: string[] | null = null;
+    let email: string | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -57,6 +58,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ) {
           missing = responseObject.missing as string[];
         }
+        if (typeof responseObject.email === 'string') {
+          email = responseObject.email;
+        }
         errorDetails =
           typeof responseObject.error === 'string'
             ? responseObject.error
@@ -76,6 +80,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       ...(code ? { code } : {}),
       ...(missing ? { missing } : {}),
+      ...(email ? { email } : {}),
       ...(errorDetails ? { error: errorDetails } : {}),
       timestamp: new Date().toISOString(),
     });
