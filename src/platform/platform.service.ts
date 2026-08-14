@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { format, getDaysInMonth } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { BillingService } from 'src/billing/billing.service';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { TrialExpiryService } from 'src/companies/trial-expiry.service';
@@ -21,6 +22,7 @@ import {
 } from 'src/companies/utils/trial-expiry';
 import { Court } from 'src/courts/entities/court.entity';
 import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
+import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { cleanupPersonById } from 'src/people/cleanup-person';
@@ -29,6 +31,7 @@ import { PersonRole } from 'src/people/enums/person-role.enum';
 import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
+import { BRAZIL_TZ, todayDateKey } from 'src/utils/calendarDate';
 import { DataSource, IsNull, Not, Repository } from 'typeorm';
 import { isPgUniqueViolation } from 'src/common/db/pg-error';
 import { CreatePlatformPaymentDto } from './dto/create-platform-payment.dto';
@@ -241,7 +244,11 @@ export class PlatformService {
       .getOne();
 
     if (company) {
-      return this.mapDetail(company);
+      const [detail, usage] = await Promise.all([
+        Promise.resolve(this.mapDetail(company)),
+        this.getCompanyUsage(company.id),
+      ]);
+      return { ...detail, usage };
     }
 
     const person = await this.peopleRepository.findOne({
@@ -272,6 +279,11 @@ export class PlatformService {
       courts: [],
       paymentHistory: [],
       plan: null,
+      usage: {
+        pastReservations: 0,
+        futureReservations: 0,
+        fixedSlots: 0,
+      },
       owner: {
         publicId: person.public_id,
         name: person.name || null,
@@ -869,6 +881,98 @@ export class PlatformService {
     return pickRecentLogins(people, RECENT_LOGINS_LIMIT);
   }
 
+  private async getCompanyUsage(companyId: number, now = new Date()) {
+    const todayKey = todayDateKey(now);
+    const nowTime = formatInTimeZone(now, BRAZIL_TZ, 'HH:mm:ss');
+    const monthStartKey = `${todayKey.slice(0, 7)}-01`;
+    const [year, month] = todayKey.split('-').map(Number);
+    const nextMonth =
+      month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+    const monthEndExclusiveKey = `${nextMonth.year}-${String(nextMonth.month).padStart(2, '0')}-01`;
+
+    const [pastReservations, futureReservations, fixedSlots] =
+      await Promise.all([
+        this.countCompanyReservationsByWhen(
+          companyId,
+          'past',
+          todayKey,
+          nowTime,
+          monthStartKey,
+          monthEndExclusiveKey,
+        ),
+        this.countCompanyReservationsByWhen(
+          companyId,
+          'future',
+          todayKey,
+          nowTime,
+          monthStartKey,
+          monthEndExclusiveKey,
+        ),
+        this.countCompanyFixedSlots(companyId),
+      ]);
+
+    return {
+      pastReservations,
+      futureReservations,
+      fixedSlots,
+    };
+  }
+
+  /** Reservas orgânicas do mês civil atual (America/Sao_Paulo), passadas ou futuras. */
+  private async countCompanyReservationsByWhen(
+    companyId: number,
+    when: 'past' | 'future',
+    todayKey: string,
+    nowTime: string,
+    monthStartKey: string,
+    monthEndExclusiveKey: string,
+  ): Promise<number> {
+    const query = this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(reservation.id)', 'count')
+      .from(Reservation, 'reservation')
+      .innerJoin(
+        CourtSchedule,
+        'schedule',
+        'schedule.id = reservation.court_schedule_id',
+      )
+      .innerJoin(Court, 'court', 'court.id = schedule.court_id')
+      .where('court.company_id = :companyId', { companyId })
+      .andWhere('schedule.date >= :monthStartKey', { monthStartKey })
+      .andWhere('schedule.date < :monthEndExclusiveKey', {
+        monthEndExclusiveKey,
+      });
+
+    if (when === 'past') {
+      query.andWhere(
+        `(schedule.date < :todayKey OR (schedule.date = :todayKey AND schedule.start_hour < :nowTime))`,
+        { todayKey, nowTime },
+      );
+    } else {
+      query.andWhere(
+        `(schedule.date > :todayKey OR (schedule.date = :todayKey AND schedule.start_hour >= :nowTime))`,
+        { todayKey, nowTime },
+      );
+    }
+
+    const raw = await query.getRawOne<{ count: string }>();
+    return Number(raw?.count ?? 0);
+  }
+
+  private async countCompanyFixedSlots(companyId: number): Promise<number> {
+    const raw = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from(OperatingSchedule, 'slot')
+      .innerJoin(Court, 'court', 'court.id = slot.court_id')
+      .where('court.company_id = :companyId', { companyId })
+      .andWhere('slot.is_fixed = :fixed', { fixed: true })
+      .andWhere('slot.is_active = :active', { active: true })
+      .getRawOne<{ count: string }>();
+
+    return Number(raw?.count ?? 0);
+  }
+
   private async getReservationPulse(now: Date) {
     const today = brazilDayWindow(now);
     const last7Days = brazilLastDaysWindow(now, 7);
@@ -887,11 +991,14 @@ export class PlatformService {
     };
   }
 
-  private async countOrganicReservations(window: {
-    start: Date;
-    end: Date;
-  }): Promise<number> {
-    const raw = await this.dataSource
+  private async countOrganicReservations(
+    window: {
+      start: Date;
+      end: Date;
+    },
+    companyId?: number,
+  ): Promise<number> {
+    const query = this.dataSource
       .createQueryBuilder()
       .select('COUNT(reservation.id)', 'count')
       .from(Reservation, 'reservation')
@@ -902,9 +1009,15 @@ export class PlatformService {
       )
       .where('schedule.is_fixed = :fixed', { fixed: false })
       .andWhere('reservation.created_at >= :start', { start: window.start })
-      .andWhere('reservation.created_at < :end', { end: window.end })
-      .getRawOne<{ count: string }>();
+      .andWhere('reservation.created_at < :end', { end: window.end });
 
+    if (companyId != null) {
+      query
+        .innerJoin(Court, 'court', 'court.id = schedule.court_id')
+        .andWhere('court.company_id = :companyId', { companyId });
+    }
+
+    const raw = await query.getRawOne<{ count: string }>();
     return Number(raw?.count ?? 0);
   }
 
