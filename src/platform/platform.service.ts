@@ -20,14 +20,16 @@ import {
   isCompanyOnTrial,
 } from 'src/companies/utils/trial-expiry';
 import { Court } from 'src/courts/entities/court.entity';
+import { CourtSchedule } from 'src/court-schedules/entities/court-schedule.entity';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
+import { Reservation } from 'src/reservations/entities/reservation.entity';
 import { cleanupPersonById } from 'src/people/cleanup-person';
 import { Person } from 'src/people/entities/person.entity';
 import { PersonRole } from 'src/people/enums/person-role.enum';
 import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Not, Repository } from 'typeorm';
 import { isPgUniqueViolation } from 'src/common/db/pg-error';
 import { CreatePlatformPaymentDto } from './dto/create-platform-payment.dto';
 import {
@@ -38,6 +40,14 @@ import { MarkPlatformPaymentPaidDto } from './dto/mark-platform-payment-paid.dto
 import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-access.dto';
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
 import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
+import {
+  brazilDayWindow,
+  brazilLastDaysWindow,
+  brazilMonthWindow,
+  pickRecentLogins,
+  RECENT_LOGINS_LIMIT,
+  summarizeDashboardCompanies,
+} from './platform-dashboard';
 
 type PlatformClientListItem = {
   kind: 'company' | 'onboarding';
@@ -124,6 +134,36 @@ export class PlatformService {
     private readonly publicListingCache: PublicListingCache,
     private readonly trialExpiryService: TrialExpiryService,
   ) {}
+
+  async getDashboard(now = new Date()) {
+    await this.trialExpiryService.expireDueTrials();
+
+    const [companies, onboarding, receivedThisMonth, reservations, recentLogins] =
+      await Promise.all([
+        this.companiesRepository.find({
+          relations: { plan: true, courts: true },
+        }),
+        this.peopleRepository
+          .createQueryBuilder('person')
+          .leftJoin('person.companies', 'company')
+          .where('company.id IS NULL')
+          .andWhere('person.role = :role', { role: PersonRole.OWNER })
+          .getCount(),
+        this.sumReceivedInWindow(brazilMonthWindow(now)),
+        this.getReservationPulse(now),
+        this.getRecentLogins(),
+      ]);
+
+    const summary = summarizeDashboardCompanies(companies, now);
+
+    return {
+      ...summary,
+      onboarding,
+      receivedThisMonth,
+      recentLogins,
+      ...reservations,
+    };
+  }
 
   async listClients(query: ListPlatformClientsQueryDto) {
     const page = query.page ?? 1;
@@ -801,5 +841,92 @@ export class PlatformService {
           }
         : null,
     };
+  }
+
+  private async sumReceivedInWindow(window: { start: Date; end: Date }) {
+    const raw = await this.paymentsRepository
+      .createQueryBuilder('payment')
+      .select('COALESCE(SUM(payment.price), 0)', 'total')
+      .where('payment.dt_payment IS NOT NULL')
+      .andWhere('payment.dt_payment >= :start', { start: window.start })
+      .andWhere('payment.dt_payment < :end', { end: window.end })
+      .getRawOne<{ total: string }>();
+
+    return Number(Number(raw?.total ?? 0).toFixed(2));
+  }
+
+  private async getRecentLogins() {
+    const people = await this.peopleRepository.find({
+      where: {
+        role: PersonRole.OWNER,
+        last_login_at: Not(IsNull()),
+      },
+      relations: { companies: true },
+      order: { last_login_at: 'DESC' },
+      take: RECENT_LOGINS_LIMIT,
+    });
+
+    return pickRecentLogins(people, RECENT_LOGINS_LIMIT);
+  }
+
+  private async getReservationPulse(now: Date) {
+    const today = brazilDayWindow(now);
+    const last7Days = brazilLastDaysWindow(now, 7);
+
+    const [reservationsToday, reservationsLast7Days, arenasActiveThisWeek] =
+      await Promise.all([
+        this.countOrganicReservations(today),
+        this.countOrganicReservations(last7Days),
+        this.countArenasWithOrganicReservations(last7Days),
+      ]);
+
+    return {
+      reservationsToday,
+      reservationsLast7Days,
+      arenasActiveThisWeek,
+    };
+  }
+
+  private async countOrganicReservations(window: {
+    start: Date;
+    end: Date;
+  }): Promise<number> {
+    const raw = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(reservation.id)', 'count')
+      .from(Reservation, 'reservation')
+      .innerJoin(
+        CourtSchedule,
+        'schedule',
+        'schedule.id = reservation.court_schedule_id',
+      )
+      .where('schedule.is_fixed = :fixed', { fixed: false })
+      .andWhere('reservation.created_at >= :start', { start: window.start })
+      .andWhere('reservation.created_at < :end', { end: window.end })
+      .getRawOne<{ count: string }>();
+
+    return Number(raw?.count ?? 0);
+  }
+
+  private async countArenasWithOrganicReservations(window: {
+    start: Date;
+    end: Date;
+  }): Promise<number> {
+    const raw = await this.dataSource
+      .createQueryBuilder()
+      .select('COUNT(DISTINCT court.company_id)', 'count')
+      .from(Reservation, 'reservation')
+      .innerJoin(
+        CourtSchedule,
+        'schedule',
+        'schedule.id = reservation.court_schedule_id',
+      )
+      .innerJoin(Court, 'court', 'court.id = schedule.court_id')
+      .where('schedule.is_fixed = :fixed', { fixed: false })
+      .andWhere('reservation.created_at >= :start', { start: window.start })
+      .andWhere('reservation.created_at < :end', { end: window.end })
+      .getRawOne<{ count: string }>();
+
+    return Number(raw?.count ?? 0);
   }
 }

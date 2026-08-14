@@ -29,6 +29,12 @@ import { PlatformService } from './platform.service';
 export class PlatformController {
   constructor(private readonly platformService: PlatformService) {}
 
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Indicadores da home do admin' })
+  getDashboard() {
+    return this.platformService.getDashboard();
+  }
+
   @Get('clients')
   @ApiOperation({ summary: 'Listar clientes (arenas) da plataforma' })
   listClients(@Query() query: ListPlatformClientsQueryDto) {
