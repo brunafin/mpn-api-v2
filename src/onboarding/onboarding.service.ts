@@ -70,14 +70,13 @@ export class OnboardingService {
     if (existingCompany) {
       const courts = existingCompany.courts ?? [];
       const needsPopulate = await this.courtsNeedPopulate(courts);
-      let schedulesReady = !needsPopulate;
       if (needsPopulate) {
-        schedulesReady = await this.populateToday(courts);
-        void this.populateSchedulesBackground(courts);
+        this.kickoffPopulate(courts);
       }
       return this.toResponse(person, existingCompany, courts, {
         alreadyExisted: true,
-        schedulesReady,
+        // Agenda do dia pode ainda estar nascendo em background.
+        schedulesReady: !needsPopulate,
       });
     }
 
@@ -197,22 +196,24 @@ export class OnboardingService {
       },
     );
 
-    let schedulesReady = true;
+    // Não bloqueia a resposta no populate — o manager abre a agenda em poucos
+    // segundos e acompanha “Configurando os horários…” enquanto o dia nasce.
     if (!created.alreadyExisted) {
-      schedulesReady = await this.populateToday(created.courts);
-      void this.populateSchedulesBackground(created.courts);
+      this.kickoffPopulate(created.courts);
     } else {
       const needsPopulate = await this.courtsNeedPopulate(created.courts);
-      schedulesReady = !needsPopulate;
       if (needsPopulate) {
-        schedulesReady = await this.populateToday(created.courts);
-        void this.populateSchedulesBackground(created.courts);
+        this.kickoffPopulate(created.courts);
       }
+      return this.toResponse(person, created.company, created.courts, {
+        alreadyExisted: true,
+        schedulesReady: !needsPopulate,
+      });
     }
 
     return this.toResponse(person, created.company, created.courts, {
-      alreadyExisted: created.alreadyExisted,
-      schedulesReady,
+      alreadyExisted: false,
+      schedulesReady: false,
     });
   }
 
@@ -313,6 +314,14 @@ export class OnboardingService {
       if (schedCount === 0) return true;
     }
     return false;
+  }
+
+  /** Dispara populate do dia + horizonte sem segurar o HTTP. */
+  private kickoffPopulate(courts: Court[]) {
+    void (async () => {
+      await this.populateToday(courts);
+      await this.populateSchedulesBackground(courts);
+    })();
   }
 
   private async populateToday(courts: Court[]): Promise<boolean> {

@@ -248,7 +248,8 @@ describe('OnboardingService', () => {
     const result = await service.complete(OWNER_PUBLIC_ID, baseDto);
 
     expect(result.alreadyExisted).toBe(true);
-    expect(result.schedulesReady).toBe(true);
+    expect(result.schedulesReady).toBe(false);
+    await new Promise((resolve) => setImmediate(resolve));
     expect(courtSchedules.populateCourtSchedule).toHaveBeenCalled();
   });
 
@@ -344,15 +345,15 @@ describe('OnboardingService', () => {
       true,
     );
 
-    // Dia atual síncrono (2 quadras) + horizonte em background (2).
+    // Dia atual + horizonte em background (2 quadras × 2).
     await new Promise((resolve) => setImmediate(resolve));
     expect(courtSchedules.populateCourtSchedule).toHaveBeenCalledTimes(4);
 
     expect(result.companyPublicId).toBe('company-uuid');
     expect(result.courts).toHaveLength(2);
     expect(result.alreadyExisted).toBe(false);
-    expect(result.schedulesReady).toBe(true);
-    expect(result.schedulesPopulated).toBe(true);
+    expect(result.schedulesReady).toBe(false);
+    expect(result.schedulesPopulated).toBe(false);
 
     // Reemite token com o estabelecimento recém-criado.
     expect(jwtService.sign).toHaveBeenCalledWith(
@@ -394,7 +395,7 @@ describe('OnboardingService', () => {
     expect(rows.find((r) => r.hour === '09:00')?.price).toBe(150);
   });
 
-  it('retorna schedulesReady=false quando o populate do dia atual falha', async () => {
+  it('retorna schedulesReady=false e popula em background', async () => {
     mockValidLookups();
     courtSchedules.populateCourtSchedule.mockRejectedValue(new Error('boom'));
 
