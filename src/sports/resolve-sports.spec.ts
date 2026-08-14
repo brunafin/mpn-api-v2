@@ -35,6 +35,26 @@ describe('resolveSportsByName', () => {
     expect(result.map((s) => s.name)).toEqual(['Futsal', 'Fut5']);
   });
 
+  it('cria Society do catálogo sem needsNet no payload', async () => {
+    const store = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn((x) => x),
+      save: jest.fn(async (rows) =>
+        rows.map((row: { name: string }, i: number) => ({
+          id: 10 + i,
+          ...row,
+        })),
+      ),
+    };
+
+    const result = await resolveSportsByName(store, [{ name: 'Society' }]);
+
+    expect(store.save).toHaveBeenCalledWith([
+      expect.objectContaining({ name: 'Society', needsNet: false }),
+    ]);
+    expect(result.map((s) => s.name)).toEqual(['Society']);
+  });
+
   it('recusa esporte novo sem needsNet', async () => {
     const store = {
       find: jest.fn().mockResolvedValue([]),

@@ -23,6 +23,15 @@ describe('calendarDate', () => {
     expect(toDateKey(dateKeyToUtcDate('2026-07-28'))).toBe('2026-07-28');
   });
 
+  it('dateKeyToUtcDate usa meio-dia UTC (evita D−1 em America/Sao_Paulo)', () => {
+    const d = dateKeyToUtcDate('2026-08-14');
+    expect(d.toISOString()).toBe('2026-08-14T12:00:00.000Z');
+    // Meia-noite UTC seria 21h do dia anterior em São Paulo.
+    expect(
+      d.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
+    ).toMatch(/8\/14\/2026/);
+  });
+
   it('eachDateKeyInclusive percorre dias civis', () => {
     expect(eachDateKeyInclusive('2026-07-28', '2026-07-30')).toEqual([
       '2026-07-28',

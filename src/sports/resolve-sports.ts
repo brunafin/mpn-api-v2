@@ -11,6 +11,32 @@ export const SPORT_NAME_ALIASES: Record<string, string> = {
   'beach tennis': 'Beach Tennis',
 };
 
+/**
+ * Catálogo conhecido (seed + variantes do manager).
+ * Se o registro ainda não existe no banco, cria com este needsNet sem exigir
+ * o campo no payload (ex.: Society marcado no onboarding).
+ */
+export const SPORT_CATALOG_NEEDS_NET: Record<string, boolean> = {
+  futsal: false,
+  society: false,
+  fut5: false,
+  fut7: false,
+  fut11: false,
+  futevôlei: true,
+  futevolei: true,
+  'vôlei de quadra': true,
+  'volei de quadra': true,
+  'vôlei de areia': true,
+  'volei de areia': true,
+  'beach tennis': true,
+  tênis: true,
+  tenis: true,
+  padel: true,
+  basquete: false,
+  handebol: false,
+  badminton: true,
+};
+
 export type SportNameInput = {
   name: string;
   needsNet?: boolean;
@@ -27,6 +53,15 @@ export function canonicalSportName(raw: string): string {
   if (!trimmed) return '';
   const alias = SPORT_NAME_ALIASES[trimmed.toLowerCase()];
   return alias ?? trimmed;
+}
+
+function resolveNeedsNet(
+  name: string,
+  explicit: boolean | undefined,
+): boolean | undefined {
+  if (typeof explicit === 'boolean') return explicit;
+  const fromCatalog = SPORT_CATALOG_NEEDS_NET[name.toLowerCase()];
+  return typeof fromCatalog === 'boolean' ? fromCatalog : undefined;
 }
 
 export async function resolveSportsByName(
@@ -65,14 +100,13 @@ export async function resolveSportsByName(
   const toCreate: Sport[] = [];
   for (const input of requested) {
     if (byName.has(input.name.toLowerCase())) continue;
-    if (typeof input.needsNet !== 'boolean') {
+    const needsNet = resolveNeedsNet(input.name, input.needsNet);
+    if (typeof needsNet !== 'boolean') {
       throw new BadRequestException(
         `Informe se o esporte "${input.name}" usa rede.`,
       );
     }
-    toCreate.push(
-      store.create({ name: input.name, needsNet: input.needsNet }),
-    );
+    toCreate.push(store.create({ name: input.name, needsNet }));
   }
 
   if (toCreate.length > 0) {

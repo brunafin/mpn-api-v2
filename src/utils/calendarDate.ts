@@ -46,10 +46,16 @@ export function weekdayRefFromDateKey(dateKey: string): number {
   return new Date(y, m - 1, d).getDay();
 }
 
-/** UTC midnight do dia civil — round-trip com toDateKey / getUTC*. */
+/**
+ * Instant para coluna PG `date` (via node-pg / TypeORM).
+ *
+ * Não usar meia-noite UTC: com TZ=America/Sao_Paulo o driver serializa em
+ * horário local e `2026-08-14T00:00:00.000Z` vira **13/08** (D−1).
+ * Meio-dia UTC permanece no mesmo dia civil no Brasil (e na leitura com getUTC*).
+ */
 export function dateKeyToUtcDate(dateKey: string): Date {
   const { y, m, d } = parseDateKeyParts(dateKey);
-  return new Date(Date.UTC(y, m - 1, d));
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
 }
 
 export function addDaysToDateKey(dateKey: string, days: number): string {
