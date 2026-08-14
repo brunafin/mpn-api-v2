@@ -32,7 +32,7 @@ import { Plan } from 'src/plans/entities/plan.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
 import { BRAZIL_TZ, todayDateKey } from 'src/utils/calendarDate';
-import { DataSource, IsNull, Not, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { isPgUniqueViolation } from 'src/common/db/pg-error';
 import { CreatePlatformPaymentDto } from './dto/create-platform-payment.dto';
 import {
@@ -867,18 +867,57 @@ export class PlatformService {
     return Number(Number(raw?.total ?? 0).toFixed(2));
   }
 
+  /**
+   * Últimos acessos por arena (company → administrator).
+   * Parte de `company` (ManyToOne) para o LIMIT do TypeORM não quebrar
+   * com join OneToMany em `person.companies`. Inclui donos e platform_admin
+   * que administram arena; completa com onboarding (sem company) se sobrar vaga.
+   */
   private async getRecentLogins() {
-    const people = await this.peopleRepository.find({
-      where: {
-        role: PersonRole.OWNER,
-        last_login_at: Not(IsNull()),
-      },
-      relations: { companies: true },
-      order: { last_login_at: 'DESC' },
-      take: RECENT_LOGINS_LIMIT,
+    const companies = await this.companiesRepository
+      .createQueryBuilder('company')
+      .innerJoinAndSelect('company.administrator', 'owner')
+      .where('owner.last_login_at IS NOT NULL')
+      .orderBy('owner.last_login_at', 'DESC')
+      .take(RECENT_LOGINS_LIMIT)
+      .getMany();
+
+    const fromArenas = companies.map((company) => {
+      const owner = company.administrator!;
+      return {
+        public_id: owner.public_id,
+        name: owner.name,
+        last_login_at: owner.last_login_at,
+        companies: [{ public_id: company.public_id, name: company.name }],
+      };
     });
 
-    return pickRecentLogins(people, RECENT_LOGINS_LIMIT);
+    if (fromArenas.length >= RECENT_LOGINS_LIMIT) {
+      return pickRecentLogins(fromArenas, RECENT_LOGINS_LIMIT);
+    }
+
+    const onboarding = await this.peopleRepository
+      .createQueryBuilder('person')
+      .leftJoin('person.companies', 'company')
+      .where('company.id IS NULL')
+      .andWhere('person.role = :role', { role: PersonRole.OWNER })
+      .andWhere('person.last_login_at IS NOT NULL')
+      .orderBy('person.last_login_at', 'DESC')
+      .take(RECENT_LOGINS_LIMIT - fromArenas.length)
+      .getMany();
+
+    return pickRecentLogins(
+      [
+        ...fromArenas,
+        ...onboarding.map((person) => ({
+          public_id: person.public_id,
+          name: person.name,
+          last_login_at: person.last_login_at,
+          companies: [],
+        })),
+      ],
+      RECENT_LOGINS_LIMIT,
+    );
   }
 
   private async getCompanyUsage(companyId: number, now = new Date()) {

@@ -19,6 +19,7 @@ describe('JwtStrategy', () => {
 
   function strategy(
     person: {
+      id?: number;
       public_id: string;
       username: string;
       status: boolean;
@@ -26,7 +27,10 @@ describe('JwtStrategy', () => {
     } | null,
   ) {
     return new JwtStrategy({
-      findByPublicIdForJwt: jest.fn().mockResolvedValue(person),
+      findByPublicIdForJwt: jest.fn().mockResolvedValue(
+        person ? { id: person.id ?? 1, ...person } : null,
+      ),
+      touchLastLoginAtIfStale: jest.fn().mockResolvedValue(undefined),
     } as never);
   }
 

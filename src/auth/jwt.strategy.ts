@@ -40,6 +40,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Acesso expirado');
     }
 
+    // Refresca último acesso enquanto a sessão está ativa (throttle ~5 min).
+    // Só no login o horário ficava “anterior” mesmo com a pessoa usando o app.
+    void this.peopleService.touchLastLoginAtIfStale(person.id);
+
     return {
       userId: person.public_id,
       username: person.username,

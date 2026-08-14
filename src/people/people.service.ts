@@ -92,6 +92,28 @@ export class PeopleService {
     );
   }
 
+  /**
+   * Atualiza último acesso no máximo a cada `staleMs` (atividade autenticada).
+   * Evita UPDATE em toda request; mantém o admin alinhado ao uso atual da agenda.
+   */
+  async touchLastLoginAtIfStale(
+    personId: number,
+    staleMs = 5 * 60 * 1000,
+  ): Promise<void> {
+    const now = new Date();
+    const threshold = new Date(now.getTime() - staleMs);
+    await this.peopleRepository
+      .createQueryBuilder()
+      .update()
+      .set({ last_login_at: now })
+      .where('id = :personId', { personId })
+      .andWhere(
+        '(last_login_at IS NULL OR last_login_at < :threshold)',
+        { threshold },
+      )
+      .execute();
+  }
+
   findByEmail(email: string): Promise<Person | null> {
     return this.peopleRepository.findOne({
       where: { email: ILike(email) },
@@ -120,7 +142,7 @@ export class PeopleService {
   /** Role/status atuais para o JWT — não confiar no payload. */
   findByPublicIdForJwt(publicId: string): Promise<Pick<
     Person,
-    'public_id' | 'username' | 'status' | 'role'
+    'id' | 'public_id' | 'username' | 'status' | 'role'
   > | null> {
     return this.peopleRepository.findOne({
       where: { public_id: publicId },
