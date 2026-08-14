@@ -110,6 +110,7 @@ export class OnboardingService {
           manager.getRepository(Company).create({
             name: dto.companyName.trim(),
             phone: dto.companyPhone?.replace(/\D/g, '') || undefined,
+            instagram_url: dto.instagramUrl?.trim() || undefined,
             cep: this.formatCep(dto.cep),
             street: dto.street.trim(),
             number: dto.number.trim(),

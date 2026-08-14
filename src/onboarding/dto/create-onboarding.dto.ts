@@ -119,6 +119,16 @@ export class CreateOnboardingDto {
   companyPhone?: string;
 
   @ApiProperty({
+    required: false,
+    example: 'https://instagram.com/marcapranos',
+    description: 'URL do Instagram (@handle ou URL completa)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  instagramUrl?: string;
+
+  @ApiProperty({
     description: 'CEP no formato 00000-000',
     example: '90010-000',
   })
