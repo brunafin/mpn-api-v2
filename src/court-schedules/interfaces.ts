@@ -33,6 +33,6 @@ export interface ICourt {
 export interface IDetailsCourt extends IWhereToPlayCourtList {
   characteristics: string[];
   photoHighlightUrl: string;
-  /** Até 3 fotos do espaço (galeria pública). */
+  /** Fotos do espaço (galeria pública; teto na API). */
   photoUrls: string[];
 }

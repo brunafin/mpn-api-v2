@@ -65,7 +65,7 @@ export class StorageService {
   }
 
   /**
-   * Foto da arena (galeria, até 3).
+   * Foto da arena (galeria, até 10).
    * Ex.: companies/{companyPublicId}/photos/{uuid}.webp
    */
   companyPhotoKey(

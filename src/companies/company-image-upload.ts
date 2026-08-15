@@ -8,7 +8,7 @@ export const IMAGE_UPLOAD_MIME_TO_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export const COMPANY_PHOTO_MAX_COUNT = 3;
+export const COMPANY_PHOTO_MAX_COUNT = 10;
 
 export function imageUploadTooLargeMessage(): string {
   return `A imagem deve ter no máximo ${IMAGE_UPLOAD_MAX_MB} MB.`;
