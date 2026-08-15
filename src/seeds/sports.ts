@@ -6,16 +6,17 @@ export async function seedSports(app: INestApplicationContext) {
   const sportRepo = app.get(getRepositoryToken(Sport));
   const sports = [
     { name: 'Futsal', needsNet: false },
-    { name: 'Society', needsNet: false },
+    { name: 'Fut5', needsNet: false },
+    { name: 'Fut7 (Society)', needsNet: false },
+    { name: 'Futebol de campo 11', needsNet: false },
     { name: 'Futevôlei', needsNet: true },
     { name: 'Vôlei de quadra', needsNet: true },
     { name: 'Vôlei de areia', needsNet: true },
     { name: 'Beach Tennis', needsNet: true },
     { name: 'Tênis', needsNet: true },
     { name: 'Padel', needsNet: true },
+    { name: 'Pickleball', needsNet: true },
     { name: 'Basquete', needsNet: false },
-    { name: 'Handebol', needsNet: false },
-    { name: 'Badminton', needsNet: true },
   ];
 
   for (const sport of sports) {

@@ -9,9 +9,11 @@ describe('resolveSportsByName', () => {
     expect(canonicalSportName('Voleibol')).toBe('Vôlei de quadra');
     expect(canonicalSportName('Vôlei de praia')).toBe('Vôlei de areia');
     expect(canonicalSportName('Beach tennis')).toBe('Beach Tennis');
+    expect(canonicalSportName('Society')).toBe('Fut7 (Society)');
+    expect(canonicalSportName('Fut11')).toBe('Futebol de campo 11');
   });
 
-  it('reusa o catálogo e cria custom com needsNet', async () => {
+  it('reusa o catálogo e cria Fut7 canônico sem needsNet', async () => {
     const existing = [{ id: 1, name: 'Futsal', needsNet: false }];
     const store = {
       find: jest.fn().mockResolvedValue(existing),
@@ -26,16 +28,16 @@ describe('resolveSportsByName', () => {
 
     const result = await resolveSportsByName(store, [
       { name: 'Futsal' },
-      { name: 'Fut5', needsNet: false },
+      { name: 'Fut7 (Society)' },
     ]);
 
     expect(store.save).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'Fut5', needsNet: false }),
+      expect.objectContaining({ name: 'Fut7 (Society)', needsNet: false }),
     ]);
-    expect(result.map((s) => s.name)).toEqual(['Futsal', 'Fut5']);
+    expect(result.map((s) => s.name)).toEqual(['Futsal', 'Fut7 (Society)']);
   });
 
-  it('cria Society do catálogo sem needsNet no payload', async () => {
+  it('normaliza Society legado para Fut7 (Society)', async () => {
     const store = {
       find: jest.fn().mockResolvedValue([]),
       create: jest.fn((x) => x),
@@ -50,9 +52,9 @@ describe('resolveSportsByName', () => {
     const result = await resolveSportsByName(store, [{ name: 'Society' }]);
 
     expect(store.save).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'Society', needsNet: false }),
+      expect.objectContaining({ name: 'Fut7 (Society)', needsNet: false }),
     ]);
-    expect(result.map((s) => s.name)).toEqual(['Society']);
+    expect(result.map((s) => s.name)).toEqual(['Fut7 (Society)']);
   });
 
   it('recusa esporte novo sem needsNet', async () => {

@@ -81,6 +81,9 @@ interface IReservationDetailsItemProps {
     sportName: string;
   } | null;
   court: string;
+  floor: string | null;
+  isCovered: boolean;
+  isCanHaveNet: boolean;
   sports: { id: number; name: string }[];
   time: string;
   price: number;
@@ -605,6 +608,9 @@ export class CourtSchedulesService {
         },
         court: {
           name: true,
+          floor: true,
+          is_covered: true,
+          is_can_have_net: true,
           court_sports: true,
           company: {
             public_id: true,
@@ -660,6 +666,9 @@ export class CourtSchedulesService {
           }
         : null,
       court: courtSchedule.court.name,
+      floor: courtSchedule.court.floor ?? null,
+      isCovered: courtSchedule.court.is_covered !== false,
+      isCanHaveNet: Boolean(courtSchedule.court.is_can_have_net),
       sports: courtSchedule.court?.court_sports?.map((sport) => ({
         id: sport.id,
         name: sport.name,

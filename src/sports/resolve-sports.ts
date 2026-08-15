@@ -3,8 +3,12 @@ import { Sport } from './entities/sport.entity';
 
 export const SPORT_NAME_MAX_LENGTH = 20;
 
-/** Labels antigos do onboarding → nome do seed. */
+/** Rótulos antigos ou alternativos → nome canônico do catálogo. */
 export const SPORT_NAME_ALIASES: Record<string, string> = {
+  society: 'Fut7 (Society)',
+  fut7: 'Fut7 (Society)',
+  fut11: 'Futebol de campo 11',
+  'futebol de campo': 'Futebol de campo 11',
   voleibol: 'Vôlei de quadra',
   'vôlei de praia': 'Vôlei de areia',
   'volei de praia': 'Vôlei de areia',
@@ -12,16 +16,15 @@ export const SPORT_NAME_ALIASES: Record<string, string> = {
 };
 
 /**
- * Catálogo conhecido (seed + variantes do manager).
+ * Catálogo disponível no manager.
  * Se o registro ainda não existe no banco, cria com este needsNet sem exigir
- * o campo no payload (ex.: Society marcado no onboarding).
+ * o campo no payload.
  */
 export const SPORT_CATALOG_NEEDS_NET: Record<string, boolean> = {
   futsal: false,
-  society: false,
   fut5: false,
-  fut7: false,
-  fut11: false,
+  'fut7 (society)': false,
+  'futebol de campo 11': false,
   futevôlei: true,
   futevolei: true,
   'vôlei de quadra': true,
@@ -32,9 +35,8 @@ export const SPORT_CATALOG_NEEDS_NET: Record<string, boolean> = {
   tênis: true,
   tenis: true,
   padel: true,
+  pickleball: true,
   basquete: false,
-  handebol: false,
-  badminton: true,
 };
 
 export type SportNameInput = {
