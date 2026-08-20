@@ -11,6 +11,7 @@ export const RECENT_LOGINS_LIMIT = 8;
 export type DashboardCompanyInput = {
   public_id: string;
   name: string;
+  administrator_id?: number | null;
   partner_status: PartnerStatus | null | undefined;
   is_trial?: boolean | null;
   trial_ends_at: Date | string | null;
@@ -29,9 +30,12 @@ export type DashboardTrialEndingSoon = {
 };
 
 export type DashboardCompanySummary = {
-  courts: number;
-  activeCourts: number;
-  trialCourts: number;
+  /** Arenas (companies) cadastradas. */
+  arenas: number;
+  /** Donos únicos com arena (sem onboarding). */
+  arenaOwners: number;
+  activeArenas: number;
+  trialArenas: number;
   expiredArenas: number;
   monthlyRevenue: number;
   trialsEndingSoon: DashboardTrialEndingSoon[];
@@ -111,11 +115,12 @@ export function summarizeDashboardCompanies(
   );
   const trialsEndingSoon: DashboardTrialEndingSoon[] = [];
 
-  let courts = 0;
-  let activeCourts = 0;
-  let trialCourts = 0;
+  let arenas = 0;
+  let activeArenas = 0;
+  let trialArenas = 0;
   let expiredArenas = 0;
   let monthlyRevenue = 0;
+  const ownerIds = new Set<number>();
 
   for (const company of companies) {
     const courtsCount = company.courts?.length ?? 0;
@@ -131,11 +136,17 @@ export function summarizeDashboardCompanies(
           isTrial,
         });
 
-    courts += courtsCount;
+    arenas += 1;
+    if (
+      typeof company.administrator_id === 'number' &&
+      Number.isFinite(company.administrator_id)
+    ) {
+      ownerIds.add(company.administrator_id);
+    }
     if (expired) expiredArenas += 1;
-    if (isTrial) trialCourts += courtsCount;
+    if (isTrial) trialArenas += 1;
     if (partnerStatus === PartnerStatus.ACTIVE && !isTrial) {
-      activeCourts += courtsCount;
+      activeArenas += 1;
       monthlyRevenue += monthlyFee;
     }
 
@@ -163,9 +174,10 @@ export function summarizeDashboardCompanies(
   );
 
   return {
-    courts,
-    activeCourts,
-    trialCourts,
+    arenas,
+    arenaOwners: ownerIds.size,
+    activeArenas,
+    trialArenas,
     expiredArenas,
     monthlyRevenue: Number(monthlyRevenue.toFixed(2)),
     trialsEndingSoon,

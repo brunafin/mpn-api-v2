@@ -161,6 +161,8 @@ export class PlatformService {
 
     return {
       ...summary,
+      /** Clientes = donos com arena + donos em cadastro (sem arena). */
+      clients: summary.arenaOwners + onboarding,
       onboarding,
       receivedThisMonth,
       recentLogins,

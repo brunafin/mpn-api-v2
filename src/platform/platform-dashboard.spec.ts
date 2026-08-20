@@ -34,6 +34,7 @@ describe('platform-dashboard', () => {
         {
           public_id: 'pay',
           name: 'Paga',
+          administrator_id: 1,
           partner_status: PartnerStatus.ACTIVE,
           is_trial: false,
           trial_ends_at: '2026-01-01T00:00:00.000Z',
@@ -43,6 +44,7 @@ describe('platform-dashboard', () => {
         {
           public_id: 'trial',
           name: 'Teste',
+          administrator_id: 2,
           partner_status: PartnerStatus.ACTIVE,
           is_trial: true,
           trial_ends_at: '2026-08-16T12:00:00.000Z',
@@ -52,6 +54,7 @@ describe('platform-dashboard', () => {
         {
           public_id: 'expired',
           name: 'Expirada',
+          administrator_id: 1,
           partner_status: PartnerStatus.EXPIRED,
           is_trial: false,
           trial_ends_at: '2026-08-01T00:00:00.000Z',
@@ -63,9 +66,10 @@ describe('platform-dashboard', () => {
     );
 
     expect(summary).toMatchObject({
-      courts: 4,
-      activeCourts: 2,
-      trialCourts: 1,
+      arenas: 3,
+      arenaOwners: 2,
+      activeArenas: 1,
+      trialArenas: 1,
       expiredArenas: 1,
       monthlyRevenue: 110,
     });
