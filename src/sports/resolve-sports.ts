@@ -23,6 +23,7 @@ export const SPORT_NAME_ALIASES: Record<string, string> = {
 export const SPORT_CATALOG_NEEDS_NET: Record<string, boolean> = {
   futsal: false,
   fut5: false,
+  fut6: false,
   'fut7 (society)': false,
   'futebol de campo 11': false,
   futevôlei: true,

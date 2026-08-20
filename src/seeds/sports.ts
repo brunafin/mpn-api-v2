@@ -7,6 +7,7 @@ export async function seedSports(app: INestApplicationContext) {
   const sports = [
     { name: 'Futsal', needsNet: false },
     { name: 'Fut5', needsNet: false },
+    { name: 'Fut6', needsNet: false },
     { name: 'Fut7 (Society)', needsNet: false },
     { name: 'Futebol de campo 11', needsNet: false },
     { name: 'Futevôlei', needsNet: true },
