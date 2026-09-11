@@ -293,10 +293,14 @@ export class AuthService {
 
   private async issueAuthToken(person: Person): Promise<AuthTokenResult> {
     const role = person.role;
+    // Dono e admin da plataforma podem administrar arena. Representante usa o
+    // portal próprio e não entra no manager como estabelecimento.
     const company =
-      role === PersonRole.OWNER ? person.companies?.[0] : undefined;
+      role === PersonRole.REPRESENTATIVE
+        ? undefined
+        : person.companies?.[0];
 
-    if (role === PersonRole.OWNER && company) {
+    if (role !== PersonRole.PLATFORM_ADMIN && company) {
       await this.trialExpiryService.expireCompanyIfNeeded(company);
     }
 

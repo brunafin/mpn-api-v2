@@ -446,6 +446,34 @@ describe('AuthService', () => {
         }),
       );
     });
+
+    it('inclui a arena no JWT do platform_admin que também administra estabelecimento', async () => {
+      process.env.DEFAULT_PASSWORD = 'bemvindo';
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 1,
+        status: true,
+        password: 'hashed',
+        username: 'marcapranos',
+        public_id: 'admin-1',
+        role: 'platform_admin',
+        cpf: null,
+        terms_accepted_at: new Date(),
+        companies: [{ public_id: 'company-1', name: 'Arena', plan_id: 1 }],
+      } as never);
+      (bcrypt.compare as jest.Mock)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      await service.signIn('marcapranos', STRONG_PASSWORD);
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'platform_admin',
+          companyPublicId: 'company-1',
+          companyName: 'Arena',
+        }),
+      );
+    });
   });
 
   describe('googleAuth', () => {
