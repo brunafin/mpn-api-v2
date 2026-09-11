@@ -154,6 +154,11 @@ export class Company {
   @Expose()
   access_restricted_at: Date | null;
 
+  /** Representante comercial (person.role = representative). */
+  @Column({ type: 'int', nullable: true })
+  @Exclude()
+  representative_id: number | null;
+
   @Column({ type: 'boolean', default: false })
   @Expose()
   preferences_is_hidden_inactive_hours: boolean;
@@ -164,6 +169,14 @@ export class Company {
   @JoinColumn({ name: 'administrator_id' })
   @Exclude()
   administrator: Person;
+
+  @ManyToOne(() => Person, (person) => person.representedCompanies, {
+    onDelete: 'SET NULL',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'representative_id' })
+  @Exclude()
+  representativePerson: Person | null;
 
   @ManyToOne(() => Plan, (plan) => plan.companies)
   @JoinColumn({ name: 'plan_id' })

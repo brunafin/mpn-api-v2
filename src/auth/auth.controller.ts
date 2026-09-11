@@ -25,6 +25,8 @@ import {
   SignInDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  PortalForgotPasswordDto,
+  PortalResetPasswordDto,
   GoogleAuthDto,
   CompleteProfileDto,
 } from './dto/signup.dto';
@@ -95,6 +97,32 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Código inválido/expirado ou senha fraca' })
   resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(
+      body.email,
+      body.code,
+      body.newPassword,
+    );
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('portal-forgot-password')
+  @ApiOperation({
+    summary:
+      'Portal: primeiro acesso ou esqueci a senha (usuário + e-mail, resposta genérica)',
+  })
+  @ApiBody({ type: PortalForgotPasswordDto })
+  portalForgotPassword(@Body() body: PortalForgotPasswordDto) {
+    return this.authService.portalForgotPassword(body.username, body.email);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('portal-reset-password')
+  @ApiOperation({
+    summary: 'Portal: define a senha com o código recebido por e-mail',
+  })
+  @ApiBody({ type: PortalResetPasswordDto })
+  portalResetPassword(@Body() body: PortalResetPasswordDto) {
+    return this.authService.portalResetPassword(
+      body.username,
       body.email,
       body.code,
       body.newPassword,

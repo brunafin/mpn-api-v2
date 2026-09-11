@@ -3,6 +3,7 @@ import {
   brazilDayWindow,
   brazilLastDaysWindow,
   brazilMonthWindow,
+  pickLoginsSince,
   pickRecentLogins,
   summarizeDashboardCompanies,
 } from './platform-dashboard';
@@ -136,6 +137,36 @@ describe('platform-dashboard', () => {
         ownerName: 'Ana',
         arenaName: null,
         lastLoginAt: '2026-08-14T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('pickLoginsSince só inclui acessos a partir do recorte', () => {
+    const since = new Date('2026-08-14T11:00:00.000Z');
+    expect(
+      pickLoginsSince(
+        [
+          {
+            public_id: 'old',
+            name: 'Ana',
+            last_login_at: '2026-08-14T10:30:00.000Z',
+            companies: [{ public_id: 'a', name: 'Arena A' }],
+          },
+          {
+            public_id: 'fresh',
+            name: 'Bruno',
+            last_login_at: '2026-08-14T11:20:00.000Z',
+            companies: [{ public_id: 'b', name: 'Arena B' }],
+          },
+        ],
+        since,
+      ),
+    ).toEqual([
+      {
+        publicId: 'b',
+        ownerName: 'Bruno',
+        arenaName: 'Arena B',
+        lastLoginAt: '2026-08-14T11:20:00.000Z',
       },
     ]);
   });

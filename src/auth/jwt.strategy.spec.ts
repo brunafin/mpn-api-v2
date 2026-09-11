@@ -65,6 +65,20 @@ describe('JwtStrategy', () => {
     expect(user.role).toBe(PersonRole.PLATFORM_ADMIN);
   });
 
+  it('preserva representative quando o DB confirma', async () => {
+    const user = await strategy({
+      public_id: 'seller',
+      username: 'seller',
+      status: true,
+      role: PersonRole.REPRESENTATIVE,
+    }).validate({
+      sub: 'seller',
+      role: PersonRole.OWNER,
+    });
+
+    expect(user.role).toBe(PersonRole.REPRESENTATIVE);
+  });
+
   it('rejeita person inexistente', async () => {
     await expect(strategy(null).validate({ sub: 'missing' })).rejects.toBeInstanceOf(
       UnauthorizedException,

@@ -21,10 +21,14 @@ describe('PlatformAdminGuard', () => {
     ).toBe(true);
   });
 
-  it('bloqueia owner', () => {
+  it('bloqueia representative', () => {
     expect(() =>
       guard.canActivate(
-        ctx({ userId: '1', role: PersonRole.OWNER, companyPublicId: 'c1' }),
+        ctx({
+          userId: '1',
+          role: PersonRole.REPRESENTATIVE,
+          companyPublicId: null,
+        }),
       ),
     ).toThrow(ForbiddenException);
   });

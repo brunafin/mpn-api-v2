@@ -29,6 +29,8 @@ import { ContactModule } from './contact/contact.module';
 import { PublicListingCacheModule } from './cache/cache.module';
 import { PlatformModule } from './platform/platform.module';
 import { BillingModule } from './billing/billing.module';
+import { CostsModule } from './costs/costs.module';
+import { RepresentativesModule } from './representatives/representatives.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { BillingModule } from './billing/billing.module';
     ContactModule,
     PlatformModule,
     BillingModule,
+    CostsModule,
+    RepresentativesModule,
   ],
   controllers: [AppController],
   providers: [

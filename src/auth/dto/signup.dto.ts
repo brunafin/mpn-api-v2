@@ -122,6 +122,43 @@ export class ResetPasswordDto {
   newPassword: string;
 }
 
+export class PortalForgotPasswordDto {
+  @ApiProperty({ example: 'joao.silva' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  username: string;
+
+  @ApiProperty({ example: 'joao@email.com' })
+  @IsEmail()
+  @MaxLength(100)
+  email: string;
+}
+
+export class PortalResetPasswordDto {
+  @ApiProperty({ example: 'joao.silva' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  username: string;
+
+  @ApiProperty({ example: 'joao@email.com' })
+  @IsEmail()
+  @MaxLength(100)
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'Código deve ter 6 dígitos.' })
+  code: string;
+
+  @ApiProperty({ example: 'Senha@123' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  newPassword: string;
+}
+
 export class SignInDto {
   @ApiProperty({ example: 'joao@email.com' })
   @IsString()

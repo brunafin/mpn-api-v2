@@ -1,11 +1,13 @@
 import { Exclude, Expose } from 'class-transformer';
 import { Company } from 'src/companies/entities/company.entity';
 import { PersonRole } from 'src/people/enums/person-role.enum';
+import { RepresentativeProfile } from 'src/representatives/entities/representative-profile.entity';
 import {
   Column,
   Entity,
   Index,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -118,4 +120,13 @@ export class Person {
 
   @OneToMany(() => Company, (company) => company.administrator)
   companies: Company[];
+
+  @OneToOne(
+    () => RepresentativeProfile,
+    (profile) => profile.person,
+  )
+  representativeProfile: RepresentativeProfile | null;
+
+  @OneToMany(() => Company, (company) => company.representativePerson)
+  representedCompanies: Company[];
 }

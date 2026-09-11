@@ -42,11 +42,16 @@ import {
 import { MarkPlatformPaymentPaidDto } from './dto/mark-platform-payment-paid.dto';
 import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-access.dto';
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
+import { UpdatePlatformClientRepresentativeDto } from './dto/update-platform-client-representative.dto';
 import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
+import { RepresentativesService } from 'src/representatives/representatives.service';
+import { computeCommissions } from 'src/representatives/commission';
 import {
   brazilDayWindow,
   brazilLastDaysWindow,
   brazilMonthWindow,
+  LAST_HOUR_MS,
+  pickLoginsSince,
   pickRecentLogins,
   RECENT_LOGINS_LIMIT,
   summarizeDashboardCompanies,
@@ -97,6 +102,11 @@ type PlatformClientListItem = {
     formOfPayment: string | null;
     paid: boolean;
   } | null;
+  representative: {
+    publicId: string;
+    name: string;
+    phone: string | null;
+  } | null;
 };
 
 type PlatformPaymentHistoryItem = {
@@ -136,12 +146,13 @@ export class PlatformService {
     private readonly billingService: BillingService,
     private readonly publicListingCache: PublicListingCache,
     private readonly trialExpiryService: TrialExpiryService,
+    private readonly representativesService: RepresentativesService,
   ) {}
 
   async getDashboard(now = new Date()) {
     await this.trialExpiryService.expireDueTrials();
 
-    const [companies, onboarding, receivedThisMonth, reservations, recentLogins] =
+    const [companies, onboarding, receivedThisMonth, reservations, recentLogins, lastHourLogins] =
       await Promise.all([
         this.companiesRepository.find({
           relations: { plan: true, courts: true },
@@ -155,6 +166,7 @@ export class PlatformService {
         this.sumReceivedInWindow(brazilMonthWindow(now)),
         this.getReservationPulse(now),
         this.getRecentLogins(),
+        this.getLastHourLogins(now),
       ]);
 
     const summary = summarizeDashboardCompanies(companies, now);
@@ -166,6 +178,7 @@ export class PlatformService {
       onboarding,
       receivedThisMonth,
       recentLogins,
+      lastHourLogins,
       ...reservations,
     };
   }
@@ -184,6 +197,7 @@ export class PlatformService {
       .leftJoinAndSelect('company.plan', 'plan')
       .leftJoinAndSelect('company.payments', 'payments')
       .leftJoinAndSelect('company.courts', 'courts')
+      .leftJoinAndSelect('company.representativePerson', 'seller')
       .getMany();
 
     const onboardingPeople = await this.peopleRepository
@@ -203,6 +217,7 @@ export class PlatformService {
         const haystack = [
           item.name,
           item.owner?.name,
+          item.representative?.name,
         ]
           .filter(Boolean)
           .join(' ')
@@ -237,6 +252,8 @@ export class PlatformService {
       .leftJoinAndSelect('company.plan', 'plan')
       .leftJoinAndSelect('company.payments', 'payments')
       .leftJoinAndSelect('company.administrator', 'administrator')
+      .leftJoinAndSelect('company.representativePerson', 'seller')
+      .leftJoinAndSelect('seller.representativeProfile', 'sellerProfile')
       .leftJoinAndSelect('company.courts', 'courts')
       .leftJoinAndSelect('courts.court_sports', 'court_sports')
       .leftJoinAndSelect('courts.operating_schedule', 'operating_schedule')
@@ -443,6 +460,23 @@ export class PlatformService {
 
     await this.companiesRepository.save(company);
     this.publicListingCache.clear();
+    return this.getClient(publicId);
+  }
+
+  async updateClientRepresentative(
+    publicId: string,
+    dto: UpdatePlatformClientRepresentativeDto,
+  ) {
+    const company = await this.findCompanyByPublicId(publicId);
+    if (!dto.representativePublicId) {
+      company.representative_id = null;
+    } else {
+      const seller = await this.representativesService.findActiveByPublicId(
+        dto.representativePublicId,
+      );
+      company.representative_id = seller.id;
+    }
+    await this.companiesRepository.save(company);
     return this.getClient(publicId);
   }
 
@@ -707,7 +741,26 @@ export class PlatformService {
       courtsCount: 0,
       visibleCourtsCount: 0,
       lastPayment: null,
+      representative: null,
     };
+  }
+
+  private mapRepresentative(person?: Person | null) {
+    if (!person) return null;
+    return {
+      publicId: person.public_id,
+      name: person.name,
+      phone: person.phone?.trim() || null,
+    };
+  }
+
+  private mapCommissions(company: Company) {
+    const profile = company.representativePerson?.representativeProfile;
+    if (!profile) return null;
+    return computeCommissions(company.payments ?? [], {
+      firstMonthPercent: Number(profile.first_month_percent),
+      recurringPercent: Number(profile.recurring_percent),
+    });
   }
 
   private mapListItem(company: Company): PlatformClientListItem {
@@ -785,6 +838,7 @@ export class PlatformService {
             paid: !!lastPayment.dt_payment,
           }
         : null,
+      representative: this.mapRepresentative(company.representativePerson),
     };
   }
 
@@ -848,6 +902,7 @@ export class PlatformService {
         : null,
       courts,
       paymentHistory,
+      commissions: this.mapCommissions(company),
       plan: list.plan
         ? {
             ...list.plan,
@@ -919,6 +974,49 @@ export class PlatformService {
         })),
       ],
       RECENT_LOGINS_LIMIT,
+    );
+  }
+
+  private async getLastHourLogins(now = new Date()) {
+    const since = new Date(now.getTime() - LAST_HOUR_MS);
+
+    const companies = await this.companiesRepository
+      .createQueryBuilder('company')
+      .innerJoinAndSelect('company.administrator', 'owner')
+      .where('owner.last_login_at >= :since', { since })
+      .orderBy('owner.last_login_at', 'DESC')
+      .getMany();
+
+    const fromArenas = companies.map((company) => {
+      const owner = company.administrator!;
+      return {
+        public_id: owner.public_id,
+        name: owner.name,
+        last_login_at: owner.last_login_at,
+        companies: [{ public_id: company.public_id, name: company.name }],
+      };
+    });
+
+    const onboarding = await this.peopleRepository
+      .createQueryBuilder('person')
+      .leftJoin('person.companies', 'company')
+      .where('company.id IS NULL')
+      .andWhere('person.role = :role', { role: PersonRole.OWNER })
+      .andWhere('person.last_login_at >= :since', { since })
+      .orderBy('person.last_login_at', 'DESC')
+      .getMany();
+
+    return pickLoginsSince(
+      [
+        ...fromArenas,
+        ...onboarding.map((person) => ({
+          public_id: person.public_id,
+          name: person.name,
+          last_login_at: person.last_login_at,
+          companies: [],
+        })),
+      ],
+      since,
     );
   }
 

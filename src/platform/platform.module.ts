@@ -10,6 +10,7 @@ import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
 import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
+import { RepresentativesModule } from 'src/representatives/representatives.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { PlatformService } from './platform.service';
     CompanyAccessModule,
     BillingModule,
     PublicListingCacheModule,
+    RepresentativesModule,
   ],
   controllers: [PlatformController],
   providers: [PlatformService],

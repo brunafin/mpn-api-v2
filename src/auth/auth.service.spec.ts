@@ -42,6 +42,8 @@ describe('AuthService', () => {
       findOneByCompanyPublicId: jest.fn(),
       findOneByPublicIdForPasswordChange: jest.fn(),
       updatePassword: jest.fn(),
+      isEmailTaken: jest.fn().mockResolvedValue(false),
+      setEmail: jest.fn().mockResolvedValue(undefined),
       updateInactiveSignup: jest.fn(),
       touchLastLoginAt: jest.fn().mockResolvedValue(undefined),
     };
@@ -391,6 +393,20 @@ describe('AuthService', () => {
 
       await expect(service.signIn('a@b.com', STRONG_PASSWORD)).rejects.toThrow(
         /google/i,
+      );
+    });
+
+    it('orienta representante sem senha a usar o primeiro acesso', async () => {
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 11,
+        status: true,
+        role: 'representative',
+        password: null,
+        email: null,
+      } as never);
+
+      await expect(service.signIn('seller', STRONG_PASSWORD)).rejects.toThrow(
+        /primeiro acesso/i,
       );
     });
 
@@ -845,6 +861,104 @@ describe('AuthService', () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(peopleService.completeOwnerProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('portalForgotPassword', () => {
+    it('não envia quando o usuário não existe', async () => {
+      peopleService.findOneForAuth.mockResolvedValue(null);
+      const result = await service.portalForgotPassword('seller', 'a@b.com');
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+      expect(result.message).toMatch(/se o usuário existir/i);
+    });
+
+    it('não envia se a conta ainda não tem e-mail cadastrado', async () => {
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 11,
+        status: true,
+        role: 'representative',
+        email: null,
+        password: null,
+      } as never);
+      await service.portalForgotPassword('seller', 'a@b.com');
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+    });
+
+    it('envia código quando o e-mail informado é o cadastrado', async () => {
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 11,
+        status: true,
+        role: 'representative',
+        email: 'a@b.com',
+        password: null,
+      } as never);
+      await service.portalForgotPassword('seller', 'A@B.com');
+      expect(emailService.sendPasswordResetCodeEmail).toHaveBeenCalledWith(
+        'a@b.com',
+        expect.any(String),
+      );
+    });
+
+    it('não envia se o e-mail informado não é o já cadastrado', async () => {
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 11,
+        status: true,
+        role: 'representative',
+        email: 'certo@b.com',
+        password: 'hashed',
+      } as never);
+      await service.portalForgotPassword('seller', 'outro@b.com');
+      expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('portalResetPassword', () => {
+    it('recusa o reset se a conta não tem e-mail cadastrado', async () => {
+      verificationRepo.findOne.mockResolvedValue({
+        person_id: 11,
+        code: '123456',
+        expires_at: new Date(Date.now() + 60_000),
+        attempts: 0,
+      });
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 11,
+        status: true,
+        role: 'representative',
+        email: null,
+        password: null,
+      } as never);
+
+      await expect(
+        service.portalResetPassword('seller', 'a@b.com', '123456', STRONG_PASSWORD),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(peopleService.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it('define a senha no primeiro acesso sem alterar o e-mail', async () => {
+      verificationRepo.findOne.mockResolvedValue({
+        person_id: 11,
+        code: '123456',
+        expires_at: new Date(Date.now() + 60_000),
+        attempts: 0,
+      });
+      peopleService.findOneForAuth.mockResolvedValue({
+        id: 11,
+        status: true,
+        role: 'representative',
+        email: 'a@b.com',
+        password: null,
+      } as never);
+
+      const result = await service.portalResetPassword(
+        'seller',
+        'a@b.com',
+        '123456',
+        STRONG_PASSWORD,
+      );
+
+      expect(peopleService.updatePassword).toHaveBeenCalled();
+      expect(peopleService.setEmail).not.toHaveBeenCalled();
+      expect(result.message).toMatch(/senha definida/i);
     });
   });
 });

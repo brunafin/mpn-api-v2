@@ -35,6 +35,9 @@ const RESEND_COOLDOWN_SECONDS = 30;
 const FORGOT_PASSWORD_GENERIC_MESSAGE =
   'Se houver uma conta ativa com este e-mail, enviamos um código para redefinir a senha.';
 
+const PORTAL_FORGOT_MESSAGE =
+  'Se o usuário existir, enviamos um código para o e-mail informado.';
+
 type AuthTokenResult = {
   access_token: string;
   needsProfileCompletion: boolean;
@@ -73,6 +76,14 @@ export class AuthService {
     }
 
     if (!user.password) {
+      if (
+        user.role === PersonRole.REPRESENTATIVE ||
+        user.role === PersonRole.PLATFORM_ADMIN
+      ) {
+        throw new UnauthorizedException(
+          'Defina sua senha em Primeiro acesso ou esqueci a senha.',
+        );
+      }
       throw new UnauthorizedException(
         'Esta conta usa login com Google. Clique em Continuar com Google.',
       );
@@ -281,13 +292,11 @@ export class AuthService {
   }
 
   private async issueAuthToken(person: Person): Promise<AuthTokenResult> {
-    const company = person.companies?.[0];
-    const role =
-      person.role === PersonRole.PLATFORM_ADMIN
-        ? PersonRole.PLATFORM_ADMIN
-        : PersonRole.OWNER;
+    const role = person.role;
+    const company =
+      role === PersonRole.OWNER ? person.companies?.[0] : undefined;
 
-    if (role !== PersonRole.PLATFORM_ADMIN && company) {
+    if (role === PersonRole.OWNER && company) {
       await this.trialExpiryService.expireCompanyIfNeeded(company);
     }
 
@@ -623,6 +632,111 @@ export class AuthService {
     await this.peopleService.updatePassword(person.id, hashed);
 
     return { message: 'Senha redefinida com sucesso. Faça login com a nova senha.' };
+  }
+
+  async portalForgotPassword(
+    rawUsername: string,
+    rawEmail: string,
+  ): Promise<{ message: string }> {
+    const email = this.normalizeEmail(rawEmail ?? '');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Informe um e-mail válido.');
+    }
+
+    const person = await this.peopleService.findOneForAuth(
+      (rawUsername ?? '').trim(),
+    );
+
+    if (
+      !person ||
+      !person.status ||
+      !this.isPortalRole(person.role)
+    ) {
+      return { message: PORTAL_FORGOT_MESSAGE };
+    }
+
+    const storedEmail = person.email?.trim().toLowerCase() || null;
+    // Só envia para o e-mail já cadastrado. Sem e-mail na conta, ninguém
+    // consegue anexar o próprio endereço e tomar o acesso.
+    if (!storedEmail || storedEmail !== email) {
+      return { message: PORTAL_FORGOT_MESSAGE };
+    }
+
+    await this.assertResendAllowed(
+      person.id,
+      EmailVerificationPurpose.PASSWORD_RESET,
+    );
+    await this.issueCode(
+      person.id,
+      email,
+      EmailVerificationPurpose.PASSWORD_RESET,
+    );
+    return { message: PORTAL_FORGOT_MESSAGE };
+  }
+
+  async portalResetPassword(
+    rawUsername: string,
+    rawEmail: string,
+    code: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    if (!isValidPassword(newPassword)) {
+      throw new BadRequestException(PASSWORD_HINT);
+    }
+
+    const email = this.normalizeEmail(rawEmail ?? '');
+    const verification = await this.findPendingCode(
+      email,
+      EmailVerificationPurpose.PASSWORD_RESET,
+    );
+    const valid = await this.assertValidPendingCode(verification, code);
+
+    const person = await this.peopleService.findOneForAuth(
+      (rawUsername ?? '').trim(),
+    );
+    if (
+      !person ||
+      !person.status ||
+      !this.isPortalRole(person.role) ||
+      person.id !== valid.person_id
+    ) {
+      throw new BadRequestException(
+        'Não foi possível definir a senha. Solicite um novo código.',
+      );
+    }
+
+    const storedEmail = person.email?.trim().toLowerCase() || null;
+    if (!storedEmail || storedEmail !== email) {
+      throw new BadRequestException(
+        'Não foi possível definir a senha. Solicite um novo código.',
+      );
+    }
+
+    if (person.password) {
+      const isSamePassword = await bcrypt.compare(newPassword, person.password);
+      if (isSamePassword) {
+        throw new BadRequestException(
+          'A nova senha não pode ser igual à senha atual.',
+        );
+      }
+    }
+
+    valid.consumed_at = new Date();
+    await this.emailVerificationRepository.save(valid);
+
+    const hashed = await this.peopleService.hashPassword(newPassword);
+    await this.peopleService.updatePassword(person.id, hashed);
+
+    return {
+      message: 'Senha definida. Faça login com usuário e senha.',
+    };
+  }
+
+  private isPortalRole(role?: PersonRole): boolean {
+    return (
+      role === PersonRole.PLATFORM_ADMIN ||
+      role === PersonRole.REPRESENTATIVE
+    );
   }
 
   async changePassword(

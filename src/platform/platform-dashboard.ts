@@ -7,6 +7,7 @@ import { BRAZIL_TZ } from 'src/utils/calendarDate';
 
 const TRIAL_ENDING_SOON_DAYS = 7;
 export const RECENT_LOGINS_LIMIT = 8;
+export const LAST_HOUR_MS = 60 * 60 * 1000;
 
 export type DashboardCompanyInput = {
   public_id: string;
@@ -76,6 +77,21 @@ export function pickRecentLogins(
         lastLoginAt: new Date(person.last_login_at as Date | string).toISOString(),
       };
     });
+}
+
+/** Acessos com `last_login_at` a partir de `since` (ex.: última hora). */
+export function pickLoginsSince(
+  people: DashboardRecentLoginInput[],
+  since: Date,
+): DashboardRecentLogin[] {
+  const sinceMs = since.getTime();
+  return pickRecentLogins(
+    people.filter((person) => {
+      if (!person.last_login_at) return false;
+      return new Date(person.last_login_at).getTime() >= sinceMs;
+    }),
+    people.length,
+  );
 }
 
 export function brazilZonedStartOfDay(now: Date): Date {

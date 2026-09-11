@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UpdatePersonDto } from './dto/update-person.dto';
+import { UpdatePortalProfileDto } from './dto/update-portal-profile.dto';
 import { Person } from './entities/person.entity';
+import { PersonRole } from './enums/person-role.enum';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import * as bcrypt from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
+import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
 
 @Injectable()
 export class PeopleService {
@@ -227,6 +231,54 @@ export class PeopleService {
     await this.peopleRepository.update({ id: personId }, patch);
   }
 
+  async createRepresentative(input: {
+    name: string;
+    username: string;
+    email?: string | null;
+    phone?: string | null;
+    passwordHash?: string | null;
+  }): Promise<Person> {
+    const person = this.peopleRepository.create({
+      name: input.name,
+      username: input.username,
+      status: true,
+      role: PersonRole.REPRESENTATIVE,
+      terms_accepted_at: new Date(),
+    });
+    person.password = input.passwordHash ?? null;
+    if (input.email) person.email = input.email;
+    if (input.phone) person.phone = input.phone;
+    return this.peopleRepository.save(person);
+  }
+
+  async setEmail(personId: number, email: string): Promise<void> {
+    await this.peopleRepository.update({ id: personId }, { email });
+  }
+
+  async findByPublicId(publicId: string): Promise<Person | null> {
+    return this.peopleRepository.findOne({ where: { public_id: publicId } });
+  }
+
+  async isUsernameTaken(username: string, exceptPersonId?: number) {
+    const existing = await this.peopleRepository.findOne({
+      where: { username: ILike(username) },
+    });
+    if (!existing) return false;
+    return exceptPersonId == null || existing.id !== exceptPersonId;
+  }
+
+  async isEmailTaken(email: string, exceptPersonId?: number) {
+    const existing = await this.findByEmail(email);
+    if (!existing) return false;
+    return exceptPersonId == null || existing.id !== exceptPersonId;
+  }
+
+  async isCpfTaken(cpf: string, exceptPersonId?: number) {
+    const existing = await this.findByCpf(cpf);
+    if (!existing) return false;
+    return exceptPersonId == null || existing.id !== exceptPersonId;
+  }
+
   /**
    * Dono ativo via Google (e-mail já verificado pelo provedor).
    * Termos e CPF ficam para o complete-profile (só conta nova, sem termos).
@@ -309,6 +361,84 @@ export class PeopleService {
       password: person.password,
       public_id: person.public_id,
     };
+  }
+
+  mapPortalProfile(person: Person) {
+    return {
+      publicId: person.public_id,
+      name: person.name,
+      username: person.username,
+      email: person.email || null,
+      phone: person.phone?.trim() || null,
+      cpf: person.cpf?.trim() || null,
+      cep: person.cep?.trim() || null,
+      street: person.street || null,
+      number: person.number || null,
+      neighborhood: person.neighborhood || null,
+      city: person.city || null,
+      uf: person.uf?.trim() || null,
+      role: person.role,
+    };
+  }
+
+  async getPortalProfile(publicId: string) {
+    const person = await this.findByPublicId(publicId);
+    if (!person) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return this.mapPortalProfile(person);
+  }
+
+  async updatePortalProfile(publicId: string, dto: UpdatePortalProfileDto) {
+    const person = await this.findByPublicId(publicId);
+    if (!person) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    const patch: Record<string, string | null> = {};
+
+    if (dto.username && dto.username !== person.username) {
+      if (await this.isUsernameTaken(dto.username, person.id)) {
+        throw new ConflictException('Este usuário já está em uso.');
+      }
+      patch.username = dto.username;
+    }
+    if (dto.email !== undefined) {
+      if (
+        dto.email &&
+        dto.email !== person.email?.toLowerCase() &&
+        (await this.isEmailTaken(dto.email, person.id))
+      ) {
+        throw new ConflictException('Já existe uma conta com este e-mail.');
+      }
+      patch.email = dto.email;
+    }
+    if (dto.cpf !== undefined) {
+      if (dto.cpf && (await this.isCpfTaken(dto.cpf, person.id))) {
+        throw new ConflictException('Já existe uma conta com este CPF.');
+      }
+      patch.cpf = dto.cpf;
+    }
+    if (dto.name !== undefined) patch.name = dto.name.trim();
+    if (dto.phone !== undefined) patch.phone = dto.phone;
+    if (dto.cep !== undefined) patch.cep = dto.cep;
+    if (dto.street !== undefined) patch.street = dto.street;
+    if (dto.number !== undefined) patch.number = dto.number;
+    if (dto.neighborhood !== undefined) patch.neighborhood = dto.neighborhood;
+    if (dto.city !== undefined) patch.city = dto.city;
+    if (dto.uf !== undefined) patch.uf = dto.uf;
+    if (dto.password) {
+      if (!isValidPassword(dto.password)) {
+        throw new BadRequestException(PASSWORD_HINT);
+      }
+      patch.password = await this.hashPassword(dto.password);
+    }
+
+    await this.peopleRepository.update(
+      { id: person.id },
+      patch as QueryDeepPartialEntity<Person>,
+    );
+    return this.getPortalProfile(publicId);
   }
 
   async update(id: number, updatePersonDto: UpdatePersonDto) {

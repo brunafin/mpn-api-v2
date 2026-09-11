@@ -19,6 +19,7 @@ import { ListPlatformClientsQueryDto } from './dto/list-platform-clients-query.d
 import { MarkPlatformPaymentPaidDto } from './dto/mark-platform-payment-paid.dto';
 import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-access.dto';
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
+import { UpdatePlatformClientRepresentativeDto } from './dto/update-platform-client-representative.dto';
 import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
 import { PlatformService } from './platform.service';
 
@@ -75,6 +76,15 @@ export class PlatformController {
     @Body() dto: UpdatePlatformClientAccessDto,
   ) {
     return this.platformService.updateClientAccess(companyPublicId, dto);
+  }
+
+  @Patch('clients/:companyPublicId/representative')
+  @ApiOperation({ summary: 'Definir o representante comercial da arena' })
+  updateClientRepresentative(
+    @Param('companyPublicId') companyPublicId: string,
+    @Body() dto: UpdatePlatformClientRepresentativeDto,
+  ) {
+    return this.platformService.updateClientRepresentative(companyPublicId, dto);
   }
 
   @Patch('clients/:companyPublicId/courts/:courtPublicId/visibility')
