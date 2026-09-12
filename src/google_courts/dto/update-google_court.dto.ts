@@ -1,4 +1,23 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateGoogleCourtDto } from './create-google_court.dto';
+import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { CourtCompetitor } from '../enums/competitor.enum';
+import { OutreachStatus } from '../enums/outreach-status.enum';
 
-export class UpdateGoogleCourtDto extends PartialType(CreateGoogleCourtDto) {}
+export class UpdateGoogleCourtOutreachDto {
+  @IsOptional()
+  @IsEnum(OutreachStatus)
+  outreachStatus?: OutreachStatus;
+
+  @IsOptional()
+  @IsEnum(CourtCompetitor)
+  competitor?: CourtCompetitor;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  notes?: string;
+
+  /** Se true, registra contato agora (status vira contacted se ainda for new). */
+  @IsOptional()
+  @IsBoolean()
+  markContacted?: boolean;
+}
