@@ -1,0 +1,2 @@
+echo "pre-commit: npm run build (mesmo comando do Railway)"
+npm run build
