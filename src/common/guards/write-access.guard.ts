@@ -79,7 +79,7 @@ export class WriteAccessGuard implements CanActivate {
     if (!canMutateCompany(company)) {
       throw new ForbiddenException({
         message:
-          'Sua conta está em modo somente leitura. Regularize a pendência para editar a agenda.',
+          'A agenda continua aberta para consulta. Para reservar ou alterar horários, quite a mensalidade em Planos e pagamentos.',
         code: 'ACCOUNT_READ_ONLY',
       });
     }
