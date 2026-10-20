@@ -5,12 +5,18 @@ import {
   IsString,
   IsArray,
   ArrayNotEmpty,
+  MaxLength,
 } from 'class-validator';
+import { COURT_NAME_MAX_LENGTH } from 'src/utils/normalize-form';
 import { Sport } from 'src/sports/entities/sport.entity';
 
 export class CreateCourtDto {
-  @ApiProperty({ maxLength: 100, description: 'Nome da quadra' })
+  @ApiProperty({
+    maxLength: COURT_NAME_MAX_LENGTH,
+    description: 'Nome da quadra',
+  })
   @IsString()
+  @MaxLength(COURT_NAME_MAX_LENGTH)
   name: string;
 
   @ApiProperty({ description: 'ID da empresa' })

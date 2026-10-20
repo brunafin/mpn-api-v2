@@ -24,6 +24,15 @@ import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { TrialExpiryService } from 'src/companies/trial-expiry.service';
 import { buildCapabilities } from 'src/companies/utils/company-access';
 import {
+  normalizeAddressNumber,
+  normalizeAddressText,
+  normalizeCepStored,
+  normalizeInstagramUrl,
+  normalizePhoneDigits,
+  normalizeTitle,
+  normalizeUf,
+} from 'src/utils/normalize-form';
+import {
   COMPANY_PHOTO_MAX_COUNT,
   IMAGE_UPLOAD_MAX_BYTES,
   IMAGE_UPLOAD_MIME_TO_EXT,
@@ -314,6 +323,33 @@ export class CompaniesService {
             .filter((item) => item.length > 0),
         ),
       );
+    }
+    if (safeUpdate.name !== undefined) {
+      safeUpdate.name = normalizeTitle(safeUpdate.name, 50);
+    }
+    if (safeUpdate.phone !== undefined) {
+      safeUpdate.phone = normalizePhoneDigits(safeUpdate.phone);
+    }
+    if (safeUpdate.instagram_url !== undefined) {
+      safeUpdate.instagram_url = normalizeInstagramUrl(safeUpdate.instagram_url);
+    }
+    if (safeUpdate.cep !== undefined) {
+      safeUpdate.cep = normalizeCepStored(safeUpdate.cep);
+    }
+    if (safeUpdate.street !== undefined) {
+      safeUpdate.street = normalizeAddressText(safeUpdate.street, 100);
+    }
+    if (safeUpdate.number !== undefined) {
+      safeUpdate.number = normalizeAddressNumber(safeUpdate.number);
+    }
+    if (safeUpdate.neighborhood !== undefined) {
+      safeUpdate.neighborhood = normalizeAddressText(safeUpdate.neighborhood, 50);
+    }
+    if (safeUpdate.city !== undefined) {
+      safeUpdate.city = normalizeAddressText(safeUpdate.city, 50);
+    }
+    if (safeUpdate.uf !== undefined) {
+      safeUpdate.uf = normalizeUf(safeUpdate.uf);
     }
     this.companiesRepository.merge(company, safeUpdate);
     const saved = await this.companiesRepository.save(company);

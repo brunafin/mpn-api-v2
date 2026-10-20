@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { OBSERVATION_MAX_LENGTH } from 'src/utils/sanitize-note-text';
 
 export class UpdateReservationExtraDto {
@@ -18,4 +18,10 @@ export class UpdateReservationExtraDto {
   @IsOptional()
   @IsBoolean()
   is_event?: boolean;
+
+  @ApiPropertyOptional({ description: 'Esporte da reserva, entre os da quadra' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  sport_id?: number;
 }

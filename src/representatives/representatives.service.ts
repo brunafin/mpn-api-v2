@@ -15,8 +15,10 @@ import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
 import { ILike, Repository } from 'typeorm';
 import { computeCommissions, type CommissionSummary } from './commission';
+import { CreateRepresentativePayoutDto } from './dto/create-representative-payout.dto';
 import { CreateRepresentativeDto } from './dto/create-representative.dto';
 import { UpdateRepresentativeDto } from './dto/update-representative.dto';
+import { RepresentativePayout } from './entities/representative-payout.entity';
 import { RepresentativeProfile } from './entities/representative-profile.entity';
 
 export const DEFAULT_FIRST_MONTH_PERCENT = 100;
@@ -60,6 +62,13 @@ export type RepresentativeCompanyItem = {
   commissions: CommissionSummary;
 };
 
+export type RepresentativePayoutItem = {
+  year: number;
+  month: number;
+  amount: number;
+  paidAt: string;
+};
+
 export type RepresentativeDetail = {
   publicId: string;
   name: string;
@@ -73,11 +82,12 @@ export type RepresentativeDetail = {
   companiesCount: number;
   commissionTotal: number;
   companies: RepresentativeCompanyItem[];
+  payouts: RepresentativePayoutItem[];
 };
 
 export type RepresentativeListItem = Omit<
   RepresentativeDetail,
-  'companies'
+  'companies' | 'payouts'
 >;
 
 @Injectable()
@@ -87,6 +97,8 @@ export class RepresentativesService {
     private readonly peopleRepository: Repository<Person>,
     @InjectRepository(RepresentativeProfile)
     private readonly profilesRepository: Repository<RepresentativeProfile>,
+    @InjectRepository(RepresentativePayout)
+    private readonly payoutsRepository: Repository<RepresentativePayout>,
     @InjectRepository(Company)
     private readonly companiesRepository: Repository<Company>,
     private readonly peopleService: PeopleService,
@@ -184,6 +196,36 @@ export class RepresentativesService {
     return { ok: true };
   }
 
+  async recordPayout(
+    publicId: string,
+    dto: CreateRepresentativePayoutDto,
+  ): Promise<RepresentativeDetail> {
+    const person = await this.findRepresentative(publicId);
+    const paidAt = dto.paidAt.slice(0, 10);
+    const amount = Number(Number(dto.amount).toFixed(2));
+    const existing = await this.payoutsRepository.findOne({
+      where: { person_id: person.id, year: dto.year, month: dto.month },
+    });
+
+    if (existing) {
+      existing.amount = amount;
+      existing.paid_at = paidAt;
+      await this.payoutsRepository.save(existing);
+    } else {
+      await this.payoutsRepository.save(
+        this.payoutsRepository.create({
+          person_id: person.id,
+          year: dto.year,
+          month: dto.month,
+          amount,
+          paid_at: paidAt,
+        }),
+      );
+    }
+
+    return this.getByPublicId(publicId);
+  }
+
   async getMyCompany(
     representativePublicId: string,
     companyPublicId: string,
@@ -254,6 +296,13 @@ export class RepresentativesService {
         .toFixed(2),
     );
 
+    const payoutRows = opts.includeCompanies
+      ? await this.payoutsRepository.find({
+          where: { person_id: person.id },
+          order: { year: 'DESC', month: 'DESC' },
+        })
+      : [];
+
     return {
       publicId: person.public_id,
       name: person.name,
@@ -267,6 +316,15 @@ export class RepresentativesService {
       companiesCount: mapped.length,
       commissionTotal,
       companies: opts.includeCompanies ? mapped : [],
+      payouts: payoutRows.map((row) => ({
+        year: row.year,
+        month: row.month,
+        amount: Number(row.amount),
+        paidAt:
+          typeof row.paid_at === 'string'
+            ? row.paid_at.slice(0, 10)
+            : format(new Date(row.paid_at), 'yyyy-MM-dd'),
+      })),
     };
   }
 

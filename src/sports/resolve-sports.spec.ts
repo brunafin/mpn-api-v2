@@ -9,7 +9,8 @@ describe('resolveSportsByName', () => {
     expect(canonicalSportName('Voleibol')).toBe('Vôlei de quadra');
     expect(canonicalSportName('Vôlei de praia')).toBe('Vôlei de areia');
     expect(canonicalSportName('Beach tennis')).toBe('Beach Tennis');
-    expect(canonicalSportName('Society')).toBe('Fut7 (Society)');
+    expect(canonicalSportName('Society')).toBe('Fut7');
+    expect(canonicalSportName('Fut7 (Society)')).toBe('Fut7');
     expect(canonicalSportName('Fut11')).toBe('Futebol de campo 11');
   });
 
@@ -28,16 +29,16 @@ describe('resolveSportsByName', () => {
 
     const result = await resolveSportsByName(store, [
       { name: 'Futsal' },
-      { name: 'Fut7 (Society)' },
+      { name: 'Fut7' },
     ]);
 
     expect(store.save).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'Fut7 (Society)', needsNet: false }),
+      expect.objectContaining({ name: 'Fut7', needsNet: false }),
     ]);
-    expect(result.map((s) => s.name)).toEqual(['Futsal', 'Fut7 (Society)']);
+    expect(result.map((s) => s.name)).toEqual(['Futsal', 'Fut7']);
   });
 
-  it('normaliza Society legado para Fut7 (Society)', async () => {
+  it('normaliza Society legado para Fut7', async () => {
     const store = {
       find: jest.fn().mockResolvedValue([]),
       create: jest.fn((x) => x),
@@ -52,9 +53,9 @@ describe('resolveSportsByName', () => {
     const result = await resolveSportsByName(store, [{ name: 'Society' }]);
 
     expect(store.save).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'Fut7 (Society)', needsNet: false }),
+      expect.objectContaining({ name: 'Fut7', needsNet: false }),
     ]);
-    expect(result.map((s) => s.name)).toEqual(['Fut7 (Society)']);
+    expect(result.map((s) => s.name)).toEqual(['Fut7']);
   });
 
   it('recusa esporte novo sem needsNet', async () => {

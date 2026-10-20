@@ -20,6 +20,11 @@ import { Person } from 'src/people/entities/person.entity';
 import { EmailService } from 'src/email/email.service';
 import { isValidPassword, PASSWORD_HINT } from 'src/utils/passwordPolicy';
 import { CPF_INVALID_MESSAGE, normalizeCpf } from 'src/utils/normalize-cpf';
+import {
+  normalizeEmail as normalizeEmailValue,
+  normalizePersonName,
+  normalizePhoneDigits,
+} from 'src/utils/normalize-form';
 import { EmailVerification } from './entities/email-verification.entity';
 import { EmailVerificationPurpose } from './enums/email-verification-purpose.enum';
 import {
@@ -124,7 +129,10 @@ export class AuthService {
     const payload = await this.verifyGoogleIdToken(dto.idToken);
     const email = this.normalizeEmail(payload.email);
     const googleSub = payload.sub;
-    const name = (payload.name?.trim() || email.split('@')[0]).slice(0, 50);
+    const name =
+      normalizePersonName(payload.name || '') ||
+      normalizePersonName(email.split('@')[0]) ||
+      'Conta';
 
     const bySub = await this.peopleService.findByGoogleSub(googleSub);
     if (bySub) {
@@ -191,7 +199,7 @@ export class AuthService {
       throw new UnauthorizedException('Não autorizado.');
     }
 
-    const phoneDigits = dto.phone?.replace(/\D/g, '') || undefined;
+    const phoneDigits = normalizePhoneDigits(dto.phone);
     const cpf = normalizeCpf(dto.cpf);
 
     // Cliente já existente (termos no banco): não pede CPF/telefone de novo.
@@ -344,7 +352,7 @@ export class AuthService {
   }
 
   private normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
+    return normalizeEmailValue(email);
   }
 
   /**
@@ -444,7 +452,7 @@ export class AuthService {
   }
 
   async signup(dto: SignupDto): Promise<{ message: string; email: string }> {
-    const name = dto.name?.trim();
+    const name = normalizePersonName(dto.name ?? '');
     const email = this.normalizeEmail(dto.email ?? '');
 
     if (!name || !email) {
@@ -476,7 +484,7 @@ export class AuthService {
       const passwordHash = await this.peopleService.hashPassword(dto.password);
       await this.peopleService.updateInactiveSignup(existing.id, {
         name,
-        phone: dto.phone?.replace(/\D/g, '') || undefined,
+        phone: normalizePhoneDigits(dto.phone),
         cpf,
         passwordHash,
         termsAcceptedAt: new Date(),
@@ -507,7 +515,7 @@ export class AuthService {
     const person = await this.peopleService.createInactiveOwner({
       name,
       email,
-      phone: dto.phone?.replace(/\D/g, '') || undefined,
+      phone: normalizePhoneDigits(dto.phone),
       cpf,
       passwordHash,
       termsAcceptedAt: new Date(),

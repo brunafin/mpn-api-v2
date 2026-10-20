@@ -9,16 +9,17 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { SportNameDto } from 'src/sports/dto/sport-name.dto';
+import { COURT_NAME_MAX_LENGTH } from 'src/utils/normalize-form';
 
 /**
  * Atualização estrutural da quadra (pós-onboarding).
  * Esportes por nome (mesmo contrato do onboarding); piso opcional.
  */
 export class UpdateCourtDto {
-  @ApiPropertyOptional({ maxLength: 100 })
+  @ApiPropertyOptional({ maxLength: COURT_NAME_MAX_LENGTH })
   @IsOptional()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(COURT_NAME_MAX_LENGTH)
   name?: string;
 
   @ApiPropertyOptional({ maxLength: 30, nullable: true })

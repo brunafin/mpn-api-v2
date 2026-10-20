@@ -9,6 +9,8 @@
     "build": "nest build",
     "seed": "ts-node -r tsconfig-paths/register src/seeds/seed.ts",
     "cleanup:person": "ts-node -r tsconfig-paths/register src/scripts/cleanup-person.ts",
+    "db:reset:dev": "ts-node -r tsconfig-paths/register src/scripts/reset-dev-database.ts",
+    "db:seed:dev": "ts-node -r tsconfig-paths/register src/scripts/seed-dev.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

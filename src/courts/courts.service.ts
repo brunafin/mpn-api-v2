@@ -13,6 +13,10 @@ import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { CourtSchedulesService } from 'src/court-schedules/court-schedules.service';
 import { addDaysToDateKey, todayDateKey } from 'src/utils/calendarDate';
+import {
+  COURT_NAME_MAX_LENGTH,
+  normalizeTitle,
+} from 'src/utils/normalize-form';
 
 @Injectable()
 export class CourtsService {
@@ -85,8 +89,14 @@ export class CourtsService {
       throw new NotFoundException('Um ou mais esportes não encontrados');
     }
 
+    const name = normalizeTitle(courtData.name ?? '', COURT_NAME_MAX_LENGTH);
+    if (!name) {
+      throw new BadRequestException('Informe o nome da quadra.');
+    }
+
     const court = this.courtRepository.create({
       ...courtData,
+      name,
       court_sports: sportsEntities,
     });
 
@@ -121,9 +131,14 @@ export class CourtsService {
       );
     }
 
+    const name = normalizeTitle(dto.name, COURT_NAME_MAX_LENGTH);
+    if (!name) {
+      throw new BadRequestException('Informe o nome da quadra.');
+    }
+
     const court = await this.courtRepository.save(
       this.courtRepository.create({
-        name: dto.name.trim(),
+        name,
         company_id: company.id,
         floor: dto.floor,
         is_covered: dto.is_covered ?? true,
@@ -280,7 +295,7 @@ export class CourtsService {
     const court = await this.assertCourtOwnedBy(publicId, ownerPublicId);
 
     if (updateCourtDto.name !== undefined) {
-      const name = updateCourtDto.name.trim();
+      const name = normalizeTitle(updateCourtDto.name, COURT_NAME_MAX_LENGTH);
       if (!name) {
         throw new BadRequestException('Informe o nome da quadra.');
       }

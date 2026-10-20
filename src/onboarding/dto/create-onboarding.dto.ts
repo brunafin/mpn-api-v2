@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
+import { COURT_NAME_MAX_LENGTH } from 'src/utils/normalize-form';
 import { SportNameDto } from 'src/sports/dto/sport-name.dto';
 
 export class OnboardingDayDto {
@@ -57,8 +58,9 @@ export class OnboardingPriceSlotDto {
 }
 
 export class OnboardingCourtDto {
-  @ApiProperty({ example: 'Q1' })
+  @ApiProperty({ example: 'Q1', maxLength: COURT_NAME_MAX_LENGTH })
   @IsString()
+  @MaxLength(COURT_NAME_MAX_LENGTH)
   name: string;
 
   @ApiProperty({

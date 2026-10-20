@@ -287,7 +287,7 @@ describe('OnboardingService', () => {
       courts: [
         {
           name: 'Q1',
-          sports: [{ name: 'Futsal' }, { name: 'Fut7 (Society)' }],
+          sports: [{ name: 'Futsal' }, { name: 'Fut7' }],
           floor: 'madeira',
           price: 100,
         },
@@ -295,7 +295,7 @@ describe('OnboardingService', () => {
     });
 
     expect(sportRepo.save).toHaveBeenCalledWith([
-      expect.objectContaining({ name: 'Fut7 (Society)', needsNet: false }),
+      expect.objectContaining({ name: 'Fut7', needsNet: false }),
     ]);
   });
 

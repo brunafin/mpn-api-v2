@@ -29,6 +29,16 @@ import {
   dateKeyToUtcDate,
   todayDateKey,
 } from 'src/utils/calendarDate';
+import {
+  normalizeAddressNumber,
+  normalizeAddressText,
+  normalizeCepStored,
+  normalizeInstagramUrl,
+  normalizePhoneDigits,
+  COURT_NAME_MAX_LENGTH,
+  normalizeTitle,
+  normalizeUf,
+} from 'src/utils/normalize-form';
 
 const POPULATE_DAYS_AHEAD = 89;
 
@@ -57,6 +67,7 @@ export class OnboardingService {
       throw new ForbiddenException('Confirme seu e-mail antes de continuar.');
     }
 
+    this.normalizePayload(dto);
     this.assertAddress(dto);
     this.assertCourts(dto);
     this.assertWeekTemplate(dto);
@@ -233,6 +244,28 @@ export class OnboardingService {
       n += 1;
     }
     return candidate;
+  }
+
+  private normalizePayload(dto: CreateOnboardingDto) {
+    dto.companyName = normalizeTitle(dto.companyName ?? '', 50);
+    dto.companyPhone = normalizePhoneDigits(dto.companyPhone);
+    dto.instagramUrl = normalizeInstagramUrl(dto.instagramUrl);
+    dto.cep = normalizeCepStored(dto.cep ?? '');
+    dto.street = normalizeAddressText(dto.street ?? '', 100);
+    dto.number = normalizeAddressNumber(dto.number ?? '');
+    dto.neighborhood = normalizeAddressText(dto.neighborhood ?? '', 50);
+    dto.city = normalizeAddressText(dto.city ?? '', 50);
+    dto.uf = normalizeUf(dto.uf ?? '');
+    for (const court of dto.courts ?? []) {
+      court.name = normalizeTitle(court.name ?? '', COURT_NAME_MAX_LENGTH);
+    }
+
+    if (!dto.companyName) {
+      throw new BadRequestException('Informe o nome do estabelecimento.');
+    }
+    if (dto.courts.some((court) => !court.name)) {
+      throw new BadRequestException('Informe o nome da quadra.');
+    }
   }
 
   private assertAddress(dto: CreateOnboardingDto) {

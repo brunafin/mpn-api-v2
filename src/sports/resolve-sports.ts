@@ -5,8 +5,9 @@ export const SPORT_NAME_MAX_LENGTH = 20;
 
 /** Rótulos antigos ou alternativos → nome canônico do catálogo. */
 export const SPORT_NAME_ALIASES: Record<string, string> = {
-  society: 'Fut7 (Society)',
-  fut7: 'Fut7 (Society)',
+  society: 'Fut7',
+  fut7: 'Fut7',
+  'fut7 (society)': 'Fut7',
   fut11: 'Futebol de campo 11',
   'futebol de campo': 'Futebol de campo 11',
   voleibol: 'Vôlei de quadra',
@@ -24,7 +25,7 @@ export const SPORT_CATALOG_NEEDS_NET: Record<string, boolean> = {
   futsal: false,
   fut5: false,
   fut6: false,
-  'fut7 (society)': false,
+  fut7: false,
   'futebol de campo 11': false,
   futevôlei: true,
   futevolei: true,
@@ -100,20 +101,36 @@ export async function resolveSportsByName(
     existing.map((sport) => [sport.name.toLowerCase(), sport]),
   );
 
-  const toCreate: Sport[] = [];
+  const toSave: Sport[] = [];
   for (const input of requested) {
-    if (byName.has(input.name.toLowerCase())) continue;
+    const matchKey = Object.keys(SPORT_NAME_ALIASES)
+      .concat(input.name.toLowerCase())
+      .find(
+        (key) =>
+          byName.has(key) &&
+          canonicalSportName(key).toLowerCase() === input.name.toLowerCase(),
+      );
+    if (matchKey) {
+      const sport = byName.get(matchKey)!;
+      if (sport.name !== input.name) {
+        byName.delete(matchKey);
+        sport.name = input.name;
+        byName.set(input.name.toLowerCase(), sport);
+        toSave.push(sport);
+      }
+      continue;
+    }
     const needsNet = resolveNeedsNet(input.name, input.needsNet);
     if (typeof needsNet !== 'boolean') {
       throw new BadRequestException(
         `Informe se o esporte "${input.name}" usa rede.`,
       );
     }
-    toCreate.push(store.create({ name: input.name, needsNet }));
+    toSave.push(store.create({ name: input.name, needsNet }));
   }
 
-  if (toCreate.length > 0) {
-    const created = await store.save(toCreate);
+  if (toSave.length > 0) {
+    const created = await store.save(toSave);
     for (const sport of created) {
       byName.set(sport.name.toLowerCase(), sport);
     }

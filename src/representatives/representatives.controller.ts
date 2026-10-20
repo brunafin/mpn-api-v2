@@ -14,6 +14,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthUser } from 'src/auth/jwt.strategy';
 import { PlatformAdminGuard } from 'src/common/guards/platform-admin.guard';
 import { RepresentativeGuard } from 'src/common/guards/representative.guard';
+import { CreateRepresentativePayoutDto } from './dto/create-representative-payout.dto';
 import { CreateRepresentativeDto } from './dto/create-representative.dto';
 import { UpdateRepresentativeDto } from './dto/update-representative.dto';
 import { RepresentativesService } from './representatives.service';
@@ -60,6 +61,16 @@ export class RepresentativesController {
   @ApiOperation({ summary: 'Listar representantes' })
   list() {
     return this.representativesService.list();
+  }
+
+  @Post(':publicId/payouts')
+  @UseGuards(AuthGuard('jwt'), PlatformAdminGuard)
+  @ApiOperation({ summary: 'Informar pagamento da comissão do mês' })
+  recordPayout(
+    @Param('publicId') publicId: string,
+    @Body() dto: CreateRepresentativePayoutDto,
+  ) {
+    return this.representativesService.recordPayout(publicId, dto);
   }
 
   @Get(':publicId')

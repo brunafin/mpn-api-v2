@@ -13,11 +13,12 @@ import {
 } from 'class-validator';
 import { SportNameDto } from 'src/sports/dto/sport-name.dto';
 import { MAX_COURT_PRICE_REAIS } from 'src/utils/court-price';
+import { COURT_NAME_MAX_LENGTH } from 'src/utils/normalize-form';
 
 export class CreateOwnedCourtDto {
-  @ApiProperty({ example: 'Q2' })
+  @ApiProperty({ example: 'Q2', maxLength: COURT_NAME_MAX_LENGTH })
   @IsString()
-  @MaxLength(100)
+  @MaxLength(COURT_NAME_MAX_LENGTH)
   name: string;
 
   @ApiProperty({ type: [SportNameDto] })

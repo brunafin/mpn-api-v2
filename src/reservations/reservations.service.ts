@@ -270,6 +270,7 @@ export class ReservationsService {
       observation?: string;
       is_barbecue_included?: boolean;
       is_event?: boolean;
+      sport_id?: number;
     },
     ownerPublicId: string,
   ) {
@@ -283,6 +284,23 @@ export class ReservationsService {
     if (fields.is_barbecue_included !== undefined)
       updateData.is_barbecue_included = fields.is_barbecue_included;
     if (fields.is_event !== undefined) updateData.is_event = fields.is_event;
+    if (fields.sport_id !== undefined) {
+      const withSports = await this.reservationsRepository.findOne({
+        where: { public_id },
+        relations: {
+          court_schedule: { court: { court_sports: true } },
+        },
+      });
+      const allowed = withSports?.court_schedule?.court?.court_sports?.some(
+        (sport) => sport.id === fields.sport_id,
+      );
+      if (!allowed) {
+        throw new BadRequestException(
+          'Este esporte não está disponível nesta quadra.',
+        );
+      }
+      updateData.sport_id = fields.sport_id;
+    }
     return this.reservationsRepository.update({ public_id }, updateData);
   }
 
