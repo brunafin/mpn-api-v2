@@ -36,5 +36,6 @@ USER appuser
 # Exponha a porta da aplicação
 EXPOSE 3001
 
-# Comando de inicialização
-CMD ["node", "dist/src/main.js"]
+# A pipe não tem um passo de migration. O container aplica as pendentes
+# com o Postgres da própria Railway e só então escuta.
+CMD ["sh", "-c", "node ./node_modules/typeorm/cli.js -d dist/src/database/data-source.js migration:run && exec node dist/src/main.js"]

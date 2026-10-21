@@ -15,7 +15,8 @@ function envFlag(value: string | undefined, fallback = false): boolean {
  * - `synchronize` fica DESLIGADO por padrão. O schema passa a ser gerenciado
  *   por migrations. Só habilite via TYPEORM_SYNCHRONIZE=true em ambiente de
  *   desenvolvimento local descartável — NUNCA em produção.
- * - `migrationsRun` só roda migrations no boot quando TYPEORM_MIGRATIONS_RUN=true.
+ * - `migrationsRun` só roda migrations no boot do Nest quando TYPEORM_MIGRATIONS_RUN=true.
+ *   A imagem de produção roda `migration:run` no CMD, antes de escutar.
  */
 export function buildTypeOrmOptions(): DataSourceOptions {
   return {
