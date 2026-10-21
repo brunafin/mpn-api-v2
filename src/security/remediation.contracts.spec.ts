@@ -37,7 +37,10 @@ describe('Security remediation contracts', () => {
     });
 
     it('PeopleController não expõe findAll/findOne/update/remove (sem UI)', () => {
-      const proto = PeopleController.prototype as Record<string, unknown>;
+      const proto = PeopleController.prototype as unknown as Record<
+        string,
+        unknown
+      >;
       expect(proto.findAll).toBeUndefined();
       expect(proto.findOne).toBeUndefined();
       expect(proto.update).toBeUndefined();
