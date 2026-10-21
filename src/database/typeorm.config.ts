@@ -9,26 +9,38 @@ function envFlag(value: string | undefined, fallback = false): boolean {
 }
 
 /**
+ * O boot aplica as migrations pendentes. `TYPEORM_MIGRATIONS_RUN=false`
+ * desliga isso (o seed de teste faz assim e roda as migrations à parte).
+ */
+export function shouldRunMigrationsOnBoot(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.TYPEORM_MIGRATIONS_RUN !== 'false' && env.TYPEORM_MIGRATIONS_RUN !== '0';
+}
+
+/**
  * Opções compartilhadas do TypeORM (runtime + CLI de migrations).
  *
  * Importante:
  * - `synchronize` fica DESLIGADO por padrão. O schema passa a ser gerenciado
  *   por migrations. Só habilite via TYPEORM_SYNCHRONIZE=true em ambiente de
  *   desenvolvimento local descartável — NUNCA em produção.
- * - `migrationsRun` só roda migrations no boot do Nest quando TYPEORM_MIGRATIONS_RUN=true.
- *   A imagem de produção roda `migration:run` no CMD, antes de escutar.
+ * - `migrationsRun` acompanha o boot. A Railway pode trocar o CMD da imagem;
+ *   quem escuta é o processo do Nest, então é ele que aplica o schema.
  */
-export function buildTypeOrmOptions(): DataSourceOptions {
+export function buildTypeOrmOptions(
+  env: NodeJS.ProcessEnv = process.env,
+): DataSourceOptions {
   return {
     type: 'postgres',
-    host: process.env.POSTGRES_HOST,
-    port: parseInt(process.env.POSTGRES_PORT ?? '5432', 10),
-    username: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD,
-    database: process.env.POSTGRES_DB,
+    host: env.POSTGRES_HOST,
+    port: parseInt(env.POSTGRES_PORT ?? '5432', 10),
+    username: env.POSTGRES_USER,
+    password: env.POSTGRES_PASSWORD,
+    database: env.POSTGRES_DB,
     entities,
     migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
-    synchronize: envFlag(process.env.TYPEORM_SYNCHRONIZE, false),
-    migrationsRun: envFlag(process.env.TYPEORM_MIGRATIONS_RUN, false),
+    synchronize: envFlag(env.TYPEORM_SYNCHRONIZE, false),
+    migrationsRun: shouldRunMigrationsOnBoot(env),
   };
 }

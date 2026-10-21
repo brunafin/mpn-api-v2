@@ -36,14 +36,22 @@ describe('buildTypeOrmOptions', () => {
     expect(buildTypeOrmOptions()).toMatchObject({ port: 5432 });
   });
 
-  it('mantém synchronize e migrationsRun desligados por padrão', () => {
+  it('mantém synchronize desligado e aplica migrations no boot', () => {
     delete process.env.TYPEORM_SYNCHRONIZE;
     delete process.env.TYPEORM_MIGRATIONS_RUN;
 
     const options = buildTypeOrmOptions();
 
     expect(options.synchronize).toBe(false);
-    expect(options.migrationsRun).toBe(false);
+    expect(options.migrationsRun).toBe(true);
+  });
+
+  it('não aplica migrations quando TYPEORM_MIGRATIONS_RUN é false ou 0', () => {
+    process.env.TYPEORM_MIGRATIONS_RUN = 'false';
+    expect(buildTypeOrmOptions().migrationsRun).toBe(false);
+
+    process.env.TYPEORM_MIGRATIONS_RUN = '0';
+    expect(buildTypeOrmOptions().migrationsRun).toBe(false);
   });
 
   it('habilita synchronize apenas com "true" ou "1"', () => {

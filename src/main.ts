@@ -6,10 +6,12 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import createDatabaseIfNotExists from './database-init';
 import helmet from 'helmet';
 import { assertDeploySecurityGuards } from './security/assert-deploy-security';
+import { runPendingMigrations } from './database/run-pending-migrations';
 
 async function bootstrap() {
   assertDeploySecurityGuards();
   await createDatabaseIfNotExists();
+  await runPendingMigrations();
 
   const app = await NestFactory.create(AppModule);
 

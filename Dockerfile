@@ -36,6 +36,6 @@ USER appuser
 # Exponha a porta da aplicação
 EXPOSE 3001
 
-# A pipe não tem um passo de migration. O container aplica as pendentes
-# com o Postgres da própria Railway e só então escuta.
-CMD ["sh", "-c", "node ./node_modules/typeorm/cli.js -d dist/src/database/data-source.js migration:run && exec node dist/src/main.js"]
+# A pipe não tem um passo de migration. O CLI tenta primeiro; se ele falhar
+# ou a Railway trocar o CMD, o Nest ainda aplica as pendentes no boot.
+CMD ["sh", "-c", "node ./node_modules/typeorm/cli.js -d dist/src/database/data-source.js migration:run || echo 'migration:run do CLI falhou; o boot do Nest aplica as pendentes'; exec node dist/src/main.js"]
