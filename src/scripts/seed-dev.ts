@@ -2,49 +2,38 @@
  * Limpa o banco de desenvolvimento e cria:
  * - admin da plataforma (mpn-admin): usuário mpn / senha Admin@123
  * - dono de arena (mpn-manager): usuário manager / senha Admin@123
- *   com a arena "Arena Dev" e duas quadras já publicadas,
- *   grade 08:00–22:00 em todos os dias e agenda dos próximos 90 dias.
+ *   com a arena "Arena Dev", Quadra 1 publicada e Quadra 2 oculta no site,
+ *   grade 08:00–22:00 em todos os dias e agenda dos próximos 90 dias
+ * - trial encerrado, somente leitura, senha obrigatória e um representante
  *
  * Catálogos (dias, esportes, tipos de quadra, planos) são recriados se faltarem.
  * Arquivos no R2 não são apagados.
  *
  * Só roda com TYPE_ENV=development e a flag --yes.
+ * O e2e usa o mesmo applyDevSeed, com guarda própria em seed-e2e.ts.
  *
  *   npm run db:seed:dev -- --yes
  */
 import 'reflect-metadata';
 import * as bcrypt from 'bcrypt';
 import { AppDataSource } from '../database/data-source';
-import { addDaysToDateKey, todayDateKey } from '../utils/calendarDate';
+import {
+  addDaysToDateKey,
+  todayDateKey,
+  weekdayRefFromDateKey,
+} from '../utils/calendarDate';
 import {
   assertDevDatabase,
   wipeDevTables,
   type SqlRunner,
 } from './dev-database';
+import {
+  E2E_ACCOUNTS,
+  E2E_COMPANIES,
+  E2E_PAST_CONTACT,
+} from './e2e-accounts';
 
-const ADMIN = {
-  name: 'Admin MPN',
-  username: 'mpn',
-  email: 'mpn@mpn.dev',
-  phone: '51999990000',
-  password: 'Admin@123',
-  role: 'platform_admin',
-};
-
-const MANAGER = {
-  name: 'Gestor Arena',
-  username: 'manager',
-  email: 'manager@mpn.dev',
-  phone: '51999990001',
-  password: 'Admin@123',
-  role: 'owner',
-};
-
-const COMPANY = {
-  name: 'Arena Dev',
-  slug: 'arena-dev',
-  phone: '51999990002',
-  email: 'arena@mpn.dev',
+const ADDRESS = {
   cep: '90010-000',
   street: 'Rua da Praia',
   number: '100',
@@ -53,7 +42,18 @@ const COMPANY = {
   uf: 'RS',
 };
 
-const COURTS = [
+type CourtSeed = {
+  name: string;
+  floor: string;
+  isCovered: boolean;
+  canHaveNet: boolean;
+  typeName: string;
+  sports: readonly string[];
+  price: number;
+  show: boolean;
+};
+
+const MAIN_COURTS: readonly CourtSeed[] = [
   {
     name: 'Quadra 1',
     floor: 'grama_sintetica',
@@ -62,6 +62,7 @@ const COURTS = [
     typeName: 'Society',
     sports: ['Futsal', 'Fut7'],
     price: 120,
+    show: true,
   },
   {
     name: 'Quadra 2',
@@ -71,8 +72,22 @@ const COURTS = [
     typeName: 'Areia',
     sports: ['Beach Tennis'],
     price: 100,
+    show: false,
   },
-] as const;
+];
+
+const SMALL_COURT: readonly CourtSeed[] = [
+  {
+    name: 'Quadra 1',
+    floor: 'grama_sintetica',
+    isCovered: true,
+    canHaveNet: false,
+    typeName: 'Society',
+    sports: ['Futsal'],
+    price: 80,
+    show: true,
+  },
+];
 
 const AGENDA_DAYS = 90;
 
@@ -224,7 +239,22 @@ async function typeId(runner: SqlRunner, name: string): Promise<number | null> {
   return rows[0]?.id ?? null;
 }
 
-async function seedArena(runner: SqlRunner, administratorId: number) {
+async function seedArena(
+  runner: SqlRunner,
+  input: {
+    name: string;
+    slug: string;
+    phone: string;
+    email: string;
+    administratorId: number;
+    planId: number;
+    isTrial: boolean;
+    trialEndsAt: Date;
+    accessMode: 'full' | 'read_only';
+    agendaDays: number;
+    courts: readonly CourtSeed[];
+  },
+) {
   const companies = (await runner.query(
     `INSERT INTO company (
        name, phone, email, slug, cep, street, number, neighborhood, city, uf,
@@ -233,22 +263,26 @@ async function seedArena(runner: SqlRunner, administratorId: number) {
      )
      VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-       $11, 1, true, 'active', true,
-       NOW() + INTERVAL '2 months', NOW(), 'full'
+       $11, $12, true, 'active', $13,
+       $14, NOW(), $15
      )
      RETURNING id`,
     [
-      COMPANY.name,
-      COMPANY.phone,
-      COMPANY.email,
-      COMPANY.slug,
-      COMPANY.cep,
-      COMPANY.street,
-      COMPANY.number,
-      COMPANY.neighborhood,
-      COMPANY.city,
-      COMPANY.uf,
-      administratorId,
+      input.name,
+      input.phone,
+      input.email,
+      input.slug,
+      ADDRESS.cep,
+      ADDRESS.street,
+      ADDRESS.number,
+      ADDRESS.neighborhood,
+      ADDRESS.city,
+      ADDRESS.uf,
+      input.administratorId,
+      input.planId,
+      input.isTrial,
+      input.trialEndsAt,
+      input.accessMode,
     ],
   )) as IdRow[];
 
@@ -258,17 +292,18 @@ async function seedArena(runner: SqlRunner, administratorId: number) {
   }
 
   const courtIds: number[] = [];
-  for (const court of COURTS) {
+  for (const court of input.courts) {
     const created = (await runner.query(
       `INSERT INTO court (
          name, company_id, type_of_court_id, show, floor, is_covered, is_can_have_net
        )
-       VALUES ($1, $2, $3, true, $4, $5, $6)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name`,
       [
         court.name,
         companyId,
         await typeId(runner, court.typeName),
+        court.show,
         court.floor,
         court.isCovered,
         court.canHaveNet,
@@ -312,7 +347,7 @@ async function seedArena(runner: SqlRunner, administratorId: number) {
   }
 
   const start = todayDateKey();
-  const end = addDaysToDateKey(start, AGENDA_DAYS - 1);
+  const end = addDaysToDateKey(start, input.agendaDays - 1);
   await runner.query(
     `INSERT INTO court_schedule (
        start_hour, end_hour, date, available, price, court_id, day_of_week_id, is_fixed
@@ -334,18 +369,142 @@ async function seedArena(runner: SqlRunner, administratorId: number) {
     [start, end, courtIds],
   );
 
-  return { start, end };
+  return { companyId, courtIds, start, end };
+}
+
+async function seedPastReservation(runner: SqlRunner, courtId: number) {
+  const date = addDaysToDateKey(todayDateKey(), -1);
+  const schedules = (await runner.query(
+    `INSERT INTO court_schedule (
+       start_hour, end_hour, date, available, price, court_id, day_of_week_id, is_fixed
+     )
+     SELECT
+       TIME '20:00',
+       TIME '21:00',
+       $2::date,
+       false,
+       120,
+       $1::int,
+       dow.id,
+       false
+     FROM (
+       SELECT DISTINCT ON (ref) id, ref
+       FROM day_of_week
+       ORDER BY ref, id
+     ) AS dow
+     WHERE dow.ref = $3::int
+     RETURNING id`,
+    [courtId, date, weekdayRefFromDateKey(date)],
+  )) as IdRow[];
+
+  const scheduleId = schedules[0]?.id;
+  if (!scheduleId) {
+    throw new Error('Não foi possível criar o horário passado.');
+  }
+
+  const sports = (await runner.query(
+    `SELECT id FROM sport WHERE name = 'Futsal' ORDER BY id LIMIT 1`,
+  )) as IdRow[];
+  const sportId = sports[0]?.id;
+  if (!sportId) {
+    throw new Error('Esporte Futsal ausente para a reserva passada.');
+  }
+
+  await runner.query(
+    `INSERT INTO reservations (contact_name, contact_phone, court_schedule_id, sport_id)
+     VALUES ($1, '51988887777', $2, $3)`,
+    [E2E_PAST_CONTACT, scheduleId, sportId],
+  );
+}
+
+function daysFromNow(days: number): Date {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
 export async function applyDevSeed(runner: SqlRunner) {
   await wipeDevTables(runner);
   await ensureCatalogs(runner);
 
-  const admin = await insertPerson(runner, ADMIN);
-  const manager = await insertPerson(runner, MANAGER);
-  const agenda = await seedArena(runner, manager.id);
+  const admin = await insertPerson(runner, E2E_ACCOUNTS.admin);
+  const manager = await insertPerson(runner, E2E_ACCOUNTS.manager);
+  const trial = await insertPerson(runner, E2E_ACCOUNTS.trial);
+  const readonly = await insertPerson(runner, E2E_ACCOUNTS.readonly);
+  const mustChange = await insertPerson(runner, E2E_ACCOUNTS.mustChange);
+  const seller = await insertPerson(runner, E2E_ACCOUNTS.seller);
 
-  return { admin, manager, agenda };
+  const agenda = await seedArena(runner, {
+    name: E2E_COMPANIES.main.name,
+    slug: E2E_COMPANIES.main.slug,
+    phone: '51999990002',
+    email: 'arena@mpn.dev',
+    administratorId: manager.id,
+    planId: 1,
+    isTrial: true,
+    trialEndsAt: daysFromNow(60),
+    accessMode: 'full',
+    agendaDays: AGENDA_DAYS,
+    courts: MAIN_COURTS,
+  });
+
+  await seedArena(runner, {
+    name: E2E_COMPANIES.trial.name,
+    slug: E2E_COMPANIES.trial.slug,
+    phone: '51999991001',
+    email: 'trial-arena@mpn.dev',
+    administratorId: trial.id,
+    planId: 1,
+    isTrial: true,
+    trialEndsAt: daysFromNow(-2),
+    accessMode: 'full',
+    agendaDays: 14,
+    courts: SMALL_COURT,
+  });
+
+  await seedArena(runner, {
+    name: E2E_COMPANIES.readonly.name,
+    slug: E2E_COMPANIES.readonly.slug,
+    phone: '51999991002',
+    email: 'leitura-arena@mpn.dev',
+    administratorId: readonly.id,
+    planId: 1,
+    isTrial: true,
+    trialEndsAt: daysFromNow(60),
+    accessMode: 'read_only',
+    agendaDays: 14,
+    courts: SMALL_COURT,
+  });
+
+  await seedArena(runner, {
+    name: E2E_COMPANIES.mustChange.name,
+    slug: E2E_COMPANIES.mustChange.slug,
+    phone: '51999991003',
+    email: 'senha-arena@mpn.dev',
+    administratorId: mustChange.id,
+    planId: 1,
+    isTrial: true,
+    trialEndsAt: daysFromNow(60),
+    accessMode: 'full',
+    agendaDays: 14,
+    courts: SMALL_COURT,
+  });
+
+  await runner.query(
+    `INSERT INTO representative_profile (person_id)
+     VALUES ($1)`,
+    [seller.id],
+  );
+  await runner.query(
+    `UPDATE company SET representative_id = $1 WHERE slug = $2`,
+    [seller.id, E2E_COMPANIES.main.slug],
+  );
+
+  const mainCourtId = agenda.courtIds[0];
+  if (!mainCourtId) {
+    throw new Error('Arena principal sem quadra.');
+  }
+  await seedPastReservation(runner, mainCourtId);
+
+  return { admin, manager, trial, readonly, mustChange, seller, agenda };
 }
 
 async function main() {
@@ -360,20 +519,33 @@ async function main() {
     const host = process.env.POSTGRES_HOST;
     console.log(`Banco: ${db} em ${host}`);
 
-    const { admin, manager, agenda } = await applyDevSeed(queryRunner);
+    const seeded = await applyDevSeed(queryRunner);
 
     await queryRunner.commitTransaction();
 
     console.log('Seed criado.');
     console.log('Admin (mpn-admin):');
-    console.log(`  usuário: ${admin.username}`);
-    console.log(`  senha:   ${ADMIN.password}`);
+    console.log(`  usuário: ${seeded.admin.username}`);
+    console.log(`  senha:   ${E2E_ACCOUNTS.admin.password}`);
+    console.log('Representante (comissões):');
+    console.log(`  usuário: ${seeded.seller.username}`);
+    console.log(`  senha:   ${E2E_ACCOUNTS.seller.password}`);
     console.log('Manager (mpn-manager):');
-    console.log(`  usuário: ${manager.username}`);
-    console.log(`  senha:   ${MANAGER.password}`);
-    console.log(`  arena:   ${COMPANY.name} (${COMPANY.slug})`);
-    console.log(`  quadras: ${COURTS.map((court) => court.name).join(', ')}`);
-    console.log(`  agenda:  ${agenda.start} a ${agenda.end}, 08:00–22:00`);
+    console.log(`  usuário: ${seeded.manager.username}`);
+    console.log(`  senha:   ${E2E_ACCOUNTS.manager.password}`);
+    console.log(
+      `  arena:   ${E2E_COMPANIES.main.name} (${E2E_COMPANIES.main.slug})`,
+    );
+    console.log(
+      `  quadras: ${MAIN_COURTS.map((court) => court.name).join(', ')}`,
+    );
+    console.log(
+      `  agenda:  ${seeded.agenda.start} a ${seeded.agenda.end}, 08:00–22:00`,
+    );
+    console.log('Trial encerrado / somente leitura / senha obrigatória:');
+    console.log(
+      `  ${E2E_ACCOUNTS.trial.username} / ${E2E_ACCOUNTS.readonly.username} / ${E2E_ACCOUNTS.mustChange.username}`,
+    );
     console.log('OK.');
   } catch (error) {
     await queryRunner.rollbackTransaction();
