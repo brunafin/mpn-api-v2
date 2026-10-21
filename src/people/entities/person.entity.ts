@@ -104,6 +104,11 @@ export class Person {
   @Expose()
   terms_accepted_at: Date | null;
 
+  /** Aparência do painel. Claro é o padrão até a pessoa escolher escuro. */
+  @Column({ type: 'varchar', length: 8, default: 'light' })
+  @Expose()
+  preferences_color_mode: 'light' | 'dark';
+
   /** Senha local; null em contas criadas só via Google. */
   @Column({ type: 'text', nullable: true })
   @Exclude()

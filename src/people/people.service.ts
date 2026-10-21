@@ -259,6 +259,32 @@ export class PeopleService {
     return this.peopleRepository.findOne({ where: { public_id: publicId } });
   }
 
+  async getColorModePreference(publicId: string): Promise<{
+    colorMode: 'light' | 'dark';
+  }> {
+    const person = await this.findByPublicId(publicId);
+    if (!person) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return {
+      colorMode: person.preferences_color_mode === 'dark' ? 'dark' : 'light',
+    };
+  }
+
+  async updateColorModePreference(
+    publicId: string,
+    colorMode: 'light' | 'dark',
+  ): Promise<{ colorMode: 'light' | 'dark' }> {
+    const result = await this.peopleRepository.update(
+      { public_id: publicId },
+      { preferences_color_mode: colorMode },
+    );
+    if (!result.affected) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return { colorMode };
+  }
+
   async isUsernameTaken(username: string, exceptPersonId?: number) {
     const existing = await this.peopleRepository.findOne({
       where: { username: ILike(username) },
