@@ -51,7 +51,9 @@ import {
   brazilLastDaysWindow,
   brazilMonthWindow,
   LAST_HOUR_MS,
+  excludeViewerLogins,
   pickLoginsSince,
+  pickOverdueClients,
   pickRecentLogins,
   RECENT_LOGINS_LIMIT,
   summarizeDashboardCompanies,
@@ -149,25 +151,33 @@ export class PlatformService {
     private readonly representativesService: RepresentativesService,
   ) {}
 
-  async getDashboard(now = new Date()) {
+  async getDashboard(now = new Date(), viewerPublicId?: string | null) {
     await this.trialExpiryService.expireDueTrials();
 
-    const [companies, onboarding, receivedThisMonth, reservations, recentLogins, lastHourLogins] =
-      await Promise.all([
-        this.companiesRepository.find({
-          relations: { plan: true, courts: true },
-        }),
-        this.peopleRepository
-          .createQueryBuilder('person')
-          .leftJoin('person.companies', 'company')
-          .where('company.id IS NULL')
-          .andWhere('person.role = :role', { role: PersonRole.OWNER })
-          .getCount(),
-        this.sumReceivedInWindow(brazilMonthWindow(now)),
-        this.getReservationPulse(now),
-        this.getRecentLogins(),
-        this.getLastHourLogins(now),
-      ]);
+    const [
+      companies,
+      onboarding,
+      receivedThisMonth,
+      reservations,
+      recentLogins,
+      lastHourLogins,
+      overdueClients,
+    ] = await Promise.all([
+      this.companiesRepository.find({
+        relations: { plan: true, courts: true },
+      }),
+      this.peopleRepository
+        .createQueryBuilder('person')
+        .leftJoin('person.companies', 'company')
+        .where('company.id IS NULL')
+        .andWhere('person.role = :role', { role: PersonRole.OWNER })
+        .getCount(),
+      this.sumReceivedInWindow(brazilMonthWindow(now)),
+      this.getReservationPulse(now),
+      this.getRecentLogins(),
+      this.getLastHourLogins(now, viewerPublicId),
+      this.getOverdueClients(now),
+    ]);
 
     const summary = summarizeDashboardCompanies(companies, now);
 
@@ -179,6 +189,7 @@ export class PlatformService {
       receivedThisMonth,
       recentLogins,
       lastHourLogins,
+      overdueClients,
       ...reservations,
     };
   }
@@ -977,7 +988,22 @@ export class PlatformService {
     );
   }
 
-  private async getLastHourLogins(now = new Date()) {
+  private async getOverdueClients(now: Date) {
+    const payments = await this.paymentsRepository
+      .createQueryBuilder('payment')
+      .innerJoinAndSelect('payment.company', 'company')
+      .leftJoinAndSelect('company.administrator', 'administrator')
+      .where('payment.dt_payment IS NULL')
+      .andWhere('payment.dt_due IS NOT NULL')
+      .getMany();
+
+    return pickOverdueClients(payments, now);
+  }
+
+  private async getLastHourLogins(
+    now = new Date(),
+    viewerPublicId?: string | null,
+  ) {
     const since = new Date(now.getTime() - LAST_HOUR_MS);
 
     const companies = await this.companiesRepository
@@ -1007,15 +1033,18 @@ export class PlatformService {
       .getMany();
 
     return pickLoginsSince(
-      [
-        ...fromArenas,
-        ...onboarding.map((person) => ({
-          public_id: person.public_id,
-          name: person.name,
-          last_login_at: person.last_login_at,
-          companies: [],
-        })),
-      ],
+      excludeViewerLogins(
+        [
+          ...fromArenas,
+          ...onboarding.map((person) => ({
+            public_id: person.public_id,
+            name: person.name,
+            last_login_at: person.last_login_at,
+            companies: [],
+          })),
+        ],
+        viewerPublicId,
+      ),
       since,
     );
   }

@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -23,6 +24,10 @@ import { UpdatePlatformClientRepresentativeDto } from './dto/update-platform-cli
 import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
 import { PlatformService } from './platform.service';
 
+type AuthedRequest = {
+  user: { userId: string };
+};
+
 @Controller('platform')
 @ApiTags('platform')
 @UseGuards(AuthGuard('jwt'), PlatformAdminGuard)
@@ -32,8 +37,8 @@ export class PlatformController {
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Indicadores da home do admin' })
-  getDashboard() {
-    return this.platformService.getDashboard();
+  getDashboard(@Req() req: AuthedRequest) {
+    return this.platformService.getDashboard(new Date(), req.user.userId);
   }
 
   @Get('clients')

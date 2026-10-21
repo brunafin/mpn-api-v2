@@ -3,7 +3,9 @@ import {
   brazilDayWindow,
   brazilLastDaysWindow,
   brazilMonthWindow,
+  excludeViewerLogins,
   pickLoginsSince,
+  pickOverdueClients,
   pickRecentLogins,
   summarizeDashboardCompanies,
 } from './platform-dashboard';
@@ -139,6 +141,120 @@ describe('platform-dashboard', () => {
         lastLoginAt: '2026-08-14T10:00:00.000Z',
       },
     ]);
+  });
+
+  it('pickOverdueClients agrupa parcelas vencidas e ignora PIX em andamento', () => {
+    const now = new Date('2026-10-21T15:00:00.000Z');
+    const clients = pickOverdueClients(
+      [
+        {
+          price: '120.50',
+          dt_due: '2026-09-10T15:00:00.000Z',
+          dt_payment: null,
+          company: {
+            public_id: 'arena-a',
+            name: 'Arena A',
+            phone: '51988887777',
+            administrator: { name: 'Maria Silva', phone: ' 51999990000 ' },
+          },
+        },
+        {
+          price: 80,
+          dt_due: '2026-10-10T15:00:00.000Z',
+          company: {
+            public_id: 'arena-a',
+            name: 'Arena A',
+            administrator: { name: 'Maria Silva', phone: '51999990000' },
+          },
+        },
+        {
+          price: 90,
+          dt_due: '2026-10-21T15:00:00.000Z',
+          company: {
+            public_id: 'hoje',
+            name: 'Vence hoje',
+            administrator: { name: 'Hoje', phone: '51911112222' },
+          },
+        },
+        {
+          price: 70,
+          dt_due: '2026-10-01T15:00:00.000Z',
+          dt_payment: '2026-10-02T15:00:00.000Z',
+          company: {
+            public_id: 'pago',
+            name: 'Já pagou',
+            administrator: { name: 'Pago', phone: '51911113333' },
+          },
+        },
+        {
+          price: 50,
+          dt_due: '2026-10-05T15:00:00.000Z',
+          mp_payment_id: 'pix-1',
+          pix_expires_at: '2026-10-21T18:00:00.000Z',
+          company: {
+            public_id: 'pix',
+            name: 'Aguardando PIX',
+            administrator: { name: 'Pix', phone: '51911114444' },
+          },
+        },
+        {
+          price: 40,
+          dt_due: '2026-10-15T15:00:00.000Z',
+          company: {
+            public_id: 'sem-dono',
+            name: 'Quadra do Zé',
+            phone: '51977776666',
+            administrator: null,
+          },
+        },
+      ],
+      now,
+    );
+
+    expect(clients).toEqual([
+      {
+        publicId: 'arena-a',
+        name: 'Arena A',
+        ownerName: 'Maria Silva',
+        phone: '51999990000',
+        amount: 200.5,
+        oldestDueDate: '2026-09-10',
+        overdueCount: 2,
+        daysOverdue: 41,
+      },
+      {
+        publicId: 'sem-dono',
+        name: 'Quadra do Zé',
+        ownerName: null,
+        phone: '51977776666',
+        amount: 40,
+        oldestDueDate: '2026-10-15',
+        overdueCount: 1,
+        daysOverdue: 6,
+      },
+    ]);
+  });
+
+  it('excludeViewerLogins tira quem está olhando a home', () => {
+    const people = [
+      {
+        public_id: 'me',
+        name: 'Admin',
+        last_login_at: '2026-10-21T18:00:00.000Z',
+        companies: [{ public_id: 'arena', name: 'Arena' }],
+      },
+      {
+        public_id: 'client',
+        name: 'Cliente',
+        last_login_at: '2026-10-21T18:10:00.000Z',
+        companies: [{ public_id: 'outra', name: 'Outra' }],
+      },
+    ];
+
+    expect(excludeViewerLogins(people, 'me').map((person) => person.public_id)).toEqual([
+      'client',
+    ]);
+    expect(excludeViewerLogins(people, null)).toBe(people);
   });
 
   it('pickLoginsSince só inclui acessos a partir do recorte', () => {

@@ -1,5 +1,5 @@
 import { addDays, addMonths, startOfDay, startOfMonth } from 'date-fns';
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { isCompanyOnTrial } from 'src/companies/utils/trial-expiry';
 import { computeMonthlyFee } from 'src/plans/utils/compute-monthly-fee';
@@ -56,6 +56,35 @@ export type DashboardRecentLogin = {
   lastLoginAt: string;
 };
 
+export type DashboardOverduePaymentInput = {
+  price: number | string;
+  dt_due: Date | string | null;
+  dt_payment?: Date | string | null;
+  mp_payment_id?: string | null;
+  pix_expires_at?: Date | string | null;
+  company?: {
+    public_id: string;
+    name: string;
+    phone?: string | null;
+    administrator?: {
+      name?: string | null;
+      phone?: string | null;
+    } | null;
+  } | null;
+};
+
+export type DashboardOverdueClient = {
+  publicId: string;
+  name: string;
+  ownerName: string | null;
+  phone: string | null;
+  amount: number;
+  /** Parcela mais antiga ainda em aberto, YYYY-MM-DD no calendário de São Paulo. */
+  oldestDueDate: string;
+  overdueCount: number;
+  daysOverdue: number;
+};
+
 export function pickRecentLogins(
   people: DashboardRecentLoginInput[],
   limit = RECENT_LOGINS_LIMIT,
@@ -77,6 +106,114 @@ export function pickRecentLogins(
         lastLoginAt: new Date(person.last_login_at as Date | string).toISOString(),
       };
     });
+}
+
+function brazilDateKey(value: Date | string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return formatInTimeZone(date, BRAZIL_TZ, 'yyyy-MM-dd');
+}
+
+function daysBetweenDateKeys(earlier: string, later: string): number {
+  const [y1, m1, d1] = earlier.split('-').map(Number);
+  const [y2, m2, d2] = later.split('-').map(Number);
+  const utc = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d);
+  return Math.round((utc(y2, m2, d2) - utc(y1, m1, d1)) / 86_400_000);
+}
+
+function contactPhone(
+  company: NonNullable<DashboardOverduePaymentInput['company']>,
+): string | null {
+  const owner = company.administrator?.phone?.trim();
+  if (owner) return owner;
+  const arena = company.phone?.trim();
+  return arena || null;
+}
+
+/**
+ * Clientes com parcela não paga e vencida (calendário de São Paulo).
+ * PIX ainda válido não entra: o cliente já começou o pagamento.
+ * Agrupa por arena, soma o valor e ordena pelo atraso maior.
+ */
+export function pickOverdueClients(
+  payments: DashboardOverduePaymentInput[],
+  now: Date = new Date(),
+): DashboardOverdueClient[] {
+  const todayKey = brazilDateKey(now);
+  if (!todayKey) return [];
+
+  const grouped = new Map<
+    string,
+    {
+      name: string;
+      ownerName: string | null;
+      phone: string | null;
+      amount: number;
+      oldestDueDate: string;
+      overdueCount: number;
+    }
+  >();
+
+  for (const payment of payments) {
+    const company = payment.company;
+    if (!company?.public_id) continue;
+    if (payment.dt_payment) continue;
+    if (!payment.dt_due) continue;
+    const price = Number(payment.price);
+    if (!Number.isFinite(price) || price <= 0) continue;
+    if (
+      payment.mp_payment_id &&
+      payment.pix_expires_at &&
+      new Date(payment.pix_expires_at).getTime() > now.getTime()
+    ) {
+      continue;
+    }
+
+    const dueKey = brazilDateKey(payment.dt_due);
+    if (!dueKey || dueKey >= todayKey) continue;
+
+    const current = grouped.get(company.public_id);
+    if (!current) {
+      grouped.set(company.public_id, {
+        name: company.name,
+        ownerName: company.administrator?.name?.trim() || null,
+        phone: contactPhone(company),
+        amount: price,
+        oldestDueDate: dueKey,
+        overdueCount: 1,
+      });
+      continue;
+    }
+
+    current.amount += price;
+    current.overdueCount += 1;
+    if (dueKey < current.oldestDueDate) current.oldestDueDate = dueKey;
+  }
+
+  return [...grouped.entries()]
+    .map(([publicId, item]) => ({
+      publicId,
+      name: item.name,
+      ownerName: item.ownerName,
+      phone: item.phone,
+      amount: Number(item.amount.toFixed(2)),
+      oldestDueDate: item.oldestDueDate,
+      overdueCount: item.overdueCount,
+      daysOverdue: daysBetweenDateKeys(item.oldestDueDate, todayKey),
+    }))
+    .sort((a, b) => {
+      if (b.daysOverdue !== a.daysOverdue) return b.daysOverdue - a.daysOverdue;
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+}
+
+/** Quem está olhando o dashboard não conta como acesso de cliente. */
+export function excludeViewerLogins(
+  people: DashboardRecentLoginInput[],
+  viewerPublicId?: string | null,
+): DashboardRecentLoginInput[] {
+  if (!viewerPublicId) return people;
+  return people.filter((person) => person.public_id !== viewerPublicId);
 }
 
 /** Acessos com `last_login_at` a partir de `since` (ex.: última hora). */
