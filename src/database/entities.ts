@@ -17,6 +17,7 @@ import { EmailVerification } from '../auth/entities/email-verification.entity';
 import { PlatformCost } from '../costs/entities/platform-cost.entity';
 import { RepresentativeProfile } from '../representatives/entities/representative-profile.entity';
 import { RepresentativePayout } from '../representatives/entities/representative-payout.entity';
+import { PlatformSetting } from '../platform/entities/platform-setting.entity';
 
 /**
  * Fonte única das entidades TypeORM. Reutilizada pelo AppModule (runtime) e
@@ -42,4 +43,5 @@ export const entities = [
   PlatformCost,
   RepresentativeProfile,
   RepresentativePayout,
+  PlatformSetting,
 ];

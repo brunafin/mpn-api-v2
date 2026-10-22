@@ -22,6 +22,8 @@ import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-acce
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
 import { UpdatePlatformClientRepresentativeDto } from './dto/update-platform-client-representative.dto';
 import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
+import { UpdatePlatformMaintenanceDto } from './dto/update-platform-maintenance.dto';
+import { PlatformMaintenanceService } from './platform-maintenance.service';
 import { PlatformService } from './platform.service';
 
 type AuthedRequest = {
@@ -33,7 +35,22 @@ type AuthedRequest = {
 @UseGuards(AuthGuard('jwt'), PlatformAdminGuard)
 @ApiBearerAuth()
 export class PlatformController {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+    private readonly maintenanceService: PlatformMaintenanceService,
+  ) {}
+
+  @Get('maintenance')
+  @ApiOperation({ summary: 'Estado de manutenção do site público' })
+  getMaintenance() {
+    return this.maintenanceService.get();
+  }
+
+  @Patch('maintenance')
+  @ApiOperation({ summary: 'Ligar ou desligar a manutenção do site público' })
+  updateMaintenance(@Body() dto: UpdatePlatformMaintenanceDto) {
+    return this.maintenanceService.update(dto);
+  }
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Indicadores da home do admin' })
