@@ -19,11 +19,14 @@ import {
   detectCompetitor,
   isRelevantPlace,
   namesLookAlike,
+  normalizeName,
+  addressConflictsWithCity,
   parseCityUfFromAddress,
   phoneDigits,
   PlacesSearchPlace,
   previewFromPlace,
   previewToPlace,
+  resolvePlaceCity,
   type PlacePreview,
 } from './google-court.helpers';
 import { GooglePlacesClient } from './google-places.client';
@@ -84,6 +87,7 @@ export type GoogleCourtSearchResponse = {
   found: number;
   skipped: number;
   alreadyInPortfolio: number;
+  outsideCity: number;
   items: GoogleCourtSearchHit[];
 };
 
@@ -192,6 +196,13 @@ export class GoogleCourtsService {
     if (dto.notes !== undefined) {
       court.notes = dto.notes.trim() || null;
     }
+    if (dto.city !== undefined) {
+      court.city = dto.city.trim() || null;
+    }
+    if (dto.uf !== undefined) {
+      const uf = dto.uf.trim().toUpperCase();
+      court.uf = uf || null;
+    }
     if (dto.markContacted) {
       court.contacted_at = new Date();
       if (
@@ -240,9 +251,16 @@ export class GoogleCourtsService {
       }
     }
 
-    const previews = [...placesById.values()]
-      .map((place) => previewFromPlace(place, city, uf))
-      .filter((preview): preview is PlacePreview => Boolean(preview));
+    let outsideCity = 0;
+    const previews: PlacePreview[] = [];
+    for (const place of placesById.values()) {
+      if (addressConflictsWithCity(place.formattedAddress, city, uf)) {
+        outsideCity += 1;
+        continue;
+      }
+      const preview = previewFromPlace(place, city, uf);
+      if (preview) previews.push(preview);
+    }
 
     const items = await this.annotateSearchHits(previews);
     return {
@@ -250,9 +268,38 @@ export class GoogleCourtsService {
       uf,
       found: items.length,
       skipped,
+      outsideCity,
       alreadyInPortfolio: items.filter((item) => item.inPortfolio).length,
       items,
     };
+  }
+
+  /**
+   * A cidade gravada passa a ser a do endereço, quando ele diz outra.
+   * Quadra puxada para a cidade da busca, mas com endereço de fora, sai dessa lista.
+   */
+  async sanitizeLocations(): Promise<{ checked: number; updated: number }> {
+    const rows = await this.googleCourtRepository.find();
+    const changed: GoogleCourt[] = [];
+
+    for (const row of rows) {
+      const parsed = parseCityUfFromAddress(row.full_address);
+      if (!parsed.city && !parsed.uf) continue;
+      const storedUf = (row.uf || '').trim().toUpperCase();
+      const cityDiff =
+        Boolean(parsed.city) &&
+        normalizeName(parsed.city) !== normalizeName(row.city);
+      const ufDiff = Boolean(parsed.uf) && parsed.uf !== storedUf;
+      if (!cityDiff && !ufDiff) continue;
+      if (parsed.city) row.city = parsed.city;
+      if (parsed.uf) row.uf = parsed.uf;
+      changed.push(row);
+    }
+
+    if (changed.length > 0) {
+      await this.googleCourtRepository.save(changed);
+    }
+    return { checked: rows.length, updated: changed.length };
   }
 
   async importPlaces(dto: ImportGoogleCourtsDto): Promise<{
@@ -361,7 +408,11 @@ export class GoogleCourtsService {
 
     for (const place of places) {
       if (!place.id) continue;
-      const parsed = parseCityUfFromAddress(place.formattedAddress);
+      const resolved = resolvePlaceCity(
+        place.formattedAddress,
+        city,
+        uf,
+      );
       const website = place.websiteUri || null;
       const detected = detectCompetitor(website);
       const current = existingById.get(place.id);
@@ -371,8 +422,12 @@ export class GoogleCourtsService {
       row.name = place.displayName?.text?.trim() || row.name || 'Sem nome';
       row.phone = phoneDigits(place.nationalPhoneNumber) || row.phone || null;
       row.full_address = place.formattedAddress || row.full_address || null;
-      row.city = city || parsed.city || row.city || null;
-      row.uf = (uf || parsed.uf || row.uf || null)?.toUpperCase() || null;
+      if (!current || !row.city) {
+        row.city = resolved.city || row.city || null;
+      }
+      if (!current || !row.uf) {
+        row.uf = resolved.uf || row.uf || null;
+      }
       row.website = website;
       row.google_maps_uri = place.googleMapsUri || row.google_maps_uri || null;
       row.latitude = place.location?.latitude ?? row.latitude ?? null;

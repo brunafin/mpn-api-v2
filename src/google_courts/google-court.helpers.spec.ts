@@ -2,9 +2,11 @@ import {
   detectCompetitor,
   isRelevantPlace,
   namesLookAlike,
+  addressConflictsWithCity,
   parseCityUfFromAddress,
   phoneDigits,
   previewFromPlace,
+  resolvePlaceCity,
 } from './google-court.helpers';
 import { CourtCompetitor } from './enums/competitor.enum';
 
@@ -68,6 +70,50 @@ describe('google-court.helpers', () => {
       city: null,
       uf: null,
     });
+    expect(
+      parseCityUfFromAddress(
+        'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil',
+      ),
+    ).toEqual({ city: 'Joinville', uf: 'SC' });
+  });
+
+  it('resolvePlaceCity não troca a cidade da busca pela rua de mesmo nome', () => {
+    expect(
+      resolvePlaceCity(
+        'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil',
+        'Santo Antônio da Patrulha',
+        'RS',
+      ),
+    ).toEqual({ city: 'Joinville', uf: 'SC' });
+    expect(
+      resolvePlaceCity(
+        'Rua sem cidade definida',
+        'Santo Antônio da Patrulha',
+        'RS',
+      ),
+    ).toEqual({ city: 'Santo Antônio da Patrulha', uf: 'RS' });
+  });
+
+  it('addressConflictsWithCity separa rua de outro estado da cidade buscada', () => {
+    const joinville =
+      'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil';
+    expect(
+      addressConflictsWithCity(
+        joinville,
+        'Santo Antônio da Patrulha',
+        'RS',
+      ),
+    ).toBe(true);
+    expect(
+      addressConflictsWithCity(
+        'Rua das Palmeiras, 10 - Centro, Campinas - SP, 13010-000, Brasil',
+        'Campinas',
+        'SP',
+      ),
+    ).toBe(false);
+    expect(
+      addressConflictsWithCity('Rua sem cidade', 'Campinas', 'SP'),
+    ).toBe(false);
   });
 
   it('namesLookAlike compara nomes ignorando acento', () => {

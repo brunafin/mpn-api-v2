@@ -110,6 +110,25 @@ export function normalizeName(value: string | null | undefined): string {
     .trim();
 }
 
+/** Endereço de outra cidade ou outro estado que a busca pediu. */
+export function addressConflictsWithCity(
+  address: string | null | undefined,
+  city: string | null | undefined,
+  uf: string | null | undefined,
+): boolean {
+  const parsed = parseCityUfFromAddress(address);
+  const wantedUf = (uf || '').trim().toUpperCase();
+  if (parsed.uf && wantedUf && parsed.uf !== wantedUf) return true;
+  if (
+    parsed.city &&
+    city &&
+    normalizeName(parsed.city) !== normalizeName(city)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function namesLookAlike(a: string, b: string): boolean {
   const left = normalizeName(a);
   const right = normalizeName(b);
@@ -134,21 +153,37 @@ export type PlacePreview = {
   competitor: CourtCompetitor;
 };
 
+/**
+ * A cidade do endereço do Google vale mais que a cidade digitada na busca.
+ * "Rua Santo Antônio" em Joinville não vira Santo Antônio da Patrulha.
+ */
+export function resolvePlaceCity(
+  address: string | null | undefined,
+  fallbackCity: string | null,
+  fallbackUf: string | null,
+): { city: string | null; uf: string | null } {
+  const parsed = parseCityUfFromAddress(address);
+  const uf = (parsed.uf || fallbackUf || '').trim().toUpperCase();
+  return {
+    city: parsed.city || fallbackCity || null,
+    uf: uf || null,
+  };
+}
+
 export function previewFromPlace(
   place: PlacesSearchPlace,
   city: string | null,
   uf: string | null,
 ): PlacePreview | null {
   if (!place.id) return null;
-  const parsed = parseCityUfFromAddress(place.formattedAddress);
-  const resolvedUf = (uf || parsed.uf || null)?.toUpperCase() || null;
+  const resolved = resolvePlaceCity(place.formattedAddress, city, uf);
   return {
     googlePlaceId: place.id,
     name: place.displayName?.text?.trim() || 'Sem nome',
     phone: phoneDigits(place.nationalPhoneNumber) || null,
     fullAddress: place.formattedAddress || null,
-    city: city || parsed.city || null,
-    uf: resolvedUf,
+    city: resolved.city,
+    uf: resolved.uf,
     website: place.websiteUri || null,
     googleMapsUri: place.googleMapsUri || null,
     rating: place.rating ?? null,

@@ -52,6 +52,14 @@ export class GoogleCourtsController {
     return this.googleCourtsService.importPlaces(dto);
   }
 
+  @Post('sanitize')
+  @ApiOperation({
+    summary: 'Ajusta a cidade gravada para a cidade que está no endereço',
+  })
+  sanitize() {
+    return this.googleCourtsService.sanitizeLocations();
+  }
+
   @Post('batch')
   @ApiOperation({ summary: 'Ingestão em lote (n8n / Places)' })
   createBatch(@Body() dto: CreateBatchGoogleCourtDto) {

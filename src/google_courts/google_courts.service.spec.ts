@@ -73,6 +73,7 @@ describe('GoogleCourtsService', () => {
     const result = await service.searchCity({ city: 'Campinas', uf: 'SP' });
 
     expect(result.found).toBe(2);
+    expect(result.outsideCity).toBe(0);
     expect(result.skipped).toBe(1);
     expect(result.alreadyInPortfolio).toBe(1);
     expect(courtRepo.save).not.toHaveBeenCalled();
@@ -86,6 +87,51 @@ describe('GoogleCourtsService', () => {
       inPortfolio: false,
       outreachStatus: null,
     });
+  });
+
+  it('searchCity deixa de fora endereço de outra cidade', async () => {
+    placesClient.searchAllPages.mockResolvedValue([
+      {
+        id: 'place-ok',
+        displayName: { text: 'Society da Patrulha' },
+        formattedAddress:
+          'Rua A, 10 - Centro, Santo Antônio da Patrulha - RS, Brasil',
+      },
+      {
+        id: 'place-sc',
+        displayName: { text: 'Society da Rua' },
+        formattedAddress:
+          'Rua Santo Antônio, 120 - Centro, Joinville - SC, Brasil',
+      },
+    ]);
+    courtRepo.find.mockResolvedValue([]);
+    companyRepo.find.mockResolvedValue([]);
+
+    const result = await service.searchCity({
+      city: 'Santo Antônio da Patrulha',
+      uf: 'RS',
+    });
+
+    expect(result.found).toBe(1);
+    expect(result.outsideCity).toBe(1);
+    expect(result.items[0].googlePlaceId).toBe('place-ok');
+  });
+
+  it('sanitizeLocations grava a cidade que está no endereço', async () => {
+    const row = {
+      city: 'Santo Antônio da Patrulha',
+      uf: 'RS',
+      full_address:
+        'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil',
+    };
+    courtRepo.find.mockResolvedValue([row]);
+    courtRepo.save.mockImplementation(async (rows: GoogleCourt[]) => rows);
+
+    const result = await service.sanitizeLocations();
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    expect(row.city).toBe('Joinville');
+    expect(row.uf).toBe('SC');
   });
 
   it('importPlaces puxa só as quadras escolhidas', async () => {
@@ -109,7 +155,33 @@ describe('GoogleCourtsService', () => {
     expect(result.imported).toBe(1);
     expect(result.updated).toBe(0);
     expect(result.items[0].googlePlaceId).toBe('place-new');
+    expect(result.items[0].city).toBe('Campinas');
+    expect(result.items[0].uf).toBe('SP');
     expect(courtRepo.save).toHaveBeenCalled();
+  });
+
+  it('importPlaces grava a cidade do endereço, não a da busca', async () => {
+    courtRepo.find.mockResolvedValue([]);
+    courtRepo.save.mockImplementation(async (rows: GoogleCourt[]) => rows);
+    companyRepo.find.mockResolvedValue([]);
+
+    const result = await service.importPlaces({
+      city: 'Santo Antônio da Patrulha',
+      uf: 'RS',
+      places: [
+        {
+          googlePlaceId: 'place-rua',
+          name: 'Society da Rua',
+          fullAddress:
+            'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil',
+        },
+      ],
+    });
+
+    expect(result.items[0]).toMatchObject({
+      city: 'Joinville',
+      uf: 'SC',
+    });
   });
 
   it('updateOutreach marca contato sem rebaixar interessado', async () => {
