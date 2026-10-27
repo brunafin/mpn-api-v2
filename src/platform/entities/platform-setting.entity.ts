@@ -12,6 +12,10 @@ export class PlatformSetting {
   @Column({ type: 'varchar', length: 280, nullable: true })
   maintenance_message: string | null;
 
+  /** Dia após o vencimento em que a arena inadimplente fica somente leitura. */
+  @Column({ type: 'int', default: 10 })
+  delinquency_block_after_days: number;
+
   @UpdateDateColumn({
     type: 'timestamp',
     default: () => 'CURRENT_TIMESTAMP',

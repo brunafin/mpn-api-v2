@@ -16,6 +16,16 @@ export type BillingPaymentItem = {
   hasCpfOnFile: boolean;
 };
 
+export type DelinquencyReminder = {
+  paymentId: number;
+  /** yyyy-MM-dd do vencimento. */
+  dueDate: string;
+  /** yyyy-MM-dd em que a agenda passa a somente leitura. */
+  suspendsOn: string;
+  /** Dias corridos depois do vencimento. */
+  daysAfterDue: number;
+};
+
 export type BillingSummary = {
   openPayment: BillingPaymentItem | null;
   history: BillingPaymentItem[];
@@ -25,6 +35,8 @@ export type BillingSummary = {
   /** ISO da data de fim do teste. */
   trialEndsAt: string;
   pixEnabled: boolean;
+  /** Preenchido do 3º dia até a véspera do bloqueio. No dia do bloqueio fica nulo. */
+  delinquencyReminder: DelinquencyReminder | null;
 };
 
 export type BillingPixPayload = {

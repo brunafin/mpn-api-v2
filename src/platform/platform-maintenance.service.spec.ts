@@ -6,6 +6,7 @@ function row(partial: Partial<PlatformSetting> = {}): PlatformSetting {
     id: 1,
     maintenance_enabled: false,
     maintenance_message: null,
+    delinquency_block_after_days: 10,
     updated_at: new Date('2026-10-22T12:00:00.000Z'),
     ...partial,
   };
@@ -36,6 +37,7 @@ describe('PlatformMaintenanceService', () => {
       id: 1,
       maintenance_enabled: false,
       maintenance_message: null,
+      delinquency_block_after_days: 10,
     });
     expect(view).toEqual({
       maintenance: false,

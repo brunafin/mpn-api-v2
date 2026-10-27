@@ -22,7 +22,9 @@ import { UpdatePlatformClientAccessDto } from './dto/update-platform-client-acce
 import { UpdatePlatformClientPlanDto } from './dto/update-platform-client-plan.dto';
 import { UpdatePlatformClientRepresentativeDto } from './dto/update-platform-client-representative.dto';
 import { UpdatePlatformCourtVisibilityDto } from './dto/update-platform-court-visibility.dto';
+import { UpdateDelinquencyPolicyDto } from './dto/update-delinquency-policy.dto';
 import { UpdatePlatformMaintenanceDto } from './dto/update-platform-maintenance.dto';
+import { BillingService } from 'src/billing/billing.service';
 import { PlatformMaintenanceService } from './platform-maintenance.service';
 import { PlatformService } from './platform.service';
 
@@ -38,6 +40,7 @@ export class PlatformController {
   constructor(
     private readonly platformService: PlatformService,
     private readonly maintenanceService: PlatformMaintenanceService,
+    private readonly billingService: BillingService,
   ) {}
 
   @Get('maintenance')
@@ -50,6 +53,24 @@ export class PlatformController {
   @ApiOperation({ summary: 'Ligar ou desligar a manutenção do site público' })
   updateMaintenance(@Body() dto: UpdatePlatformMaintenanceDto) {
     return this.maintenanceService.update(dto);
+  }
+
+  @Get('delinquency')
+  @ApiOperation({ summary: 'Prazo de bloqueio por mensalidade em atraso' })
+  getDelinquencyPolicy() {
+    return this.maintenanceService.getDelinquencyPolicy();
+  }
+
+  @Patch('delinquency')
+  @ApiOperation({
+    summary: 'Alterar o dia do bloqueio por mensalidade e aplicar nas arenas',
+  })
+  async updateDelinquencyPolicy(@Body() dto: UpdateDelinquencyPolicyDto) {
+    const saved = await this.maintenanceService.updateDelinquencyPolicy(
+      dto.blockAfterDays,
+    );
+    const applied = await this.billingService.applyDelinquencyPolicy();
+    return { ...saved, ...applied };
   }
 
   @Get('dashboard')

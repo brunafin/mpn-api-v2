@@ -8,6 +8,7 @@ import { CompanyAccessModule } from './company-access.module';
 import { OperatingSchedule } from 'src/operating-schedule/entities/operating-schedule.entity';
 import { PeopleModule } from 'src/people/people.module';
 import { CourtsModule } from 'src/courts/courts.module';
+import { BillingModule } from 'src/billing/billing.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CourtsModule } from 'src/courts/courts.module';
     CompanyAccessModule,
     PeopleModule,
     CourtsModule,
+    BillingModule,
   ],
   controllers: [CompaniesController],
   providers: [CompaniesService],

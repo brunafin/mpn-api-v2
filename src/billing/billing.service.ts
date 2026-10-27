@@ -36,10 +36,23 @@ import {
   needsPlanActivation,
 } from './billing-eligibility';
 import {
+  addCalendarDays,
+  daysAfter,
+  DELINQUENCY_BLOCK_AFTER_DAYS,
+  DELINQUENCY_BLOCK_AFTER_DAYS_MAX,
+  DELINQUENCY_BLOCK_AFTER_DAYS_MIN,
+  formatCalendarDate,
+  isDelinquencyReminderDay,
+  shouldSuspendForDelinquency,
+  type CalendarDate,
+} from './delinquency';
+import { PlatformSetting } from 'src/platform/entities/platform-setting.entity';
+import {
   BillingPaymentItem,
   BillingPaymentStatus,
   BillingPixPayload,
   BillingSummary,
+  DelinquencyReminder,
 } from './billing.types';
 import { CPF_INVALID_MESSAGE, normalizeCpf } from 'src/utils/normalize-cpf';
 
@@ -60,6 +73,8 @@ export class BillingService {
     private readonly peopleRepository: Repository<Person>,
     @InjectRepository(Plan)
     private readonly plansRepository: Repository<Plan>,
+    @InjectRepository(PlatformSetting)
+    private readonly settingsRepository: Repository<PlatformSetting>,
     private readonly mercadoPago: MercadoPagoService,
     private readonly publicListingCache: PublicListingCache,
   ) {}
@@ -67,8 +82,9 @@ export class BillingService {
   @Cron(CronExpression.EVERY_DAY_AT_5AM)
   async handleGenerateDueParcelsCron() {
     const result = await this.generateDueParcels();
+    const blocked = await this.restrictDelinquentCompanies();
     this.logger.log(
-      `Billing cron: created=${result.created} skipped=${result.skipped} eligible=${result.eligible}`,
+      `Billing cron: created=${result.created} skipped=${result.skipped} eligible=${result.eligible} blocked=${blocked}`,
     );
   }
 
@@ -183,6 +199,8 @@ export class BillingService {
       return b.id - a.id;
     });
 
+    await this.restrictCompanyIfDelinquent(company);
+
     const history = payments.map((p) => this.mapPaymentItem(p, hasCpf));
     // Em trial, parcela de contratação não aparece como "mensalidade em aberto".
     const openPayment = isTrial
@@ -197,6 +215,9 @@ export class BillingService {
       isTrial,
       trialEndsAt: new Date(company.trial_ends_at).toISOString(),
       pixEnabled: this.mercadoPago.isConfigured(),
+      delinquencyReminder: isTrial
+        ? null
+        : await this.buildDelinquencyReminder(company, payments),
     };
   }
 
@@ -592,6 +613,197 @@ export class BillingService {
     this.logger.log(
       `Company ${company.public_id} liberada de somente leitura (inadimplência).`,
     );
+  }
+
+  /**
+   * No dia configurado após o vencimento de uma parcela em aberto, a arena
+   * fica somente leitura. Não altera bloqueio feito pelo admin.
+   */
+  async restrictDelinquentCompanies(now = new Date()): Promise<number> {
+    const companies = await this.companiesRepository.find({
+      where: {
+        partner_status: PartnerStatus.ACTIVE,
+        is_trial: false,
+        access_mode: AccessMode.FULL,
+      },
+    });
+
+    let blocked = 0;
+    for (const company of companies) {
+      if (await this.restrictCompanyIfDelinquent(company, now)) {
+        blocked += 1;
+      }
+    }
+    return blocked;
+  }
+
+  /**
+   * Aplica o prazo atual. Com `releaseIfInsideWindow`, arenas bloqueadas por
+   * mensalidade que ainda não chegaram nesse dia voltam ao acesso completo.
+   */
+  async applyDelinquencyPolicy(now = new Date()): Promise<{
+    blocked: number;
+    released: number;
+  }> {
+    const companies = await this.companiesRepository.find({
+      where: [
+        {
+          partner_status: PartnerStatus.ACTIVE,
+          is_trial: false,
+          access_mode: AccessMode.FULL,
+        },
+        {
+          partner_status: PartnerStatus.ACTIVE,
+          is_trial: false,
+          access_mode: AccessMode.READ_ONLY,
+          access_reason: AccessReason.DELINQUENCY,
+        },
+      ],
+    });
+
+    let blocked = 0;
+    let released = 0;
+    for (const company of companies) {
+      const wasRestricted = company.access_mode === AccessMode.READ_ONLY;
+      const didBlock = await this.restrictCompanyIfDelinquent(company, now, {
+        releaseIfInsideWindow: true,
+      });
+      if (didBlock) blocked += 1;
+      else if (wasRestricted && company.access_mode === AccessMode.FULL) {
+        released += 1;
+      }
+    }
+    return { blocked, released };
+  }
+
+  async restrictCompanyIfDelinquent(
+    company: Company,
+    now = new Date(),
+    options?: { releaseIfInsideWindow?: boolean },
+  ): Promise<boolean> {
+    if (company.is_trial) return false;
+    if (company.partner_status !== PartnerStatus.ACTIVE) return false;
+    if (
+      company.access_reason &&
+      company.access_reason !== AccessReason.DELINQUENCY
+    ) {
+      return false;
+    }
+
+    const blockAfterDays = await this.delinquencyBlockAfterDays();
+    const openPayments = await this.paymentsRepository.find({
+      where: { company_id: company.id, dt_payment: IsNull() },
+    });
+    const overdue = this.oldestOpenDaysAfterDue(openPayments, now);
+    const suspend = Boolean(
+      overdue &&
+        shouldSuspendForDelinquency(overdue.daysAfterDue, blockAfterDays),
+    );
+
+    if (company.access_mode === AccessMode.READ_ONLY) {
+      if (
+        options?.releaseIfInsideWindow &&
+        company.access_reason === AccessReason.DELINQUENCY &&
+        !suspend
+      ) {
+        await this.unlockDelinquencyIfNeeded(company);
+      }
+      return false;
+    }
+
+    if (!overdue || !suspend) return false;
+
+    const restrictedAt = now;
+    await this.companiesRepository.update(
+      { id: company.id },
+      {
+        access_mode: AccessMode.READ_ONLY,
+        access_reason: AccessReason.DELINQUENCY,
+        access_restricted_at: restrictedAt,
+      },
+    );
+    company.access_mode = AccessMode.READ_ONLY;
+    company.access_reason = AccessReason.DELINQUENCY;
+    company.access_restricted_at = restrictedAt;
+    this.publicListingCache.clear();
+    this.logger.log(
+      `Company ${company.public_id} em somente leitura: mensalidade com ${overdue.daysAfterDue} dias de atraso.`,
+    );
+    return true;
+  }
+
+  private async buildDelinquencyReminder(
+    company: Company,
+    payments: PaymentCompany[],
+  ): Promise<DelinquencyReminder | null> {
+    if (company.access_mode === AccessMode.READ_ONLY) return null;
+    const blockAfterDays = await this.delinquencyBlockAfterDays();
+    const overdue = this.oldestOpenDaysAfterDue(payments);
+    if (
+      !overdue ||
+      !isDelinquencyReminderDay(overdue.daysAfterDue, blockAfterDays)
+    ) {
+      return null;
+    }
+
+    return {
+      paymentId: overdue.payment.id,
+      dueDate: formatCalendarDate(overdue.due),
+      suspendsOn: formatCalendarDate(
+        addCalendarDays(overdue.due, blockAfterDays),
+      ),
+      daysAfterDue: overdue.daysAfterDue,
+    };
+  }
+
+  private async delinquencyBlockAfterDays(): Promise<number> {
+    const row = await this.settingsRepository.findOne({ where: { id: 1 } });
+    const value = row?.delinquency_block_after_days;
+    if (
+      typeof value !== 'number' ||
+      !Number.isInteger(value) ||
+      value < DELINQUENCY_BLOCK_AFTER_DAYS_MIN ||
+      value > DELINQUENCY_BLOCK_AFTER_DAYS_MAX
+    ) {
+      return DELINQUENCY_BLOCK_AFTER_DAYS;
+    }
+    return value;
+  }
+
+  private oldestOpenDaysAfterDue(
+    payments: PaymentCompany[],
+    now = new Date(),
+  ): {
+    payment: PaymentCompany;
+    due: CalendarDate;
+    daysAfterDue: number;
+  } | null {
+    const today = this.calendarDateInBrazil(now);
+    let chosen: {
+      payment: PaymentCompany;
+      due: CalendarDate;
+      daysAfterDue: number;
+    } | null = null;
+
+    for (const payment of payments) {
+      if (payment.dt_payment || !payment.dt_due) continue;
+      const due = this.calendarDateInBrazil(new Date(payment.dt_due));
+      const elapsed = daysAfter(due, today);
+      if (!chosen || elapsed > chosen.daysAfterDue) {
+        chosen = { payment, due, daysAfterDue: elapsed };
+      }
+    }
+
+    return chosen;
+  }
+
+  private calendarDateInBrazil(date: Date): CalendarDate {
+    const zoned = toZonedTime(date, BRAZIL_TZ);
+    return {
+      year: zoned.getFullYear(),
+      month: zoned.getMonth() + 1,
+      day: zoned.getDate(),
+    };
   }
 
   private async findPromotionalPlan(): Promise<Plan> {

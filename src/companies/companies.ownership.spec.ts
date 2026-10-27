@@ -12,6 +12,7 @@ import { PublicListingCache } from '../cache/public-listing.cache';
 import { OperatingSchedule } from '../operating-schedule/entities/operating-schedule.entity';
 import { PeopleService } from '../people/people.service';
 import { TrialExpiryService } from './trial-expiry.service';
+import { BillingService } from '../billing/billing.service';
 
 /**
  * Regressão da tenancy que JÁ existe (logo/fotos).
@@ -80,6 +81,12 @@ describe('CompaniesService ownership (regression)', () => {
         {
           provide: TrialExpiryService,
           useValue: { expireCompanyIfNeeded: jest.fn().mockResolvedValue(false) },
+        },
+        {
+          provide: BillingService,
+          useValue: {
+            restrictCompanyIfDelinquent: jest.fn().mockResolvedValue(false),
+          },
         },
       ],
     }).compile();

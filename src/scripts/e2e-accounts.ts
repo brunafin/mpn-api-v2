@@ -49,6 +49,14 @@ export const E2E_ACCOUNTS = {
     password: E2E_DEFAULT_PASSWORD,
     role: 'owner',
   },
+  pending: {
+    name: 'Gestor Pendente',
+    username: 'pendente',
+    email: 'pendente@mpn.dev',
+    phone: '51999990008',
+    password: E2E_PASSWORD,
+    role: 'owner',
+  },
   seller: {
     name: 'Vendedor E2E',
     username: 'seller',
@@ -64,6 +72,7 @@ export const E2E_COMPANIES = {
   trial: { name: 'Arena Trial', slug: 'arena-trial' },
   readonly: { name: 'Arena Leitura', slug: 'arena-leitura' },
   mustChange: { name: 'Arena Senha', slug: 'arena-senha' },
+  pending: { name: 'Arena Pendente', slug: 'arena-pendente' },
 } as const;
 
 export const E2E_PAST_CONTACT = 'Cliente Passado';

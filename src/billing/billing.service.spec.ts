@@ -3,11 +3,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { Company } from 'src/companies/entities/company.entity';
+import { AccessMode } from 'src/companies/enums/access-mode.enum';
+import { AccessReason } from 'src/companies/enums/access-reason.enum';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
+import { CronExpression } from '@nestjs/schedule';
 import { MercadoPagoService } from 'src/mercado-pago/mercado-pago.service';
 import { PaymentCompany } from 'src/payment_company/entities/payment_company.entity';
 import { Person } from 'src/people/entities/person.entity';
 import { Plan } from 'src/plans/entities/plan.entity';
+import { PlatformSetting } from 'src/platform/entities/platform-setting.entity';
 import { PlanEnum } from 'src/plans/enum/enum';
 import { QueryFailedError } from 'typeorm';
 import {
@@ -27,7 +31,12 @@ describe('billingPixIdempotencyKey', () => {
 
 describe('BillingService', () => {
   let service: BillingService;
-  let companiesRepo: { findOne: jest.Mock; find: jest.Mock };
+  let companiesRepo: {
+    findOne: jest.Mock;
+    find: jest.Mock;
+    update: jest.Mock;
+    save: jest.Mock;
+  };
   let paymentsRepo: {
     find: jest.Mock;
     findOne: jest.Mock;
@@ -35,6 +44,7 @@ describe('BillingService', () => {
     create: jest.Mock;
   };
   let plansRepo: { findOne: jest.Mock };
+  let settingsRepo: { findOne: jest.Mock };
   let peopleRepo: { findOne: jest.Mock; save: jest.Mock };
   let mercadoPago: {
     isConfigured: jest.Mock;
@@ -73,7 +83,12 @@ describe('BillingService', () => {
   }
 
   beforeEach(async () => {
-    companiesRepo = { findOne: jest.fn(), find: jest.fn() };
+    companiesRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+      save: jest.fn(async (row) => row),
+    };
     paymentsRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
@@ -81,6 +96,11 @@ describe('BillingService', () => {
       create: jest.fn((p) => p),
     };
     plansRepo = { findOne: jest.fn() };
+    settingsRepo = {
+      findOne: jest
+        .fn()
+        .mockResolvedValue({ delinquency_block_after_days: 10 }),
+    };
     peopleRepo = { findOne: jest.fn(), save: jest.fn() };
     mercadoPago = {
       isConfigured: jest.fn().mockReturnValue(true),
@@ -102,6 +122,10 @@ describe('BillingService', () => {
         },
         { provide: getRepositoryToken(Person), useValue: peopleRepo },
         { provide: getRepositoryToken(Plan), useValue: plansRepo },
+        {
+          provide: getRepositoryToken(PlatformSetting),
+          useValue: settingsRepo,
+        },
         { provide: MercadoPagoService, useValue: mercadoPago },
         {
           provide: PublicListingCache,
@@ -332,6 +356,303 @@ describe('BillingService', () => {
 
       expect(result.pixCopyPaste).toBe('pix-code');
       expect(mercadoPago.createPixPayment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('restrictCompanyIfDelinquent', () => {
+    const due = new Date('2026-10-01T15:00:00.000Z');
+
+    it('bloqueia no 10º dia após o vencimento', async () => {
+      const company = paidCompany({
+        access_mode: AccessMode.FULL,
+        access_reason: null,
+      });
+      paymentsRepo.find.mockResolvedValue([
+        { id: 1, dt_payment: null, dt_due: due },
+      ]);
+
+      const blocked = await service.restrictCompanyIfDelinquent(
+        company,
+        new Date('2026-10-11T15:00:00.000Z'),
+      );
+
+      expect(blocked).toBe(true);
+      expect(company.access_mode).toBe(AccessMode.READ_ONLY);
+      expect(companiesRepo.update).toHaveBeenCalled();
+    });
+
+    it('não bloqueia no 9º dia', async () => {
+      const company = paidCompany({ access_mode: AccessMode.FULL });
+      paymentsRepo.find.mockResolvedValue([
+        { id: 1, dt_payment: null, dt_due: due },
+      ]);
+
+      const blocked = await service.restrictCompanyIfDelinquent(
+        company,
+        new Date('2026-10-10T15:00:00.000Z'),
+      );
+
+      expect(blocked).toBe(false);
+      expect(companiesRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('com prazo de 20 dias, 14 dias de atraso ainda não bloqueia', async () => {
+      const company = paidCompany({ access_mode: AccessMode.FULL });
+      paymentsRepo.find.mockResolvedValue([
+        { id: 1, dt_payment: null, dt_due: due },
+      ]);
+      settingsRepo.findOne.mockResolvedValue({
+        delinquency_block_after_days: 20,
+      });
+
+      const blocked = await service.restrictCompanyIfDelinquent(
+        company,
+        new Date('2026-10-15T15:00:00.000Z'),
+      );
+
+      expect(blocked).toBe(false);
+      expect(company.access_mode).toBe(AccessMode.FULL);
+    });
+
+    it('não altera somente leitura marcada pelo motivo admin', async () => {
+      const company = paidCompany({
+        access_mode: AccessMode.READ_ONLY,
+        access_reason: AccessReason.ADMIN,
+      });
+      paymentsRepo.find.mockResolvedValue([
+        { id: 1, dt_payment: null, dt_due: due },
+      ]);
+
+      const blocked = await service.restrictCompanyIfDelinquent(
+        company,
+        new Date('2026-10-20T15:00:00.000Z'),
+      );
+
+      expect(blocked).toBe(false);
+      expect(company.access_mode).toBe(AccessMode.READ_ONLY);
+      expect(company.access_reason).toBe(AccessReason.ADMIN);
+      expect(companiesRepo.update).not.toHaveBeenCalled();
+      expect(companiesRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cron das 5h', () => {
+    it('está no processo da API, sem fuso próprio, e aplica o bloqueio', async () => {
+      const options = Reflect.getMetadata(
+        'SCHEDULE_CRON_OPTIONS',
+        BillingService.prototype.handleGenerateDueParcelsCron,
+      );
+      expect(options).toMatchObject({
+        cronTime: CronExpression.EVERY_DAY_AT_5AM,
+      });
+      expect(options.timeZone).toBeUndefined();
+
+      const restrict = jest
+        .spyOn(service, 'restrictDelinquentCompanies')
+        .mockResolvedValue(0);
+      jest.spyOn(service, 'generateDueParcels').mockResolvedValue({
+        eligible: 0,
+        created: 0,
+        skipped: 0,
+      });
+
+      await service.handleGenerateDueParcelsCron();
+
+      expect(restrict).toHaveBeenCalledWith();
+    });
+  });
+
+  describe('volta do acesso', () => {
+    const due = new Date('2026-10-01T15:00:00.000Z');
+    const paidAt = new Date('2026-10-11T15:00:00.000Z');
+
+    function paidParcel() {
+      return {
+        id: 7,
+        company_id: 10,
+        dt_payment: paidAt,
+        dt_due: due,
+        price: 110,
+      };
+    }
+
+    it('pagamento confirmado devolve quem está em somente leitura por inadimplência', async () => {
+      const company = paidCompany({
+        access_mode: AccessMode.READ_ONLY,
+        access_reason: AccessReason.DELINQUENCY,
+        access_restricted_at: paidAt,
+      });
+      paymentsRepo.findOne.mockResolvedValue(paidParcel());
+      companiesRepo.findOne.mockResolvedValue(company);
+
+      await service.onPaymentApproved(7);
+
+      expect(company.access_mode).toBe(AccessMode.FULL);
+      expect(company.access_reason).toBeNull();
+      expect(company.access_restricted_at).toBeNull();
+      expect(companiesRepo.save).toHaveBeenCalledWith(company);
+    });
+
+    it('pagamento confirmado não libera bloqueio com motivo admin', async () => {
+      const company = paidCompany({
+        access_mode: AccessMode.READ_ONLY,
+        access_reason: AccessReason.ADMIN,
+        access_restricted_at: paidAt,
+      });
+      paymentsRepo.findOne.mockResolvedValue(paidParcel());
+      companiesRepo.findOne.mockResolvedValue(company);
+
+      await service.onPaymentApproved(7);
+
+      expect(company.access_mode).toBe(AccessMode.READ_ONLY);
+      expect(company.access_reason).toBe(AccessReason.ADMIN);
+      expect(companiesRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('aumentar o prazo devolve quem ainda está dentro da janela e mantém quem já passou', async () => {
+      const inside = paidCompany({
+        id: 10,
+        access_mode: AccessMode.READ_ONLY,
+        access_reason: AccessReason.DELINQUENCY,
+      });
+      const past = paidCompany({
+        id: 11,
+        public_id: 'arena-passou',
+        access_mode: AccessMode.READ_ONLY,
+        access_reason: AccessReason.DELINQUENCY,
+      });
+      settingsRepo.findOne.mockResolvedValue({
+        delinquency_block_after_days: 20,
+      });
+      companiesRepo.find.mockResolvedValue([inside, past]);
+      paymentsRepo.find.mockImplementation(
+        async (query: { where: { company_id: number } }) => {
+          if (query.where.company_id === 11) {
+            return [
+              {
+                id: 2,
+                dt_payment: null,
+                dt_due: new Date('2026-09-20T15:00:00.000Z'),
+              },
+            ];
+          }
+          return [{ id: 1, dt_payment: null, dt_due: due }];
+        },
+      );
+
+      const result = await service.applyDelinquencyPolicy(
+        new Date('2026-10-15T15:00:00.000Z'),
+      );
+
+      expect(result).toEqual({ blocked: 0, released: 1 });
+      expect(inside.access_mode).toBe(AccessMode.FULL);
+      expect(inside.access_reason).toBeNull();
+      expect(past.access_mode).toBe(AccessMode.READ_ONLY);
+      expect(companiesRepo.find).toHaveBeenCalledWith({
+        where: [
+          expect.objectContaining({ access_mode: AccessMode.FULL }),
+          expect.objectContaining({
+            access_mode: AccessMode.READ_ONLY,
+            access_reason: AccessReason.DELINQUENCY,
+          }),
+        ],
+      });
+    });
+
+    it('reduzir o prazo bloqueia quem já passou do novo dia', async () => {
+      const company = paidCompany({
+        access_mode: AccessMode.FULL,
+        access_reason: null,
+      });
+      settingsRepo.findOne.mockResolvedValue({
+        delinquency_block_after_days: 4,
+      });
+      companiesRepo.find.mockResolvedValue([company]);
+      paymentsRepo.find.mockResolvedValue([
+        { id: 1, dt_payment: null, dt_due: due },
+      ]);
+
+      const result = await service.applyDelinquencyPolicy(
+        new Date('2026-10-06T15:00:00.000Z'),
+      );
+
+      expect(result).toEqual({ blocked: 1, released: 0 });
+      expect(company.access_mode).toBe(AccessMode.READ_ONLY);
+      expect(company.access_reason).toBe(AccessReason.DELINQUENCY);
+    });
+  });
+
+  describe('aviso antes do bloqueio', () => {
+    const due = new Date('2026-10-01T15:00:00.000Z');
+
+    async function summaryAt(iso: string) {
+      const company = paidCompany({
+        access_mode: AccessMode.FULL,
+        access_reason: null,
+        trial_ends_at: new Date('2026-12-01T15:00:00.000Z'),
+        day_due: 1,
+        payments: [
+          {
+            id: 1,
+            dt_payment: null,
+            dt_due: due,
+            price: 110,
+          },
+        ],
+      } as Partial<Company>);
+      companiesRepo.findOne.mockResolvedValue(company);
+      paymentsRepo.find.mockResolvedValue(company.payments);
+
+      jest.useFakeTimers({
+        now: new Date(iso),
+        doNotFake: [
+          'nextTick',
+          'queueMicrotask',
+          'setImmediate',
+          'setInterval',
+          'setTimeout',
+          'clearTimeout',
+          'clearInterval',
+        ],
+      });
+      try {
+        return {
+          company,
+          summary: await service.getBillingSummary(
+            companyPublicId,
+            ownerPublicId,
+          ),
+        };
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+
+    it('no 9º dia ainda avisa e não suspende', async () => {
+      const { company, summary } = await summaryAt('2026-10-10T15:00:00.000Z');
+
+      expect(company.access_mode).toBe(AccessMode.FULL);
+      expect(summary.delinquencyReminder).toEqual({
+        paymentId: 1,
+        dueDate: '2026-10-01',
+        suspendsOn: '2026-10-11',
+        daysAfterDue: 9,
+      });
+    });
+
+    it('no 10º dia o aviso some e a arena fica somente leitura', async () => {
+      const { company, summary } = await summaryAt('2026-10-11T15:00:00.000Z');
+
+      expect(company.access_mode).toBe(AccessMode.READ_ONLY);
+      expect(company.access_reason).toBe(AccessReason.DELINQUENCY);
+      expect(summary.delinquencyReminder).toBeNull();
+    });
+
+    it('antes do 3º dia não há aviso', async () => {
+      const { company, summary } = await summaryAt('2026-10-03T15:00:00.000Z');
+
+      expect(company.access_mode).toBe(AccessMode.FULL);
+      expect(summary.delinquencyReminder).toBeNull();
     });
   });
 

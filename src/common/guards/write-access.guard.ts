@@ -79,7 +79,7 @@ export class WriteAccessGuard implements CanActivate {
     if (!canMutateCompany(company)) {
       throw new ForbiddenException({
         message:
-          'A agenda continua aberta para consulta. Para reservar ou alterar horários, quite a mensalidade em Planos e pagamentos.',
+          'Mensalidade pendente. Regularize para voltar a ter o acesso completo.',
         code: 'ACCOUNT_READ_ONLY',
       });
     }

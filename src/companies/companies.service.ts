@@ -22,6 +22,7 @@ import { PublicListingCache } from 'src/cache/public-listing.cache';
 import { computeMonthlyFee, quotePlanPrices } from 'src/plans/utils/compute-monthly-fee';
 import { PartnerStatus } from 'src/companies/enums/partner-status.enum';
 import { TrialExpiryService } from 'src/companies/trial-expiry.service';
+import { BillingService } from 'src/billing/billing.service';
 import { buildCapabilities } from 'src/companies/utils/company-access';
 import {
   normalizeAddressNumber,
@@ -72,6 +73,7 @@ export class CompaniesService {
     private readonly publicListingCache: PublicListingCache,
     private readonly peopleService: PeopleService,
     private readonly trialExpiryService: TrialExpiryService,
+    private readonly billingService: BillingService,
   ) {}
 
   /**
@@ -456,6 +458,7 @@ export class CompaniesService {
     }
 
     await this.trialExpiryService.expireCompanyIfNeeded(company);
+    await this.billingService.restrictCompanyIfDelinquent(company);
 
     const today = new Date();
     const fallbackDate = format(

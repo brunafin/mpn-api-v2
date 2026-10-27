@@ -4,7 +4,8 @@
  * - dono de arena (mpn-manager): usuário manager / senha Admin@123
  *   com a arena "Arena Dev", Quadra 1 publicada e Quadra 2 oculta no site,
  *   grade 08:00–22:00 em todos os dias e agenda dos próximos 90 dias
- * - trial encerrado, somente leitura, senha obrigatória e um representante
+ * - trial encerrado, arena paga em somente leitura (inadimplência),
+ *   senha obrigatória e um representante
  *
  * Catálogos (dias, esportes, tipos de quadra, planos) são recriados se faltarem.
  * Arquivos no R2 não são apagados.
@@ -27,6 +28,7 @@ import {
   wipeDevTables,
   type SqlRunner,
 } from './dev-database';
+import { PlanEnum } from '../plans/enum/enum';
 import {
   E2E_ACCOUNTS,
   E2E_COMPANIES,
@@ -430,6 +432,7 @@ export async function applyDevSeed(runner: SqlRunner) {
   const trial = await insertPerson(runner, E2E_ACCOUNTS.trial);
   const readonly = await insertPerson(runner, E2E_ACCOUNTS.readonly);
   const mustChange = await insertPerson(runner, E2E_ACCOUNTS.mustChange);
+  const pending = await insertPerson(runner, E2E_ACCOUNTS.pending);
   const seller = await insertPerson(runner, E2E_ACCOUNTS.seller);
 
   const agenda = await seedArena(runner, {
@@ -460,19 +463,61 @@ export async function applyDevSeed(runner: SqlRunner) {
     courts: SMALL_COURT,
   });
 
-  await seedArena(runner, {
+  const readonlyArena = await seedArena(runner, {
     name: E2E_COMPANIES.readonly.name,
     slug: E2E_COMPANIES.readonly.slug,
     phone: '51999991002',
     email: 'leitura-arena@mpn.dev',
     administratorId: readonly.id,
-    planId: 1,
-    isTrial: true,
+    planId: PlanEnum.PROMOTIONAL,
+    isTrial: false,
     trialEndsAt: daysFromNow(60),
     accessMode: 'read_only',
     agendaDays: 14,
     courts: SMALL_COURT,
   });
+  await runner.query(
+    `UPDATE company
+     SET access_reason = 'delinquency', access_restricted_at = NOW()
+     WHERE slug = $1`,
+    [E2E_COMPANIES.readonly.slug],
+  );
+  await runner.query(
+    `INSERT INTO payment_company (company_id, plan_id, dt_due, price, form_of_payment)
+     VALUES (
+       $1,
+       $2,
+       ((CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date - 10) + TIME '12:00',
+       110,
+       'PIX'
+     )`,
+    [readonlyArena.companyId, PlanEnum.PROMOTIONAL],
+  );
+
+  const pendingArena = await seedArena(runner, {
+    name: E2E_COMPANIES.pending.name,
+    slug: E2E_COMPANIES.pending.slug,
+    phone: '51999991004',
+    email: 'pendente-arena@mpn.dev',
+    administratorId: pending.id,
+    planId: PlanEnum.PROMOTIONAL,
+    isTrial: false,
+    trialEndsAt: daysFromNow(60),
+    accessMode: 'full',
+    agendaDays: 14,
+    courts: SMALL_COURT,
+  });
+  await runner.query(
+    `INSERT INTO payment_company (company_id, plan_id, dt_due, price, form_of_payment)
+     VALUES (
+       $1,
+       $2,
+       ((CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')::date - 5) + TIME '12:00',
+       110,
+       'PIX'
+     )`,
+    [pendingArena.companyId, PlanEnum.PROMOTIONAL],
+  );
 
   await seedArena(runner, {
     name: E2E_COMPANIES.mustChange.name,
