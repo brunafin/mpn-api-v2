@@ -4,10 +4,13 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   MaxLength,
 } from 'class-validator';
 import { CourtCompetitor } from '../enums/competitor.enum';
+import { LostReason } from '../enums/lost-reason.enum';
 import { OutreachStatus } from '../enums/outreach-status.enum';
+import { PlaceKind } from '../enums/place-kind.enum';
 
 export class UpdateGoogleCourtOutreachDto {
   @IsOptional()
@@ -17,6 +20,24 @@ export class UpdateGoogleCourtOutreachDto {
   @IsOptional()
   @IsEnum(CourtCompetitor)
   competitor?: CourtCompetitor;
+
+  @IsOptional()
+  @IsEnum(PlaceKind)
+  placeKind?: PlaceKind | null;
+
+  /** YYYY-MM-DD. Null limpa a data e devolve o prospecto para a fila de hoje. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  nextActionOn?: string | null;
+
+  @IsOptional()
+  @IsEnum(LostReason)
+  lostReason?: LostReason | null;
+
+  @IsOptional()
+  @IsBoolean()
+  rentsHourly?: boolean | null;
 
   @IsOptional()
   @IsString()

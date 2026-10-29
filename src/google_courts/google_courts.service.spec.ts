@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { City } from 'src/cities/entities/city.entity';
 import { Company } from 'src/companies/entities/company.entity';
 import { GoogleCourt } from './entities/google_court.entity';
+import { LostReason } from './enums/lost-reason.enum';
 import { OutreachStatus } from './enums/outreach-status.enum';
 import { GooglePlacesClient } from './google-places.client';
 import { GoogleCourtsService } from './google_courts.service';
@@ -198,6 +199,40 @@ describe('GoogleCourtsService', () => {
 
     expect(updated.outreachStatus).toBe(OutreachStatus.INTERESTED);
     expect(updated.contactedAt).toBeInstanceOf(Date);
+  });
+
+  it('updateOutreach exige motivo ao marcar sem interesse', async () => {
+    courtRepo.findOne.mockResolvedValue({
+      google_place_id: 'place-1',
+      outreach_status: OutreachStatus.NEW,
+      lost_reason: null,
+    });
+
+    await expect(
+      service.updateOutreach('place-1', {
+        outreachStatus: OutreachStatus.LOST,
+      }),
+    ).rejects.toThrow('Informe o motivo de sem interesse.');
+    expect(courtRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('sem interesse “não alugo hora” tira o prospecto da fila', async () => {
+    courtRepo.findOne.mockResolvedValue({
+      google_place_id: 'place-1',
+      outreach_status: OutreachStatus.NEW,
+      lost_reason: null,
+      rents_hourly: true,
+    });
+    courtRepo.save.mockImplementation(async (row: GoogleCourt) => row);
+
+    const updated = await service.updateOutreach('place-1', {
+      outreachStatus: OutreachStatus.LOST,
+      lostReason: LostReason.NO_HOURLY,
+      rentsHourly: true,
+    });
+
+    expect(updated.lostReason).toBe(LostReason.NO_HOURLY);
+    expect(updated.rentsHourly).toBe(false);
   });
 
   it('Places client avisa quando a chave não está configurada', () => {

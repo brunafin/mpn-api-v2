@@ -1,9 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { formatInTimeZone } from 'date-fns-tz';
 import { ILike, In, Repository } from 'typeorm';
+import { BRAZIL_TZ } from 'src/utils/calendarDate';
 import { City } from 'src/cities/entities/city.entity';
 import { Company } from 'src/companies/entities/company.entity';
 import { CreateBatchGoogleCourtDto } from './dto/createBatch-google_court.dto';
@@ -14,7 +17,9 @@ import { SearchGoogleCourtsDto } from './dto/search-google_courts.dto';
 import { UpdateGoogleCourtOutreachDto } from './dto/update-google_court.dto';
 import { GoogleCourt } from './entities/google_court.entity';
 import { CourtCompetitor } from './enums/competitor.enum';
+import { LostReason } from './enums/lost-reason.enum';
 import { OutreachStatus } from './enums/outreach-status.enum';
+import { PlaceKind } from './enums/place-kind.enum';
 import {
   detectCompetitor,
   isRelevantPlace,
@@ -46,6 +51,10 @@ export type GoogleCourtResponse = {
   userRatingsTotal: number | null;
   competitor: CourtCompetitor;
   outreachStatus: OutreachStatus;
+  placeKind: PlaceKind | null;
+  nextActionOn: string | null;
+  lostReason: LostReason | null;
+  rentsHourly: boolean | null;
   notes: string | null;
   contactedAt: Date | null;
   alreadyRegistered: boolean;
@@ -129,10 +138,46 @@ export class GoogleCourtsService {
         competitor: query.competitor,
       });
     }
+    if (query.hasPhone) {
+      qb.andWhere(`court.phone IS NOT NULL AND BTRIM(court.phone) <> ''`);
+    }
+    if (query.hourly === 'yes') {
+      // Quem ainda não foi marcado continua na fila até alguém dizer que não aluga.
+      qb.andWhere('court.rents_hourly IS NOT FALSE');
+    } else if (query.hourly === 'no') {
+      qb.andWhere('court.rents_hourly = false');
+    }
+    if (query.open) {
+      qb.andWhere('court.outreach_status IN (:...openStatuses)', {
+        openStatuses: [
+          OutreachStatus.NEW,
+          OutreachStatus.CONTACTED,
+          OutreachStatus.WAITING,
+          OutreachStatus.INTERESTED,
+        ],
+      });
+      qb.andWhere('court.already_registered = false');
+      qb.andWhere('(court.place_kind IS NULL OR court.place_kind <> :closed)', {
+        closed: PlaceKind.CLOSED,
+      });
+    }
+    if (query.due) {
+      const today = formatInTimeZone(new Date(), BRAZIL_TZ, 'yyyy-MM-dd');
+      qb.andWhere(
+        '(court.next_action_on IS NULL OR court.next_action_on <= :today)',
+        { today },
+      );
+    }
+
+    if (query.sort === 'reviews') {
+      qb.orderBy('court.user_ratings_total', 'DESC', 'NULLS LAST')
+        .addOrderBy('court.rating', 'DESC', 'NULLS LAST')
+        .addOrderBy('court.name', 'ASC');
+    } else {
+      qb.orderBy('court.city', 'ASC').addOrderBy('court.name', 'ASC');
+    }
 
     const [rows, total] = await qb
-      .orderBy('court.city', 'ASC')
-      .addOrderBy('court.name', 'ASC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -192,6 +237,28 @@ export class GoogleCourtsService {
     }
     if (dto.competitor !== undefined) {
       court.competitor = dto.competitor;
+    }
+    if (dto.placeKind !== undefined) {
+      court.place_kind = dto.placeKind;
+    }
+    if (dto.nextActionOn !== undefined) {
+      court.next_action_on = dto.nextActionOn;
+    }
+    if (dto.rentsHourly !== undefined) {
+      court.rents_hourly = dto.rentsHourly;
+    }
+    if (dto.lostReason !== undefined) {
+      court.lost_reason = dto.lostReason;
+    }
+    if (court.outreach_status === OutreachStatus.LOST) {
+      if (!court.lost_reason) {
+        throw new BadRequestException('Informe o motivo de sem interesse.');
+      }
+      if (court.lost_reason === LostReason.NO_HOURLY) {
+        court.rents_hourly = false;
+      }
+    } else {
+      court.lost_reason = null;
     }
     if (dto.notes !== undefined) {
       court.notes = dto.notes.trim() || null;
@@ -634,6 +701,11 @@ export class GoogleCourtsService {
       userRatingsTotal: court.user_ratings_total,
       competitor: court.competitor,
       outreachStatus: court.outreach_status,
+      placeKind: court.place_kind ?? null,
+      nextActionOn: calendarDate(court.next_action_on),
+      lostReason: court.lost_reason ?? null,
+      rentsHourly:
+        court.rents_hourly === undefined ? null : court.rents_hourly,
       notes: court.notes,
       contactedAt: court.contacted_at,
       alreadyRegistered: court.already_registered,
@@ -641,6 +713,15 @@ export class GoogleCourtsService {
       lastCheckedAt: court.dt_last_check,
     };
   }
+}
+
+function calendarDate(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(value.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeLoose(value: string): string {

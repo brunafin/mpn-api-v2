@@ -1,7 +1,9 @@
 import { Exclude, Expose } from 'class-transformer';
 import { Column, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { CourtCompetitor } from '../enums/competitor.enum';
+import { LostReason } from '../enums/lost-reason.enum';
 import { OutreachStatus } from '../enums/outreach-status.enum';
+import { PlaceKind } from '../enums/place-kind.enum';
 
 @Entity({ schema: 'google_courts', name: 'google_court' })
 export class GoogleCourt {
@@ -76,6 +78,25 @@ export class GoogleCourt {
   @Column({ type: 'varchar', length: 32, default: OutreachStatus.NEW })
   @Expose()
   outreach_status: OutreachStatus;
+
+  /** Arena, sociedade, condomínio, escola ou fechou. */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  @Expose()
+  place_kind: PlaceKind | null;
+
+  /** Dia civil da próxima ação. Null entra na fila de hoje. */
+  @Column({ type: 'date', nullable: true })
+  @Expose()
+  next_action_on: string | null;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  @Expose()
+  lost_reason: LostReason | null;
+
+  /** Null ainda não foi classificado e continua na fila de abordagem. */
+  @Column({ type: 'boolean', nullable: true })
+  @Expose()
+  rents_hourly: boolean | null;
 
   @Column({ type: 'text', nullable: true })
   @Expose()

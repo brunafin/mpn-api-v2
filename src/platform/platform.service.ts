@@ -164,7 +164,7 @@ export class PlatformService {
       overdueClients,
     ] = await Promise.all([
       this.companiesRepository.find({
-        relations: { plan: true, courts: true },
+        relations: { plan: true, courts: true, administrator: true },
       }),
       this.peopleRepository
         .createQueryBuilder('person')

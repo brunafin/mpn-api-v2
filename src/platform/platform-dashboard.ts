@@ -21,6 +21,11 @@ export type DashboardCompanyInput = {
     price_per_court?: number | string | null;
   } | null;
   courts?: unknown[] | null;
+  phone?: string | null;
+  administrator?: {
+    name?: string | null;
+    phone?: string | null;
+  } | null;
 };
 
 export type DashboardTrialEndingSoon = {
@@ -28,6 +33,8 @@ export type DashboardTrialEndingSoon = {
   name: string;
   trialEndsAt: string;
   courtsCount: number;
+  ownerName: string | null;
+  phone: string | null;
 };
 
 export type DashboardCompanySummary = {
@@ -317,6 +324,11 @@ export function summarizeDashboardCompanies(
         name: company.name,
         trialEndsAt: trialEndsAt.toISOString(),
         courtsCount,
+        ownerName: company.administrator?.name?.trim() || null,
+        phone:
+          company.administrator?.phone?.trim() ||
+          company.phone?.trim() ||
+          null,
       });
     }
   }

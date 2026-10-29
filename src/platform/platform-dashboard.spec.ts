@@ -82,6 +82,8 @@ describe('platform-dashboard', () => {
         name: 'Teste',
         trialEndsAt: '2026-08-16T12:00:00.000Z',
         courtsCount: 1,
+        ownerName: null,
+        phone: null,
       },
     ]);
   });
