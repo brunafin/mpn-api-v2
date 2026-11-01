@@ -28,11 +28,50 @@ const RELEVANT_TYPES = new Set([
   'arena',
 ]);
 
+const BRAZILIAN_UFS = new Set([
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
+]);
+
+const LOWERCASE_CITY_PARTICLES = new Set(['da', 'das', 'de', 'do', 'dos', 'e']);
+
 export type PlacesSearchPlace = {
   id?: string;
   nationalPhoneNumber?: string;
   internationalPhoneNumber?: string;
   formattedAddress?: string;
+  addressComponents?: Array<{
+    longText?: string;
+    shortText?: string;
+    types?: string[];
+  }>;
+  city?: string | null;
+  uf?: string | null;
   websiteUri?: string;
   googleMapsUri?: string;
   rating?: number;
@@ -86,17 +125,39 @@ export function isRelevantPlace(place: PlacesSearchPlace): boolean {
   return types.some((type) => RELEVANT_TYPES.has(type));
 }
 
-export function parseCityUfFromAddress(
-  address: string | null | undefined,
-): { city: string | null; uf: string | null } {
+export function parseCityUfFromAddress(address: string | null | undefined): {
+  city: string | null;
+  uf: string | null;
+} {
   if (!address) return { city: null, uf: null };
-  const match = address.match(
-    /,\s*([^,]+?)\s*-\s*([A-Z]{2})(?:\s|,|$)/i,
+  const matches = address.matchAll(
+    /(?:^|,)\s*([^,]+?)\s*-\s*([A-Z]{2})(?=\s*(?:,|$))/gi,
   );
-  if (!match) return { city: null, uf: null };
+  for (const match of matches) {
+    const city = match[1].trim();
+    const uf = match[2].trim().toUpperCase();
+    if (!BRAZILIAN_UFS.has(uf) || !/[a-zá-ú]/i.test(city)) continue;
+    return { city, uf };
+  }
+  return { city: null, uf: null };
+}
+
+function parseCityUfFromComponents(
+  components: PlacesSearchPlace['addressComponents'],
+): { city: string | null; uf: string | null } {
+  if (!components) return { city: null, uf: null };
+  const getComponent = (type: string) =>
+    components.find((component) => component.types?.includes(type));
+  const city =
+    getComponent('locality')?.longText ||
+    getComponent('postal_town')?.longText ||
+    getComponent('administrative_area_level_2')?.longText ||
+    null;
+  const state = getComponent('administrative_area_level_1');
+  const uf = (state?.shortText || '').trim().toUpperCase();
   return {
-    city: match[1].trim(),
-    uf: match[2].trim().toUpperCase(),
+    city: city?.trim() || null,
+    uf: BRAZILIAN_UFS.has(uf) ? uf : null,
   };
 }
 
@@ -110,13 +171,30 @@ export function normalizeName(value: string | null | undefined): string {
     .trim();
 }
 
+export function formatCityName(
+  value: string | null | undefined,
+): string | null {
+  const city = value?.trim().toLocaleLowerCase('pt-BR');
+  if (!city) return null;
+  let wordIndex = 0;
+  return city.replace(/[^ \-'’]+/g, (word) => {
+    const formatted =
+      wordIndex > 0 && LOWERCASE_CITY_PARTICLES.has(word)
+        ? word
+        : word.charAt(0).toLocaleUpperCase('pt-BR') + word.slice(1);
+    wordIndex += 1;
+    return formatted;
+  });
+}
+
 /** Endereço de outra cidade ou outro estado que a busca pediu. */
 export function addressConflictsWithCity(
   address: string | null | undefined,
   city: string | null | undefined,
   uf: string | null | undefined,
+  addressComponents?: PlacesSearchPlace['addressComponents'],
 ): boolean {
-  const parsed = parseCityUfFromAddress(address);
+  const parsed = resolvePlaceCity(address, null, null, addressComponents);
   const wantedUf = (uf || '').trim().toUpperCase();
   if (parsed.uf && wantedUf && parsed.uf !== wantedUf) return true;
   if (
@@ -161,11 +239,15 @@ export function resolvePlaceCity(
   address: string | null | undefined,
   fallbackCity: string | null,
   fallbackUf: string | null,
+  addressComponents?: PlacesSearchPlace['addressComponents'],
 ): { city: string | null; uf: string | null } {
+  const fromComponents = parseCityUfFromComponents(addressComponents);
   const parsed = parseCityUfFromAddress(address);
-  const uf = (parsed.uf || fallbackUf || '').trim().toUpperCase();
+  const uf = (fromComponents.uf || parsed.uf || fallbackUf || '')
+    .trim()
+    .toUpperCase();
   return {
-    city: parsed.city || fallbackCity || null,
+    city: fromComponents.city || parsed.city || fallbackCity || null,
     uf: uf || null,
   };
 }
@@ -176,7 +258,12 @@ export function previewFromPlace(
   uf: string | null,
 ): PlacePreview | null {
   if (!place.id) return null;
-  const resolved = resolvePlaceCity(place.formattedAddress, city, uf);
+  const resolved = resolvePlaceCity(
+    place.formattedAddress,
+    city,
+    uf,
+    place.addressComponents,
+  );
   return {
     googlePlaceId: place.id,
     name: place.displayName?.text?.trim() || 'Sem nome',
@@ -200,6 +287,8 @@ export function previewToPlace(preview: PlacePreview): PlacesSearchPlace {
     displayName: { text: preview.name },
     nationalPhoneNumber: preview.phone || undefined,
     formattedAddress: preview.fullAddress || undefined,
+    city: preview.city,
+    uf: preview.uf,
     websiteUri: preview.website || undefined,
     googleMapsUri: preview.googleMapsUri || undefined,
     rating: preview.rating ?? undefined,

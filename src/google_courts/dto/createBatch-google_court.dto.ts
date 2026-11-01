@@ -1,4 +1,11 @@
-import { Allow, IsArray, IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
+import {
+  Allow,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+} from 'class-validator';
 
 export class CreateBatchGoogleCourtDto {
   @IsString()
@@ -16,6 +23,11 @@ export class CreateBatchGoogleCourtDto {
     id?: string;
     nationalPhoneNumber?: string;
     formattedAddress?: string;
+    addressComponents?: Array<{
+      longText?: string;
+      shortText?: string;
+      types?: string[];
+    }>;
     websiteUri?: string;
     googleMapsUri?: string;
     rating?: number;

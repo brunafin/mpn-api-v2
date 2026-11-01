@@ -1,5 +1,6 @@
 import {
   detectCompetitor,
+  formatCityName,
   isRelevantPlace,
   namesLookAlike,
   addressConflictsWithCity,
@@ -75,6 +76,10 @@ describe('google-court.helpers', () => {
         'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil',
       ),
     ).toEqual({ city: 'Joinville', uf: 'SC' });
+    expect(parseCityUfFromAddress('Rua A, 1031 - DE, Brasil')).toEqual({
+      city: null,
+      uf: null,
+    });
   });
 
   it('resolvePlaceCity não troca a cidade da busca pela rua de mesmo nome', () => {
@@ -92,17 +97,26 @@ describe('google-court.helpers', () => {
         'RS',
       ),
     ).toEqual({ city: 'Santo Antônio da Patrulha', uf: 'RS' });
+    expect(
+      resolvePlaceCity('Rua A, 1031 - DE, Brasil', 'Campinas', 'SP'),
+    ).toEqual({ city: 'Campinas', uf: 'SP' });
+    expect(
+      resolvePlaceCity('Endereço formatado', 'Campinas', 'SP', [
+        { longText: 'Joinville', types: ['locality'] },
+        {
+          longText: 'Santa Catarina',
+          shortText: 'SC',
+          types: ['administrative_area_level_1'],
+        },
+      ]),
+    ).toEqual({ city: 'Joinville', uf: 'SC' });
   });
 
   it('addressConflictsWithCity separa rua de outro estado da cidade buscada', () => {
     const joinville =
       'Rua Santo Antônio, 120 - Centro, Joinville - SC, 89201-000, Brasil';
     expect(
-      addressConflictsWithCity(
-        joinville,
-        'Santo Antônio da Patrulha',
-        'RS',
-      ),
+      addressConflictsWithCity(joinville, 'Santo Antônio da Patrulha', 'RS'),
     ).toBe(true);
     expect(
       addressConflictsWithCity(
@@ -111,14 +125,22 @@ describe('google-court.helpers', () => {
         'SP',
       ),
     ).toBe(false);
-    expect(
-      addressConflictsWithCity('Rua sem cidade', 'Campinas', 'SP'),
-    ).toBe(false);
+    expect(addressConflictsWithCity('Rua sem cidade', 'Campinas', 'SP')).toBe(
+      false,
+    );
   });
 
   it('namesLookAlike compara nomes ignorando acento', () => {
     expect(namesLookAlike('Arena São José', 'arena sao jose')).toBe(true);
     expect(namesLookAlike('Quadra A', 'Padaria B')).toBe(false);
+  });
+
+  it('formatCityName padroniza capitalização e mantém partículas minúsculas', () => {
+    expect(formatCityName('CACHOEIRINHA')).toBe('Cachoeirinha');
+    expect(formatCityName('SANTO ANTÔNIO DA PATRULHA')).toBe(
+      'Santo Antônio da Patrulha',
+    );
+    expect(formatCityName(null)).toBeNull();
   });
 
   it('previewFromPlace monta o cartão da busca sem persistir', () => {
@@ -142,6 +164,8 @@ describe('google-court.helpers', () => {
       uf: 'SP',
       competitor: CourtCompetitor.AGENDEI,
     });
-    expect(previewFromPlace({ displayName: { text: 'Sem id' } }, null, null)).toBeNull();
+    expect(
+      previewFromPlace({ displayName: { text: 'Sem id' } }, null, null),
+    ).toBeNull();
   });
 });

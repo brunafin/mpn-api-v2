@@ -8,6 +8,7 @@ const FIELD_MASK = [
   'places.nationalPhoneNumber',
   'places.internationalPhoneNumber',
   'places.formattedAddress',
+  'places.addressComponents',
   'places.websiteUri',
   'places.googleMapsUri',
   'places.location',

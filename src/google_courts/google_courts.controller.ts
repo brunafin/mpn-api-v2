@@ -54,7 +54,8 @@ export class GoogleCourtsController {
 
   @Post('sanitize')
   @ApiOperation({
-    summary: 'Ajusta a cidade gravada para a cidade que está no endereço',
+    summary:
+      'Ajusta cidade e UF do endereço e padroniza a cidade em minúsculas',
   })
   sanitize() {
     return this.googleCourtsService.sanitizeLocations();

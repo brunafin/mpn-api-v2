@@ -34,6 +34,15 @@ export class ImportGoogleCourtPlaceDto {
 
   @IsOptional()
   @IsString()
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  uf?: string | null;
+
+  @IsOptional()
+  @IsString()
   website?: string | null;
 
   @IsOptional()

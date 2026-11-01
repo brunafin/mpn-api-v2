@@ -79,7 +79,9 @@ describe('GoogleCourtsService', () => {
     expect(result.alreadyInPortfolio).toBe(1);
     expect(courtRepo.save).not.toHaveBeenCalled();
     const old = result.items.find((item) => item.googlePlaceId === 'place-old');
-    const fresh = result.items.find((item) => item.googlePlaceId === 'place-new');
+    const fresh = result.items.find(
+      (item) => item.googlePlaceId === 'place-new',
+    );
     expect(old).toMatchObject({
       inPortfolio: true,
       outreachStatus: OutreachStatus.CONTACTED,
@@ -118,6 +120,37 @@ describe('GoogleCourtsService', () => {
     expect(result.items[0].googlePlaceId).toBe('place-ok');
   });
 
+  it('searchCity usa os componentes estruturados de cidade e UF do Places', async () => {
+    placesClient.searchAllPages.mockResolvedValue([
+      {
+        id: 'place-components',
+        displayName: { text: 'Society Joinville' },
+        formattedAddress: 'Rua A, 1031 - DE, Brasil',
+        addressComponents: [
+          { longText: 'JOINVILLE', types: ['locality'] },
+          {
+            longText: 'Santa Catarina',
+            shortText: 'SC',
+            types: ['administrative_area_level_1'],
+          },
+        ],
+      },
+    ]);
+    courtRepo.find.mockResolvedValue([]);
+    companyRepo.find.mockResolvedValue([]);
+
+    const result = await service.searchCity({
+      city: 'JOINVILLE',
+      uf: 'SC',
+    });
+
+    expect(result.city).toBe('Joinville');
+    expect(result.items[0]).toMatchObject({
+      city: 'Joinville',
+      uf: 'SC',
+    });
+  });
+
   it('sanitizeLocations grava a cidade que está no endereço', async () => {
     const row = {
       city: 'Santo Antônio da Patrulha',
@@ -131,8 +164,25 @@ describe('GoogleCourtsService', () => {
     const result = await service.sanitizeLocations();
 
     expect(result).toEqual({ checked: 1, updated: 1 });
-    expect(row.city).toBe('Joinville');
+    expect(row.city).toBe('joinville');
     expect(row.uf).toBe('SC');
+  });
+
+  it('sanitizeLocations agrupa variações de maiúsculas e minúsculas', async () => {
+    const rows = [
+      { city: 'CACHOEIRINHA', uf: 'RS', full_address: null },
+      { city: 'Cachoeirinha', uf: 'RS', full_address: 'Endereço sem cidade' },
+    ];
+    courtRepo.find.mockResolvedValue(rows);
+    courtRepo.save.mockImplementation(async (value: GoogleCourt[]) => value);
+
+    const result = await service.sanitizeLocations();
+
+    expect(result).toEqual({ checked: 2, updated: 2 });
+    expect(rows.map((row) => row.city)).toEqual([
+      'cachoeirinha',
+      'cachoeirinha',
+    ]);
   });
 
   it('importPlaces puxa só as quadras escolhidas', async () => {
@@ -159,6 +209,7 @@ describe('GoogleCourtsService', () => {
     expect(result.items[0].city).toBe('Campinas');
     expect(result.items[0].uf).toBe('SP');
     expect(courtRepo.save).toHaveBeenCalled();
+    expect(courtRepo.save.mock.calls[0][0][0].city).toBe('campinas');
   });
 
   it('importPlaces grava a cidade do endereço, não a da busca', async () => {
@@ -183,6 +234,33 @@ describe('GoogleCourtsService', () => {
       city: 'Joinville',
       uf: 'SC',
     });
+    expect(courtRepo.save.mock.calls[0][0][0].city).toBe('joinville');
+  });
+
+  it('importPlaces mantém cidade e UF retornadas por Places mesmo sem endereço parseável', async () => {
+    courtRepo.find.mockResolvedValue([]);
+    courtRepo.save.mockImplementation(async (rows: GoogleCourt[]) => rows);
+    companyRepo.find.mockResolvedValue([]);
+
+    const result = await service.importPlaces({
+      city: 'Campinas',
+      uf: 'SP',
+      places: [
+        {
+          googlePlaceId: 'place-components',
+          name: 'Society Joinville',
+          fullAddress: 'Rua A, 1031 - DE, Brasil',
+          city: 'JOINVILLE',
+          uf: 'SC',
+        },
+      ],
+    });
+
+    expect(result.items[0]).toMatchObject({
+      city: 'Joinville',
+      uf: 'SC',
+    });
+    expect(courtRepo.save.mock.calls[0][0][0].city).toBe('joinville');
   });
 
   it('updateOutreach marca contato sem rebaixar interessado', async () => {

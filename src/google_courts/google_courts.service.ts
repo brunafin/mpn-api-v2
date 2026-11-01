@@ -22,9 +22,9 @@ import { OutreachStatus } from './enums/outreach-status.enum';
 import { PlaceKind } from './enums/place-kind.enum';
 import {
   detectCompetitor,
+  formatCityName,
   isRelevantPlace,
   namesLookAlike,
-  normalizeName,
   addressConflictsWithCity,
   parseCityUfFromAddress,
   phoneDigits,
@@ -112,7 +112,9 @@ export class GoogleCourtsService {
     private readonly googlePlacesClient: GooglePlacesClient,
   ) {}
 
-  async list(query: ListGoogleCourtsQueryDto): Promise<GoogleCourtListResponse> {
+  async list(
+    query: ListGoogleCourtsQueryDto,
+  ): Promise<GoogleCourtListResponse> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const qb = this.googleCourtRepository.createQueryBuilder('court');
@@ -128,7 +130,9 @@ export class GoogleCourtsService {
       qb.andWhere('court.city ILIKE :city', { city: query.city.trim() });
     }
     if (query.uf?.trim()) {
-      qb.andWhere('TRIM(court.uf) = :uf', { uf: query.uf.trim().toUpperCase() });
+      qb.andWhere('TRIM(court.uf) = :uf', {
+        uf: query.uf.trim().toUpperCase(),
+      });
     }
     if (query.status) {
       qb.andWhere('court.outreach_status = :status', { status: query.status });
@@ -206,7 +210,9 @@ export class GoogleCourtsService {
     return this.mapCourt(court);
   }
 
-  async listCities(): Promise<Array<{ city: string; uf: string | null; count: number }>> {
+  async listCities(): Promise<
+    Array<{ city: string; uf: string | null; count: number }>
+  > {
     const rows = await this.googleCourtRepository
       .createQueryBuilder('court')
       .select('court.city', 'city')
@@ -220,7 +226,7 @@ export class GoogleCourtsService {
       .getRawMany<{ city: string; uf: string | null; count: string }>();
 
     return rows.map((row) => ({
-      city: row.city,
+      city: formatCityName(row.city) || '',
       uf: row.uf,
       count: Number(row.count),
     }));
@@ -264,7 +270,7 @@ export class GoogleCourtsService {
       court.notes = dto.notes.trim() || null;
     }
     if (dto.city !== undefined) {
-      court.city = dto.city.trim() || null;
+      court.city = dto.city.trim().toLocaleLowerCase('pt-BR') || null;
     }
     if (dto.uf !== undefined) {
       const uf = dto.uf.trim().toUpperCase();
@@ -284,7 +290,9 @@ export class GoogleCourtsService {
     return this.mapCourt(saved);
   }
 
-  async searchCity(dto: SearchGoogleCourtsDto): Promise<GoogleCourtSearchResponse> {
+  async searchCity(
+    dto: SearchGoogleCourtsDto,
+  ): Promise<GoogleCourtSearchResponse> {
     const city = dto.city.trim();
     const uf = dto.uf.trim().toUpperCase();
     const maxPages = dto.maxPages ?? 2;
@@ -321,7 +329,14 @@ export class GoogleCourtsService {
     let outsideCity = 0;
     const previews: PlacePreview[] = [];
     for (const place of placesById.values()) {
-      if (addressConflictsWithCity(place.formattedAddress, city, uf)) {
+      if (
+        addressConflictsWithCity(
+          place.formattedAddress,
+          city,
+          uf,
+          place.addressComponents,
+        )
+      ) {
         outsideCity += 1;
         continue;
       }
@@ -329,9 +344,12 @@ export class GoogleCourtsService {
       if (preview) previews.push(preview);
     }
 
-    const items = await this.annotateSearchHits(previews);
+    const items = (await this.annotateSearchHits(previews)).map((item) => ({
+      ...item,
+      city: formatCityName(item.city),
+    }));
     return {
-      city,
+      city: formatCityName(city) || city,
       uf,
       found: items.length,
       skipped,
@@ -342,8 +360,7 @@ export class GoogleCourtsService {
   }
 
   /**
-   * A cidade gravada passa a ser a do endereço, quando ele diz outra.
-   * Quadra puxada para a cidade da busca, mas com endereço de fora, sai dessa lista.
+   * Usa cidade e UF do endereço quando disponíveis e padroniza a cidade em minúsculas.
    */
   async sanitizeLocations(): Promise<{ checked: number; updated: number }> {
     const rows = await this.googleCourtRepository.find();
@@ -351,15 +368,15 @@ export class GoogleCourtsService {
 
     for (const row of rows) {
       const parsed = parseCityUfFromAddress(row.full_address);
-      if (!parsed.city && !parsed.uf) continue;
-      const storedUf = (row.uf || '').trim().toUpperCase();
-      const cityDiff =
-        Boolean(parsed.city) &&
-        normalizeName(parsed.city) !== normalizeName(row.city);
-      const ufDiff = Boolean(parsed.uf) && parsed.uf !== storedUf;
-      if (!cityDiff && !ufDiff) continue;
-      if (parsed.city) row.city = parsed.city;
-      if (parsed.uf) row.uf = parsed.uf;
+      const city = (parsed.city || row.city || '')
+        .trim()
+        .toLocaleLowerCase('pt-BR');
+      const uf = (parsed.uf || row.uf || '').trim().toUpperCase();
+      const nextCity = city || null;
+      const nextUf = uf || null;
+      if (nextCity === row.city && nextUf === row.uf) continue;
+      row.city = nextCity;
+      row.uf = nextUf;
       changed.push(row);
     }
 
@@ -384,8 +401,8 @@ export class GoogleCourtsService {
         name: place.name,
         phone: place.phone ?? null,
         fullAddress: place.fullAddress ?? null,
-        city,
-        uf,
+        city: place.city ?? city,
+        uf: place.uf ?? uf,
         website: place.website ?? null,
         googleMapsUri: place.googleMapsUri ?? null,
         rating: place.rating ?? null,
@@ -404,7 +421,7 @@ export class GoogleCourtsService {
     await this.refreshMatches(rows);
 
     return {
-      city,
+      city: formatCityName(city) || city,
       uf,
       imported,
       updated,
@@ -477,8 +494,9 @@ export class GoogleCourtsService {
       if (!place.id) continue;
       const resolved = resolvePlaceCity(
         place.formattedAddress,
-        city,
-        uf,
+        place.city ?? city,
+        place.uf ?? uf,
+        place.addressComponents,
       );
       const website = place.websiteUri || null;
       const detected = detectCompetitor(website);
@@ -490,7 +508,11 @@ export class GoogleCourtsService {
       row.phone = phoneDigits(place.nationalPhoneNumber) || row.phone || null;
       row.full_address = place.formattedAddress || row.full_address || null;
       if (!current || !row.city) {
-        row.city = resolved.city || row.city || null;
+        row.city =
+          resolved.city?.trim().toLocaleLowerCase('pt-BR') || row.city || null;
+      }
+      if (row.city) {
+        row.city = row.city.trim().toLocaleLowerCase('pt-BR') || null;
       }
       if (!current || !row.uf) {
         row.uf = resolved.uf || row.uf || null;
@@ -655,7 +677,9 @@ export class GoogleCourtsService {
       qb.andWhere('court.city ILIKE :city', { city: filters.city.trim() });
     }
     if (filters.uf?.trim()) {
-      qb.andWhere('TRIM(court.uf) = :uf', { uf: filters.uf.trim().toUpperCase() });
+      qb.andWhere('TRIM(court.uf) = :uf', {
+        uf: filters.uf.trim().toUpperCase(),
+      });
     }
     if (filters.competitor) {
       qb.andWhere('court.competitor = :competitor', {
@@ -693,7 +717,7 @@ export class GoogleCourtsService {
       name: court.name,
       phone: court.phone,
       fullAddress: court.full_address,
-      city: court.city,
+      city: formatCityName(court.city),
       uf: court.uf,
       website: court.website,
       googleMapsUri: court.google_maps_uri,
@@ -704,8 +728,7 @@ export class GoogleCourtsService {
       placeKind: court.place_kind ?? null,
       nextActionOn: calendarDate(court.next_action_on),
       lostReason: court.lost_reason ?? null,
-      rentsHourly:
-        court.rents_hourly === undefined ? null : court.rents_hourly,
+      rentsHourly: court.rents_hourly === undefined ? null : court.rents_hourly,
       notes: court.notes,
       contactedAt: court.contacted_at,
       alreadyRegistered: court.already_registered,
