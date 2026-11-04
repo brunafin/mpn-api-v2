@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -23,6 +24,7 @@ describe('AuthService', () => {
   let emailService: Record<string, jest.Mock>;
   let jwtService: Record<string, jest.Mock>;
   let verificationRepo: Record<string, jest.Mock>;
+  let verificationCooldownQuery: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     process.env.DEFAULT_PASSWORD = 'bemvindo';
@@ -52,11 +54,20 @@ describe('AuthService', () => {
       sendPasswordResetCodeEmail: jest.fn(),
     };
     jwtService = { sign: jest.fn().mockReturnValue('jwt-token') };
+    verificationCooldownQuery = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      setParameters: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue(null),
+    };
     verificationRepo = {
       update: jest.fn(),
       save: jest.fn((v) => Promise.resolve(v)),
       create: jest.fn((v) => v),
       findOne: jest.fn(),
+      createQueryBuilder: jest.fn(() => verificationCooldownQuery),
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -312,15 +323,28 @@ describe('AuthService', () => {
       expect(emailService.sendVerificationCodeEmail).toHaveBeenCalled();
     });
 
-    it('aplica rate-limit quando o último código é recente', async () => {
+    it('aplica rate-limit de dois minutos para reenviar código de confirmação', async () => {
       peopleService.findByEmail.mockResolvedValue({
         id: 7,
         status: false,
       } as never);
-      verificationRepo.findOne.mockResolvedValue({
-        created_at: new Date(),
+      verificationCooldownQuery.getRawOne.mockResolvedValue({
+        retryAfterSeconds: 120,
       });
-      await expect(service.resendCode('a@b.com')).rejects.toThrow(/Aguarde/i);
+      try {
+        await service.resendCode('a@b.com');
+        fail('Esperava bloqueio de reenvio.');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(429);
+        expect((error as HttpException).getResponse()).toEqual({
+          message: 'Aguarde 120s para reenviar o código.',
+          retryAfterSeconds: 120,
+        });
+      }
+      expect(verificationCooldownQuery.setParameters).toHaveBeenCalledWith({
+        cooldownSeconds: 120,
+      });
       expect(emailService.sendVerificationCodeEmail).not.toHaveBeenCalled();
     });
   });
@@ -746,10 +770,13 @@ describe('AuthService', () => {
         status: true,
         password: 'hashed',
       } as never);
-      verificationRepo.findOne.mockResolvedValue({
-        created_at: new Date(),
+      verificationCooldownQuery.getRawOne.mockResolvedValue({
+        retryAfterSeconds: 30,
       });
       await expect(service.forgotPassword('a@b.com')).rejects.toThrow(/Aguarde/i);
+      expect(verificationCooldownQuery.setParameters).toHaveBeenCalledWith({
+        cooldownSeconds: 30,
+      });
       expect(emailService.sendPasswordResetCodeEmail).not.toHaveBeenCalled();
     });
   });

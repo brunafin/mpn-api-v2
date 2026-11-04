@@ -35,7 +35,8 @@ import {
 
 const CODE_TTL_MINUTES = 15;
 const MAX_VERIFICATION_ATTEMPTS = 5;
-const RESEND_COOLDOWN_SECONDS = 30;
+const EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS = 120;
+const PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = 30;
 
 const FORGOT_PASSWORD_GENERIC_MESSAGE =
   'Se houver uma conta ativa com este e-mail, enviamos um código para redefinir a senha.';
@@ -363,17 +364,31 @@ export class AuthService {
     personId: number,
     purpose: EmailVerificationPurpose,
   ): Promise<void> {
-    const last = await this.emailVerificationRepository.findOne({
-      where: { person_id: personId, purpose },
-      order: { created_at: 'DESC' },
-    });
+    const cooldownSeconds =
+      purpose === EmailVerificationPurpose.EMAIL_VERIFICATION
+        ? EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS
+        : PASSWORD_RESET_RESEND_COOLDOWN_SECONDS;
+    const last = await this.emailVerificationRepository
+      .createQueryBuilder('verification')
+      .select(
+        `CEIL(EXTRACT(EPOCH FROM ((verification.created_at AT TIME ZONE CURRENT_SETTING('TIMEZONE')) + make_interval(secs => :cooldownSeconds) - CURRENT_TIMESTAMP)))`,
+        'retryAfterSeconds',
+      )
+      .where('verification.person_id = :personId', { personId })
+      .andWhere('verification.purpose = :purpose', { purpose })
+      .orderBy('verification.created_at', 'DESC')
+      .setParameters({ cooldownSeconds })
+      .getRawOne<{ retryAfterSeconds: string | number }>();
     if (!last) return;
 
-    const elapsedMs = Date.now() - new Date(last.created_at).getTime();
-    const remainingMs = RESEND_COOLDOWN_SECONDS * 1000 - elapsedMs;
-    if (remainingMs > 0) {
+    const remainingSeconds = Number(last.retryAfterSeconds);
+    if (remainingSeconds > 0) {
+      const retryAfterSeconds = Math.min(cooldownSeconds, remainingSeconds);
       throw new HttpException(
-        `Aguarde ${Math.ceil(remainingMs / 1000)}s para reenviar o código.`,
+        {
+          message: `Aguarde ${retryAfterSeconds}s para reenviar o código.`,
+          retryAfterSeconds,
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
